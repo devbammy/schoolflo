@@ -17,7 +17,6 @@ export default function TeacherDashboard() {
         setData(r.data.data);
       })
       .catch((e) => {
-        console.log(e);
         toast.error('Failed to load dashboard');
       })
       .finally(() => setLoading(false));

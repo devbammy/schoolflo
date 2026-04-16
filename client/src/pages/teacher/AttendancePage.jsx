@@ -1,5 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, Clock, Save, AlertCircle } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Save,
+  AlertCircle,
+  Users,
+} from 'lucide-react';
 import {
   attendanceService,
   classService,
@@ -23,70 +30,132 @@ const STATUS_ICONS = {
   Excused: AlertCircle,
 };
 
+/**
+ * Safely extract an array from the two shapes the API can return:
+ *  - sendSuccess  → { data: { [key]: [...] } }
+ *  - sendPaginated → { data: [...] }
+ */
+function extractArray(response, key) {
+  const data = response?.data?.data;
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data[key])) return data[key];
+  return [];
+}
+
 export default function AttendancePage() {
   const { user } = useAuthStore();
+
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [students, setStudents] = useState([]);
   const [records, setRecords] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [loadingStudents, setLoadingStudents] = useState(false);
   const [saving, setSaving] = useState(false);
   const [term] = useState('First Term');
   const [academicYear] = useState('2024/2025');
 
+  // ── 1. Load classes once on mount ─────────────────────────────────────
   useEffect(() => {
-    // If teacher has a class assigned, preselect it
-    const myClass = user?.teacherProfile?.classTeacherOf;
-    classService.getAll().then((r) => {
-      setClasses(r.data.data.classes || []);
-      if (myClass)
-        setSelectedClass(typeof myClass === 'object' ? myClass._id : myClass);
-    });
-  }, []);
+    setLoadingClasses(true);
+    classService
+      .getAll()
+      .then((r) => {
+        const list = extractArray(r, 'classes');
+        setClasses(list);
 
+        // Auto-select the teacher's own class if it is set
+        const myClass = user?.teacherProfile?.classTeacherOf;
+        if (myClass) {
+          const id = typeof myClass === 'object' ? myClass._id : myClass;
+          setSelectedClass(id);
+        }
+      })
+      .catch(() => toast.error('Failed to load classes'))
+      .finally(() => setLoadingClasses(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 2. Load students + existing records when class or date changes ─────
   useEffect(() => {
     if (!selectedClass) {
       setStudents([]);
       setRecords({});
       return;
     }
-    setLoading(true);
+
+    setLoadingStudents(true);
+    setStudents([]);
+    setRecords({});
+
     Promise.all([
       userService.getByClass(selectedClass),
       attendanceService.getClassAttendance(selectedClass, { date }),
     ])
       .then(([studRes, attRes]) => {
-        const studs = studRes.data.data.students || [];
-        setStudents(studs);
-        const existingRecords = {};
-        (attRes.data.data?.records || []).forEach((r) => {
-          existingRecords[r.student._id] = r.status;
+        // ── Extract students ─────────────────────────────────────────
+        // Backend returns { data: { students: [...] } } via sendSuccess
+        const studs = extractArray(studRes, 'students');
+
+        // ── Extract any existing attendance for this date ────────────
+        // Backend returns { data: { records: [...] } } via sendSuccess
+        const existing = {};
+        extractArray(attRes, 'records').forEach((r) => {
+          const sid = r.student?._id || r.student;
+          if (sid) existing[sid] = r.status;
         });
-        // Default everyone to Present if no records yet
+
+        // Build record map: use saved status or default to Present
         const defaultRecords = {};
         studs.forEach((s) => {
-          defaultRecords[s._id] = existingRecords[s._id] || 'Present';
+          defaultRecords[s._id] = existing[s._id] || 'Present';
         });
+
+        setStudents(studs);
         setRecords(defaultRecords);
+
+        if (studs.length === 0) {
+          toast(
+            'No students found in this class. Make sure students have this class assigned in their profile.',
+            {
+              icon: 'ℹ️',
+              duration: 5000,
+            },
+          );
+        }
       })
-      .catch(() => toast.error('Failed to load students'))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        toast.error(err.response?.data?.message || 'Failed to load students');
+        setStudents([]);
+        setRecords({});
+      })
+      .finally(() => setLoadingStudents(false));
   }, [selectedClass, date]);
 
-  const setAllStatus = (status) => {
-    const updated = {};
-    students.forEach((s) => {
-      updated[s._id] = status;
-    });
-    setRecords(updated);
-  };
+  // ── 3. Bulk-set all students to one status ────────────────────────────
+  const setAllStatus = useCallback(
+    (status) => {
+      setRecords(() => {
+        const updated = {};
+        students.forEach((s) => {
+          updated[s._id] = status;
+        });
+        return updated;
+      });
+    },
+    [students],
+  );
 
+  // ── 4. Save attendance ─────────────────────────────────────────────────
   const handleSave = async () => {
     if (!selectedClass) return toast.error('Select a class first');
+    if (!students.length)
+      return toast.error('No students to save attendance for');
+
     setSaving(true);
     try {
-      const payload = {
+      await attendanceService.mark({
         classId: selectedClass,
         date,
         term,
@@ -95,9 +164,10 @@ export default function AttendancePage() {
           student: s._id,
           status: records[s._id] || 'Present',
         })),
-      };
-      await attendanceService.mark(payload);
-      toast.success(`Attendance saved for ${students.length} students`);
+      });
+      toast.success(
+        `Attendance saved for ${students.length} student${students.length !== 1 ? 's' : ''}`,
+      );
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save attendance');
     } finally {
@@ -105,11 +175,18 @@ export default function AttendancePage() {
     }
   };
 
-  const summary = STATUSES.reduce((acc, s) => {
-    acc[s] = Object.values(records).filter((v) => v === s).length;
-    return acc;
-  }, {});
+  // ── Derived ────────────────────────────────────────────────────────────
+  const summary = STATUSES.reduce(
+    (acc, s) => ({
+      ...acc,
+      [s]: Object.values(records).filter((v) => v === s).length,
+    }),
+    {},
+  );
+  const selectedClassName =
+    classes.find((c) => c._id === selectedClass)?.name || '';
 
+  // ─────────────────────────────────────────────────────────────────────
   return (
     <>
       <div className="page-header">
@@ -124,11 +201,12 @@ export default function AttendancePage() {
           onClick={handleSave}
           disabled={saving || !students.length}
         >
-          <Save size={16} /> {saving ? 'Saving...' : 'Save Attendance'}
+          <Save size={16} />
+          {saving ? 'Saving...' : 'Save Attendance'}
         </button>
       </div>
 
-      {/* Controls */}
+      {/* ── Controls ──────────────────────────────────────────────────── */}
       <div className="card" style={{ marginBottom: 24 }}>
         <div
           className="card__body"
@@ -141,19 +219,41 @@ export default function AttendancePage() {
         >
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label>Select Class</label>
-            <select
-              className="form-control"
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-            >
-              <option value="">Choose class...</option>
-              {classes.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            {loadingClasses ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  height: 42,
+                }}
+              >
+                <div
+                  className="spinner"
+                  style={{ width: 18, height: 18, borderWidth: 2 }}
+                />
+                <span
+                  style={{ fontSize: '0.875rem', color: 'var(--clr-text-3)' }}
+                >
+                  Loading classes...
+                </span>
+              </div>
+            ) : (
+              <select
+                className="form-control"
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+              >
+                <option value="">Choose class...</option>
+                {classes.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
+
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label>Date</label>
             <input
@@ -164,21 +264,27 @@ export default function AttendancePage() {
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
+
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['Present', 'Absent'].map((s) => (
-              <button
-                key={s}
-                className="btn btn--secondary btn--sm"
-                onClick={() => setAllStatus(s)}
-              >
-                All {s}
-              </button>
-            ))}
+            <button
+              className="btn btn--secondary btn--sm"
+              onClick={() => setAllStatus('Present')}
+              disabled={!students.length}
+            >
+              All Present
+            </button>
+            <button
+              className="btn btn--secondary btn--sm"
+              onClick={() => setAllStatus('Absent')}
+              disabled={!students.length}
+            >
+              All Absent
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Summary Bar */}
+      {/* ── Summary bar ───────────────────────────────────────────────── */}
       {students.length > 0 && (
         <div
           style={{
@@ -186,6 +292,7 @@ export default function AttendancePage() {
             gap: 12,
             marginBottom: 24,
             flexWrap: 'wrap',
+            alignItems: 'center',
           }}
         >
           {STATUSES.map((s) => (
@@ -229,29 +336,65 @@ export default function AttendancePage() {
               </span>
             </div>
           ))}
+          <span
+            style={{
+              marginLeft: 'auto',
+              fontSize: '0.875rem',
+              color: 'var(--clr-text-3)',
+            }}
+          >
+            {selectedClassName && `${selectedClassName} · `}
+            {format(new Date(`${date}T12:00:00`), 'EEEE, dd MMMM yyyy')}
+          </span>
         </div>
       )}
 
-      {/* Student List */}
+      {/* ── Student list ──────────────────────────────────────────────── */}
       <div className="card">
-        {loading ? (
+        {/* Loading */}
+        {loadingStudents ? (
           <div
-            style={{ display: 'flex', justifyContent: 'center', padding: 60 }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 64,
+              gap: 16,
+            }}
           >
             <div className="spinner" />
+            <span style={{ fontSize: '0.9375rem', color: 'var(--clr-text-3)' }}>
+              Loading students...
+            </span>
           </div>
-        ) : students.length === 0 ? (
-          <div className="empty-state">
-            <p className="empty-state__title">No Students</p>
+        ) : /* No class selected */
+        !selectedClass ? (
+          <div className="empty-state" style={{ padding: '56px 24px' }}>
+            <Users size={44} className="empty-state__icon" />
+            <p className="empty-state__title">No Class Selected</p>
             <p className="empty-state__text">
-              Select a class to start marking attendance
+              Select a class above to load its students
+            </p>
+          </div>
+        ) : /* Class selected but no students returned */
+        students.length === 0 ? (
+          <div className="empty-state" style={{ padding: '56px 24px' }}>
+            <Users size={44} className="empty-state__icon" />
+            <p className="empty-state__title">No Students Found</p>
+            <p className="empty-state__text">
+              No students are assigned to <strong>{selectedClassName}</strong>{' '}
+              yet. Open <strong>Students</strong> and make sure each student has
+              this class set in their profile.
             </p>
           </div>
         ) : (
-          <div style={{ padding: '0 4px' }}>
+          /* Students loaded */
+          <div>
             {students.map((student, idx) => {
               const status = records[student._id] || 'Present';
-              const initials = `${student.firstName[0]}${student.lastName[0]}`;
+              const initials = `${student.firstName?.[0] || '?'}${student.lastName?.[0] || ''}`;
+
               return (
                 <div
                   key={student._id}
@@ -259,15 +402,16 @@ export default function AttendancePage() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 16,
-                    padding: '14px 20px',
+                    padding: '12px 20px',
                     borderBottom:
                       idx < students.length - 1
                         ? '1px solid var(--clr-border)'
                         : 'none',
+                    background: status === 'Absent' ? '#fff8f8' : 'transparent',
                     transition: 'background 0.15s',
                   }}
                 >
-                  {/* Rank */}
+                  {/* Row number */}
                   <span
                     style={{
                       width: 24,
@@ -312,9 +456,17 @@ export default function AttendancePage() {
                     )}
                   </div>
 
-                  {/* Name */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.9375rem' }}>
+                  {/* Name + admission */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '0.9375rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
                       {student.firstName} {student.lastName}
                     </div>
                     <div
@@ -328,8 +480,15 @@ export default function AttendancePage() {
                     </div>
                   </div>
 
-                  {/* Status Buttons */}
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {/* Status buttons */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 6,
+                      flexWrap: 'wrap',
+                      flexShrink: 0,
+                    }}
+                  >
                     {STATUSES.map((s) => {
                       const Icon = STATUS_ICONS[s];
                       const active = status === s;
@@ -368,6 +527,43 @@ export default function AttendancePage() {
                 </div>
               );
             })}
+
+            {/* Footer */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 20px',
+                borderTop: '2px solid var(--clr-border)',
+                background: 'var(--clr-bg)',
+              }}
+            >
+              <span
+                style={{ fontSize: '0.875rem', color: 'var(--clr-text-3)' }}
+              >
+                {students.length} student{students.length !== 1 ? 's' : ''}
+                {' · '}
+                <span style={{ color: STATUS_COLORS.Present, fontWeight: 600 }}>
+                  {summary.Present} present
+                </span>
+                {summary.Absent > 0 && (
+                  <span
+                    style={{ color: STATUS_COLORS.Absent, fontWeight: 600 }}
+                  >
+                    , {summary.Absent} absent
+                  </span>
+                )}
+              </span>
+              <button
+                className="btn btn--primary btn--sm"
+                onClick={handleSave}
+                disabled={saving}
+              >
+                <Save size={14} />
+                {saving ? 'Saving...' : 'Save Attendance'}
+              </button>
+            </div>
           </div>
         )}
       </div>

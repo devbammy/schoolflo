@@ -9,9 +9,62 @@ const {
 // @desc    Register user (Admin only in prod)
 // @route   POST /api/v1/auth/register
 // @access  Private (Admin)
+// const register = async (req, res) => {
+//   try {
+//     const { firstName, lastName, email, password, role, phone } = req.body;
+
+//     const existingUser = await User.findOne({ email });
+//     if (existingUser) return sendError(res, 400, 'Email already registered');
+
+//     const user = await User.create({
+//       firstName,
+//       lastName,
+//       email,
+//       password,
+//       role,
+//       phone,
+//       studentProfile: role === 'Student' ? {} : undefined,
+//     });
+
+//     console.log(user.studentProfile);
+
+//     // Send welcome email
+//     await sendEmail({
+//       to: email,
+//       subject: 'Welcome to School Management Portal',
+//       html: emailTemplates.welcome({
+//         firstName,
+//         email,
+//         password,
+//         role,
+//         loginUrl: `${process.env.CLIENT_URL}/login`,
+//       }),
+//     });
+
+//     const accessToken = user.generateAccessToken();
+//     const refreshToken = user.generateRefreshToken();
+
+//     user.password = undefined;
+//     return sendSuccess(res, 201, 'User registered successfully', {
+//       user,
+//       accessToken,
+//       refreshToken,
+//     });
+//   } catch (error) {
+//     return sendError(res, 500, error.message);
+//   }
+// };
 const register = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, role, phone } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      role,
+      phone,
+      classId, // ✅ ADD THIS
+    } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) return sendError(res, 400, 'Email already registered');
@@ -23,12 +76,19 @@ const register = async (req, res) => {
       password,
       role,
       phone,
-      studentProfile: role === 'student' ? {} : undefined,
+
+      // ✅ FIXED ROLE CHECK (IMPORTANT)
+      studentProfile:
+        role === 'Student'
+          ? {
+              class: classId || null, // ✅ THIS FIXES YOUR ATTENDANCE BUG
+              profileStatus: 'Active',
+            }
+          : undefined,
     });
 
     console.log(user.studentProfile);
 
-    // Send welcome email
     await sendEmail({
       to: email,
       subject: 'Welcome to School Management Portal',
@@ -45,6 +105,7 @@ const register = async (req, res) => {
     const refreshToken = user.generateRefreshToken();
 
     user.password = undefined;
+
     return sendSuccess(res, 201, 'User registered successfully', {
       user,
       accessToken,
