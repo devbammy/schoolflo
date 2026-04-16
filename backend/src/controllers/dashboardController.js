@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const { Result } = require('../models/Exam');
 const Attendance = require('../models/Attendance');
@@ -134,18 +135,112 @@ const getAdminDashboard = async (req, res) => {
 // @desc    Teacher dashboard
 // @route   GET /api/v1/dashboard/teacher
 // @access  Teacher
+// const getTeacherDashboard = async (req, res) => {
+//   try {
+//     const teacherId = req.user._id;
+//     const { term, academicYear } = req.query;
+
+//     const teacher = await User.findById(teacherId)
+//       .populate('teacherProfile.classTeacherOf', 'name sections')
+//       .populate('teacherProfile.subjectsTaught', 'name code');
+
+//     const myClass = teacher.teacherProfile?.classTeacherOf;
+//     const mySubjects = teacher.teacherProfile?.subjectsTaught || [];
+
+//     const [assignments, pendingGrades, announcements] = await Promise.all([
+//       Assignment.find({ teacher: teacherId, isActive: true })
+//         .populate('class', 'name')
+//         .populate('subject', 'name')
+//         .sort({ dueDate: 1 })
+//         .limit(10),
+
+//       Submission.countDocuments({
+//         status: 'Submitted',
+//         assignment: {
+//           $in: await Assignment.find({ teacher: teacherId }).distinct('_id'),
+//         },
+//       }),
+
+//       Announcement.find({
+//         isPublished: true,
+//         targetAudience: { $in: ['All', 'Teacher'] },
+//       })
+//         .sort({ publishedAt: -1 })
+//         .limit(5),
+//     ]);
+
+//     // Today's attendance for my class
+//    let todayAttendance = null;
+
+//    if (myClass) {
+//      const today = new Date();
+//      today.setHours(0, 0, 0, 0);
+
+//      const counts = await Attendance.aggregate([
+//        {
+//          $match: {
+//            class: myClass._id,
+//            date: { $gte: today },
+//          },
+//        },
+//        { $unwind: '$records' },
+//        {
+//          $group: {
+//            _id: '$records.status',
+//            count: { $sum: 1 },
+//          },
+//        },
+//      ]);
+
+//      todayAttendance = { Present: 0, Absent: 0, Late: 0 };
+
+//      counts.forEach((c) => {
+//        todayAttendance[c._id] = c.count;
+//      });
+//    }
+
+//     return sendSuccess(res, 200, 'Teacher dashboard data', {
+//       teacher: {
+//         fullName: teacher.fullName,
+//         classTeacher: myClass,
+//         subjects: mySubjects,
+//       },
+//       stats: {
+//         assignmentsCreated: assignments.length,
+//         pendingGrades,
+//       },
+//       assignments,
+//       todayAttendance,
+//       announcements,
+//     });
+//   } catch (error) {
+//     return sendError(res, 500, error.message);
+//   }
+// };
+
 const getTeacherDashboard = async (req, res) => {
   try {
     const teacherId = req.user._id;
     const { term, academicYear } = req.query;
 
+    // 🔹 Fetch teacher with relations
     const teacher = await User.findById(teacherId)
       .populate('teacherProfile.classTeacherOf', 'name sections')
       .populate('teacherProfile.subjectsTaught', 'name code');
 
+    if (!teacher) {
+      return sendError(res, 404, 'Teacher not found');
+    }
+
     const myClass = teacher.teacherProfile?.classTeacherOf;
     const mySubjects = teacher.teacherProfile?.subjectsTaught || [];
 
+    // 🔹 Get assignment IDs once (avoids nested await in query)
+    const assignmentIds = await Assignment.find({
+      teacher: teacherId,
+    }).distinct('_id');
+
+    // 🔹 Parallel queries
     const [assignments, pendingGrades, announcements] = await Promise.all([
       Assignment.find({ teacher: teacherId, isActive: true })
         .populate('class', 'name')
@@ -155,9 +250,7 @@ const getTeacherDashboard = async (req, res) => {
 
       Submission.countDocuments({
         status: 'Submitted',
-        assignment: {
-          $in: await Assignment.find({ teacher: teacherId }).distinct('_id'),
-        },
+        assignment: { $in: assignmentIds },
       }),
 
       Announcement.find({
@@ -168,21 +261,40 @@ const getTeacherDashboard = async (req, res) => {
         .limit(5),
     ]);
 
-    // Today's attendance for my class
+    // 🔹 Today's attendance (STRICT date range)
     let todayAttendance = null;
-    if (myClass) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+
+    if (myClass?._id) {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+
       const counts = await Attendance.aggregate([
-        { $match: { class: myClass._id, date: { $gte: today } } },
-        { $group: { _id: '$status', count: { $sum: 1 } } },
+        {
+          $match: {
+            class: new mongoose.Types.ObjectId(myClass._id),
+            date: { $gte: start, $lte: end },
+          },
+        },
+        { $unwind: '$records' },
+        {
+          $group: {
+            _id: '$records.status',
+            count: { $sum: 1 },
+          },
+        },
       ]);
+
       todayAttendance = { Present: 0, Absent: 0, Late: 0 };
+
       counts.forEach((c) => {
         todayAttendance[c._id] = c.count;
       });
     }
 
+    // 🔹 Response
     return sendSuccess(res, 200, 'Teacher dashboard data', {
       teacher: {
         fullName: teacher.fullName,
@@ -201,86 +313,6 @@ const getTeacherDashboard = async (req, res) => {
     return sendError(res, 500, error.message);
   }
 };
-
-// @desc    Student dashboard
-// @route   GET /api/v1/dashboard/student
-// @access  Student
-// const getStudentDashboard = async (req, res) => {
-//   try {
-//     const studentId = req.user._id;
-//     const { term, academicYear } = req.query;
-
-//     const student = await User.findById(studentId)
-//       .populate('studentProfile.class', 'name level subjects')
-//       .select('firstName lastName studentProfile avatar');
-
-//     const classId = student.studentProfile?.class?._id;
-
-//     const [
-//       results,
-//       attendance,
-//       pendingAssignments,
-//       announcements,
-//       recentPayment,
-//     ] = await Promise.all([
-//       Result.find({ student: studentId, term, academicYear, isPublished: true })
-//         .populate('subject', 'name code')
-//         .sort({ totalScore: -1 }),
-
-//       classId
-//         ? Attendance.find({
-//             'records.student': studentId,
-//             term,
-//             academicYear,
-//           })
-//         : null,
-
-//       classId
-//         ? Assignment.find({
-//             class: classId,
-//             dueDate: { $gte: new Date() },
-//             isActive: true,
-//           })
-//             .populate('subject', 'name')
-//             .sort({ dueDate: 1 })
-//             .limit(5)
-//         : [],
-
-//       Announcement.find({
-//         isPublished: true,
-//         targetAudience: { $in: ['All', 'Student'] },
-//       })
-//         .sort({ publishedAt: -1 })
-//         .limit(5),
-
-//       Payment.findOne({ student: studentId })
-//         .sort({ createdAt: -1 })
-//         .populate('feeStructure', 'title term totalAmount'),
-//     ]);
-
-//     const avgScore = results.length
-//       ? (
-//           results.reduce((s, r) => s + r.totalScore, 0) / results.length
-//         ).toFixed(1)
-//       : null;
-
-//     return sendSuccess(res, 200, 'Student dashboard data', {
-//       student,
-//       stats: {
-//         averageScore: avgScore,
-//         subjectCount: results.length,
-//         attendance,
-//         pendingAssignmentsCount: pendingAssignments.length,
-//       },
-//       recentResults: results.slice(0, 5),
-//       pendingAssignments,
-//       announcements,
-//       recentPayment,
-//     });
-//   } catch (error) {
-//     return sendError(res, 500, error.message);
-//   }
-// };
 
 const getStudentDashboard = async (req, res) => {
   try {

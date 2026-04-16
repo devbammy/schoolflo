@@ -1,13 +1,6 @@
-// ─── TeacherDashboard.jsx ─────────────────────────────────────────────────────
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  ClipboardList,
-  Users,
-  BookOpen,
-  CheckSquare,
-  Bell,
-} from 'lucide-react';
+import { ClipboardList, Users, BookOpen, CheckSquare } from 'lucide-react';
 import { dashboardService } from '../../services/api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -20,18 +13,44 @@ export default function TeacherDashboard() {
   useEffect(() => {
     dashboardService
       .getTeacher()
-      .then((r) => setData(r.data.data))
-      .catch(() => toast.error('Failed to load dashboard'))
+      .then((r) => {
+        setData(r.data.data);
+      })
+      .catch((e) => {
+        console.log(e);
+        toast.error('Failed to load dashboard');
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading)
+  if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
         <div className="spinner" />
       </div>
     );
-  const { teacher, stats, assignments, todayAttendance, announcements } = data;
+  }
+
+  // ✅ SAFE FALLBACKS
+  const teacher = data?.teacher || {};
+  const stats = data?.stats || {};
+  const assignments = data?.assignments || [];
+  const todayAttendance = data?.todayAttendance || {
+    Present: 0,
+    Absent: 0,
+    Late: 0,
+  };
+
+  const firstName = teacher.fullName
+    ? teacher.fullName.split(' ')[0]
+    : 'Teacher';
+
+  const now = new Date();
+
+  const totalAttendance = Object.values(todayAttendance).reduce(
+    (a, b) => a + b,
+    0,
+  );
 
   const statCards = [
     {
@@ -54,7 +73,7 @@ export default function TeacherDashboard() {
     },
     {
       label: 'Today Present',
-      value: todayAttendance?.Present || 0,
+      value: todayAttendance.Present || 0,
       icon: CheckSquare,
       color: '#10B981',
     },
@@ -62,22 +81,22 @@ export default function TeacherDashboard() {
 
   return (
     <>
+      {/* Header */}
       <div className="page-header">
         <div>
-          <h1 className="page-header__title">
-            Good morning, {teacher.fullName?.split(' ')[0]}!
-          </h1>
+          <h1 className="page-header__title">Good morning, {firstName}!</h1>
           <p className="page-header__subtitle">
             Here's what's happening in your class today
           </p>
         </div>
       </div>
 
+      {/* Stats */}
       <div className="stats-grid">
         {statCards.map((s) => (
           <div
             key={s.label}
-            className="stat-card "
+            className="stat-card"
             style={{ '--accent-color': s.color }}
           >
             <div className="stat-card__icon">
@@ -92,6 +111,7 @@ export default function TeacherDashboard() {
       </div>
 
       <div className="dashboard-grid">
+        {/* Assignments */}
         <div className="card">
           <div className="card__header">
             <span className="card__title">Upcoming Assignments</span>
@@ -102,10 +122,8 @@ export default function TeacherDashboard() {
               Manage
             </button>
           </div>
-          <div
-            className="table-wrapper"
-            style={{ border: 'none', borderRadius: 0 }}
-          >
+
+          <div className="table-wrapper" style={{ border: 'none' }}>
             <table className="table">
               <thead>
                 <tr>
@@ -120,61 +138,61 @@ export default function TeacherDashboard() {
                   <tr>
                     <td
                       colSpan={4}
-                      style={{
-                        textAlign: 'center',
-                        padding: 32,
-                        color: 'var(--clr-text-3)',
-                      }}
+                      style={{ textAlign: 'center', padding: 32 }}
                     >
                       No assignments
                     </td>
                   </tr>
                 ) : (
-                  assignments.map((a) => (
-                    <tr key={a._id}>
-                      <td style={{ fontWeight: 500 }}>{a.title}</td>
-                      <td>{a.subject?.name}</td>
-                      <td
-                        style={{
-                          color:
-                            new Date(a.dueDate) < new Date()
+                  assignments.map((a) => {
+                    const isOverdue = new Date(a.dueDate) < now;
+
+                    return (
+                      <tr key={a._id}>
+                        <td style={{ fontWeight: 500 }}>{a.title}</td>
+                        <td>{a.subject?.name || '—'}</td>
+                        <td
+                          style={{
+                            color: isOverdue
                               ? 'var(--clr-danger)'
                               : 'var(--clr-text-2)',
-                          fontSize: '0.875rem',
-                        }}
-                      >
-                        {format(new Date(a.dueDate), 'dd MMM yyyy')}
-                      </td>
-                      <td>
-                        <span
-                          className={`badge badge--${new Date(a.dueDate) < new Date() ? 'danger' : 'success'}`}
+                          }}
                         >
-                          {new Date(a.dueDate) < new Date()
-                            ? 'Overdue'
-                            : 'Active'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                          {format(new Date(a.dueDate), 'dd MMM yyyy')}
+                        </td>
+                        <td>
+                          <span
+                            className={`badge badge--${
+                              isOverdue ? 'danger' : 'success'
+                            }`}
+                          >
+                            {isOverdue ? 'Overdue' : 'Active'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
         </div>
 
+        {/* Attendance */}
         <div className="card">
           <div className="card__header">
             <span className="card__title">Today's Attendance</span>
           </div>
+
           <div className="card__body">
             {['Present', 'Absent', 'Late'].map((status, i) => {
               const colors = ['#10B981', '#EF4444', '#F59E0B'];
-              const count = todayAttendance?.[status] || 0;
-              const total = Object.values(todayAttendance || {}).reduce(
-                (a, b) => a + b,
-                0,
-              );
-              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+              const count = todayAttendance[status] || 0;
+              const pct =
+                totalAttendance > 0
+                  ? Math.round((count / totalAttendance) * 100)
+                  : 0;
+
               return (
                 <div key={status} style={{ marginBottom: 20 }}>
                   <div
@@ -184,44 +202,34 @@ export default function TeacherDashboard() {
                       marginBottom: 6,
                     }}
                   >
-                    <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                      {status}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '0.875rem',
-                        fontWeight: 700,
-                        color: colors[i],
-                      }}
-                    >
+                    <span>{status}</span>
+                    <span style={{ color: colors[i], fontWeight: 700 }}>
                       {count}
                     </span>
                   </div>
+
                   <div
                     style={{
                       height: 6,
                       borderRadius: 3,
                       background: 'var(--clr-bg-alt)',
-                      overflow: 'hidden',
                     }}
                   >
                     <div
                       style={{
-                        height: '100%',
                         width: `${pct}%`,
+                        height: '100%',
                         background: colors[i],
-                        borderRadius: 3,
-                        transition: 'width 0.8s ease',
                       }}
                     />
                   </div>
                 </div>
               );
             })}
+
             <button
               className="btn btn--primary btn--full"
               onClick={() => navigate('/teacher/attendance')}
-              style={{ marginTop: 8 }}
             >
               Mark Attendance
             </button>
