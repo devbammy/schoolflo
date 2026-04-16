@@ -441,8 +441,8 @@ export default function SubjectsPage() {
               Assign to Classes
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {classes.classes.length > 0 &&
-                classes.classes.map((c) => {
+              {classes.length > 0 &&
+                classes.map((c) => {
                   const active = assignedClasses.includes(c._id);
                   return (
                     <button
