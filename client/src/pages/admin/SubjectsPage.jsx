@@ -48,7 +48,7 @@ export default function SubjectsPage() {
       classService.getAll(),
       userService.getAll({ role: 'Teacher', limit: 100 }),
     ]).then(([c, t]) => {
-      setClasses(c.data.data || []);
+      setClasses(c.data.data.classes || []);
       setTeachers(t.data.data || []);
     });
   }, []);

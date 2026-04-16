@@ -66,7 +66,7 @@ export default function StudentsPage() {
     load();
   }, [load]);
   useEffect(() => {
-    classService.getAll().then((r) => setClasses(r.data.data || []));
+    classService.getAll().then((r) => setClasses(r.data.data.classes || []));
   }, []);
 
   const openCreate = () => {
@@ -462,6 +462,8 @@ export default function StudentsPage() {
                       type="text"
                       className="form-control"
                       value={form.studentProfile.admissionNumber}
+                      readOnly
+                      placeholder="Auto Generated"
                       onChange={(e) =>
                         setField(
                           'studentProfile.admissionNumber',
@@ -474,7 +476,7 @@ export default function StudentsPage() {
                     <label>Class</label>
                     <select
                       className="form-control"
-                      value={form.studentProfile.class}
+                      value={form.studentProfile?.class || ''}
                       onChange={(e) =>
                         setField('studentProfile.class', e.target.value)
                       }
@@ -493,7 +495,7 @@ export default function StudentsPage() {
                     <label>Gender</label>
                     <select
                       className="form-control"
-                      value={form.studentProfile.gender}
+                      value={form.studentProfile?.gender || ''}
                       onChange={(e) =>
                         setField('studentProfile.gender', e.target.value)
                       }
@@ -523,7 +525,7 @@ export default function StudentsPage() {
                     <input
                       type="text"
                       className="form-control"
-                      value={form.studentProfile.address}
+                      value={form.studentProfile?.address || ''}
                       onChange={(e) =>
                         setField('studentProfile.address', e.target.value)
                       }

@@ -205,6 +205,83 @@ const getTeacherDashboard = async (req, res) => {
 // @desc    Student dashboard
 // @route   GET /api/v1/dashboard/student
 // @access  Student
+// const getStudentDashboard = async (req, res) => {
+//   try {
+//     const studentId = req.user._id;
+//     const { term, academicYear } = req.query;
+
+//     const student = await User.findById(studentId)
+//       .populate('studentProfile.class', 'name level subjects')
+//       .select('firstName lastName studentProfile avatar');
+
+//     const classId = student.studentProfile?.class?._id;
+
+//     const [
+//       results,
+//       attendance,
+//       pendingAssignments,
+//       announcements,
+//       recentPayment,
+//     ] = await Promise.all([
+//       Result.find({ student: studentId, term, academicYear, isPublished: true })
+//         .populate('subject', 'name code')
+//         .sort({ totalScore: -1 }),
+
+//       classId
+//         ? Attendance.find({
+//             'records.student': studentId,
+//             term,
+//             academicYear,
+//           })
+//         : null,
+
+//       classId
+//         ? Assignment.find({
+//             class: classId,
+//             dueDate: { $gte: new Date() },
+//             isActive: true,
+//           })
+//             .populate('subject', 'name')
+//             .sort({ dueDate: 1 })
+//             .limit(5)
+//         : [],
+
+//       Announcement.find({
+//         isPublished: true,
+//         targetAudience: { $in: ['All', 'Student'] },
+//       })
+//         .sort({ publishedAt: -1 })
+//         .limit(5),
+
+//       Payment.findOne({ student: studentId })
+//         .sort({ createdAt: -1 })
+//         .populate('feeStructure', 'title term totalAmount'),
+//     ]);
+
+//     const avgScore = results.length
+//       ? (
+//           results.reduce((s, r) => s + r.totalScore, 0) / results.length
+//         ).toFixed(1)
+//       : null;
+
+//     return sendSuccess(res, 200, 'Student dashboard data', {
+//       student,
+//       stats: {
+//         averageScore: avgScore,
+//         subjectCount: results.length,
+//         attendance,
+//         pendingAssignmentsCount: pendingAssignments.length,
+//       },
+//       recentResults: results.slice(0, 5),
+//       pendingAssignments,
+//       announcements,
+//       recentPayment,
+//     });
+//   } catch (error) {
+//     return sendError(res, 500, error.message);
+//   }
+// };
+
 const getStudentDashboard = async (req, res) => {
   try {
     const studentId = req.user._id;
@@ -218,16 +295,27 @@ const getStudentDashboard = async (req, res) => {
 
     const [
       results,
-      attendance,
+      attendanceDocs,
       pendingAssignments,
       announcements,
       recentPayment,
     ] = await Promise.all([
-      Result.find({ student: studentId, term, academicYear, isPublished: true })
+      Result.find({
+        student: studentId,
+        term,
+        academicYear,
+        isPublished: true,
+      })
         .populate('subject', 'name code')
         .sort({ totalScore: -1 }),
 
-      classId ? Attendance.getSummary(studentId, term, academicYear) : null,
+      classId
+        ? Attendance.find({
+            'records.student': studentId,
+            term,
+            academicYear,
+          })
+        : [],
 
       classId
         ? Assignment.find({
@@ -252,10 +340,49 @@ const getStudentDashboard = async (req, res) => {
         .populate('feeStructure', 'title term totalAmount'),
     ]);
 
+    // ✅ Compute attendance summary from records[]
+    let attendanceSummary = {
+      Present: 0,
+      Absent: 0,
+      Late: 0,
+      Excused: 0,
+      percentage: 0,
+    };
+
+    if (attendanceDocs.length) {
+      attendanceDocs.forEach((doc) => {
+        const record = doc.records.find(
+          (r) => r.student.toString() === studentId.toString(),
+        );
+
+        if (!record) return;
+
+        if (attendanceSummary[record.status] !== undefined) {
+          attendanceSummary[record.status]++;
+        }
+      });
+
+      const total =
+        attendanceSummary.Present +
+        attendanceSummary.Absent +
+        attendanceSummary.Late +
+        attendanceSummary.Excused;
+
+      attendanceSummary.percentage = total
+        ? Number(((attendanceSummary.Present / total) * 100).toFixed(1))
+        : 0;
+    }
+
+    const allAttendance = await Attendance.find({});
+    console.log(JSON.stringify(allAttendance, null, 2));
+
+    // ✅ Average score
     const avgScore = results.length
-      ? (
-          results.reduce((s, r) => s + r.totalScore, 0) / results.length
-        ).toFixed(1)
+      ? Number(
+          (
+            results.reduce((s, r) => s + r.totalScore, 0) / results.length
+          ).toFixed(1),
+        )
       : null;
 
     return sendSuccess(res, 200, 'Student dashboard data', {
@@ -263,7 +390,7 @@ const getStudentDashboard = async (req, res) => {
       stats: {
         averageScore: avgScore,
         subjectCount: results.length,
-        attendance,
+        attendance: attendanceSummary, // ✅ now correct shape
         pendingAssignmentsCount: pendingAssignments.length,
       },
       recentResults: results.slice(0, 5),

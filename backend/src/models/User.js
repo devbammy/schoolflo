@@ -124,13 +124,68 @@ UserSchema.index({ role: 1 });
 UserSchema.index({ 'studentProfile.admissionNumber': 1 });
 UserSchema.index({ 'teacherProfile.staffId': 1 });
 
-// Hash password before save
+// Admission Number and harshed password
 UserSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(12);
-  this.password = await bcrypt.hash(this.password, salt);
-  this.passwordChangedAt = Date.now() - 1000;
-  next();
+  try {
+    // hash password first
+    if (this.isModified('password')) {
+      const salt = await bcrypt.genSalt(12);
+      this.password = await bcrypt.hash(this.password, salt);
+      this.passwordChangedAt = Date.now() - 1000;
+    }
+
+    // admission number
+    if (this.role === 'Student' && !this.studentProfile?.admissionNumber) {
+      if (!this.studentProfile) this.studentProfile = {};
+
+      const Counter = require('./Counter');
+
+      const prefix = (this.lastName || 'XX')
+        .substring(0, 2)
+        .toUpperCase()
+        .padEnd(2, 'X');
+
+      const year = new Date().getFullYear().toString().slice(-2);
+
+      const counter = await Counter.findOneAndUpdate(
+        { year },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true },
+      );
+
+      const index = counter.seq.toString().padStart(4, '0');
+
+      this.studentProfile.admissionNumber = `${prefix}${year}${index}`;
+      this.markModified('studentProfile');
+    }
+    if (this.role === 'Teacher' && !this.teacherProfile?.staffId) {
+      if (!this.teacherProfile) this.teacherProfile = {};
+
+      const Counter = require('./Counter');
+
+      const prefix = (this.lastName || 'XX')
+        .substring(0, 2)
+        .toUpperCase()
+        .padEnd(2, 'X');
+
+      const year = new Date().getFullYear().toString().slice(-2);
+
+      const counter = await Counter.findOneAndUpdate(
+        { year },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true },
+      );
+
+      const index = counter.seq.toString().padStart(4, '0');
+
+      this.teacherProfile.staffId = `${prefix}${year}${index}`;
+      this.markModified('teacherProfile');
+    }
+
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Compare password

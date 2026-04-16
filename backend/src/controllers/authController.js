@@ -23,7 +23,10 @@ const register = async (req, res) => {
       password,
       role,
       phone,
+      studentProfile: role === 'student' ? {} : undefined,
     });
+
+    console.log(user.studentProfile);
 
     // Send welcome email
     await sendEmail({
