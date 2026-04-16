@@ -23,8 +23,6 @@ export default function ParentDashboard() {
     );
   const { childrenData = [], announcements = [] } = data || {};
 
-  console.log(childrenData);
-
   return (
     <>
       <div className="page-header">

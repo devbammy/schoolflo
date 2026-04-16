@@ -153,6 +153,8 @@ export default function PaymentsPage() {
       ? ((overview.totalCollected / overview.totalExpected) * 100).toFixed(1)
       : 0;
 
+  console.log(report);
+
   return (
     <>
       <div className="page-header">

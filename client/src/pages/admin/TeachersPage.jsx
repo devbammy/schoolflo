@@ -464,10 +464,11 @@ export default function TeachersPage() {
               <input
                 className="form-control"
                 value={form.teacherProfile.staffId}
+                readOnly
+                placeholder="Auto Generated"
                 onChange={(e) =>
                   setField('teacherProfile.staffId', e.target.value)
                 }
-                placeholder="STF/2024/001"
               />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>

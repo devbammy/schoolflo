@@ -58,42 +58,92 @@ const register = async (req, res) => {
 // @desc    Login
 // @route   POST /api/v1/auth/login
 // @access  Public
+// const login = async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+
+//     if (!email || !password)
+//       return sendError(res, 400, 'Email and password are required');
+
+//     const user = await User.findOne({ email }).select('+password');
+//     if (!user) return sendError(res, 401, 'Invalid credentials');
+
+//     if (!user.isActive)
+//       return sendError(res, 401, 'Account deactivated. Contact admin.');
+
+//     const isMatch = await user.comparePassword(password);
+//     if (!isMatch) return sendError(res, 401, 'Invalid credentials');
+
+//     user.lastLogin = new Date();
+//     await user.save({ validateBeforeSave: false });
+
+//     const accessToken = user.generateAccessToken();
+//     const refreshToken = user.generateRefreshToken();
+
+//     user.password = undefined;
+//     return sendSuccess(res, 200, 'Login successful', {
+//       user: {
+//         _id: user._id,
+//         firstName: user.firstName,
+//         lastName: user.lastName,
+//         email: user.email,
+//         role: user.role,
+//         avatar: user.avatar,
+//         lastLogin: user.lastLogin,
+//         studentProfile: user.studentProfile,
+//         teacherProfile: user.teacherProfile,
+//         parentProfile: user.parentProfile,
+//       },
+//       accessToken,
+//       refreshToken,
+//     });
+//   } catch (error) {
+//     return sendError(res, 500, error.message);
+//   }
+// };
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password)
+    if (!email || !password) {
       return sendError(res, 400, 'Email and password are required');
+    }
 
+    // 🔐 Get user with password
     const user = await User.findOne({ email }).select('+password');
     if (!user) return sendError(res, 401, 'Invalid credentials');
 
-    if (!user.isActive)
+    if (!user.isActive) {
       return sendError(res, 401, 'Account deactivated. Contact admin.');
+    }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return sendError(res, 401, 'Invalid credentials');
 
+    // 🕒 Update last login
     user.lastLogin = new Date();
     await user.save({ validateBeforeSave: false });
 
+    // 🔑 Tokens
     const accessToken = user.generateAccessToken();
     const refreshToken = user.generateRefreshToken();
 
-    user.password = undefined;
+    // ✅ IMPORTANT: fetch fully populated user
+    const populatedUser = await User.findById(user._id)
+      .populate('studentProfile.class', 'name level')
+      .populate('teacherProfile.classTeacherOf', 'name')
+      .populate('teacherProfile.subjectsTaught', 'name code')
+      .populate({
+        path: 'parentProfile.children',
+        select: 'firstName lastName avatar studentProfile',
+        populate: {
+          path: 'studentProfile.class',
+          select: 'name level',
+        },
+      });
+
     return sendSuccess(res, 200, 'Login successful', {
-      user: {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar,
-        lastLogin: user.lastLogin,
-        studentProfile: user.studentProfile,
-        teacherProfile: user.teacherProfile,
-        parentProfile: user.parentProfile,
-      },
+      user: populatedUser,
       accessToken,
       refreshToken,
     });
@@ -111,10 +161,14 @@ const getMe = async (req, res) => {
       .populate('studentProfile.class', 'name level')
       .populate('teacherProfile.classTeacherOf', 'name')
       .populate('teacherProfile.subjectsTaught', 'name code')
-      .populate(
-        'parentProfile.children',
-        'firstName lastName studentProfile.admissionNumber',
-      );
+      .populate({
+        path: 'parentProfile.children',
+        select: 'firstName lastName avatar studentProfile',
+        populate: {
+          path: 'studentProfile.class',
+          select: 'name level',
+        },
+      });
 
     return sendSuccess(res, 200, 'Profile fetched', { user });
   } catch (error) {

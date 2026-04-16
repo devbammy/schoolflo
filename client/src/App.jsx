@@ -40,6 +40,7 @@ import StudentPayments from './pages/student/StudentPayments';
 // Parent Pages
 import ParentDashboard from './pages/parent/ParentDashboard';
 import ParentResults from './pages/parent/ParentResults';
+import ParentPayments from './pages/parent/ParentPayments';
 
 // Guards
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -166,7 +167,7 @@ export default function App() {
         >
           <Route index element={<ParentDashboard />} />
           <Route path="results" element={<ParentResults />} />
-          <Route path="payments" element={<StudentPayments />} />
+          <Route path="payments" element={<ParentPayments />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
         </Route>
 
