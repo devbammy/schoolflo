@@ -9,51 +9,7 @@ const {
 // @desc    Register user (Admin only in prod)
 // @route   POST /api/v1/auth/register
 // @access  Private (Admin)
-// const register = async (req, res) => {
-//   try {
-//     const { firstName, lastName, email, password, role, phone } = req.body;
 
-//     const existingUser = await User.findOne({ email });
-//     if (existingUser) return sendError(res, 400, 'Email already registered');
-
-//     const user = await User.create({
-//       firstName,
-//       lastName,
-//       email,
-//       password,
-//       role,
-//       phone,
-//       studentProfile: role === 'Student' ? {} : undefined,
-//     });
-
-//     console.log(user.studentProfile);
-
-//     // Send welcome email
-//     await sendEmail({
-//       to: email,
-//       subject: 'Welcome to School Management Portal',
-//       html: emailTemplates.welcome({
-//         firstName,
-//         email,
-//         password,
-//         role,
-//         loginUrl: `${process.env.CLIENT_URL}/login`,
-//       }),
-//     });
-
-//     const accessToken = user.generateAccessToken();
-//     const refreshToken = user.generateRefreshToken();
-
-//     user.password = undefined;
-//     return sendSuccess(res, 201, 'User registered successfully', {
-//       user,
-//       accessToken,
-//       refreshToken,
-//     });
-//   } catch (error) {
-//     return sendError(res, 500, error.message);
-//   }
-// };
 const register = async (req, res) => {
   try {
     const {
@@ -119,49 +75,7 @@ const register = async (req, res) => {
 // @desc    Login
 // @route   POST /api/v1/auth/login
 // @access  Public
-// const login = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
 
-//     if (!email || !password)
-//       return sendError(res, 400, 'Email and password are required');
-
-//     const user = await User.findOne({ email }).select('+password');
-//     if (!user) return sendError(res, 401, 'Invalid credentials');
-
-//     if (!user.isActive)
-//       return sendError(res, 401, 'Account deactivated. Contact admin.');
-
-//     const isMatch = await user.comparePassword(password);
-//     if (!isMatch) return sendError(res, 401, 'Invalid credentials');
-
-//     user.lastLogin = new Date();
-//     await user.save({ validateBeforeSave: false });
-
-//     const accessToken = user.generateAccessToken();
-//     const refreshToken = user.generateRefreshToken();
-
-//     user.password = undefined;
-//     return sendSuccess(res, 200, 'Login successful', {
-//       user: {
-//         _id: user._id,
-//         firstName: user.firstName,
-//         lastName: user.lastName,
-//         email: user.email,
-//         role: user.role,
-//         avatar: user.avatar,
-//         lastLogin: user.lastLogin,
-//         studentProfile: user.studentProfile,
-//         teacherProfile: user.teacherProfile,
-//         parentProfile: user.parentProfile,
-//       },
-//       accessToken,
-//       refreshToken,
-//     });
-//   } catch (error) {
-//     return sendError(res, 500, error.message);
-//   }
-// };
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
