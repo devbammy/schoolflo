@@ -24,23 +24,27 @@ import FeesPage from './pages/admin/FeesPage';
 import PaymentsPage from './pages/admin/PaymentsPage';
 import AnnouncementsPage from './pages/admin/AnnouncementsPage';
 import ResultsAdminPage from './pages/admin/ResultsAdminPage';
+import TimetablePage from './pages/admin/TimetablePage';
 
 // Teacher Pages
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import AttendancePage from './pages/teacher/AttendancePage';
 import AssignmentsTeacherPage from './pages/teacher/AssignmentsPage';
 import GradesPage from './pages/teacher/GradesPage';
+import TeacherTimetable from './pages/teacher/TeacherTimetable';
 
 // Student Pages
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentResults from './pages/student/StudentResults';
 import StudentAssignments from './pages/student/StudentAssignments';
 import StudentPayments from './pages/student/StudentPayments';
+import StudentTimetable from './pages/student/StudentTimetable';
 
 // Parent Pages
 import ParentDashboard from './pages/parent/ParentDashboard';
 import ParentResults from './pages/parent/ParentResults';
 import ParentPayments from './pages/parent/ParentPayments';
+import ParentTimetable from './pages/parent/ParentTimetable';
 
 // Guards
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -54,6 +58,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
 const RoleRedirect = () => {
   const { user } = useAuthStore();
+
+  console.log(user);
   const map = {
     Admin: '/admin',
     Teacher: '/teacher',
@@ -121,6 +127,7 @@ export default function App() {
           <Route path="fees" element={<FeesPage />} />
           <Route path="payments" element={<PaymentsPage />} />
           <Route path="results" element={<ResultsAdminPage />} />
+          <Route path="timetables" element={<TimetablePage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
         </Route>
 
@@ -138,6 +145,7 @@ export default function App() {
           <Route path="assignments" element={<AssignmentsTeacherPage />} />
           <Route path="grades" element={<GradesPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
+          <Route path="timetable" element={<TeacherTimetable />} />
         </Route>
 
         {/* Student */}
@@ -153,6 +161,8 @@ export default function App() {
           <Route path="results" element={<StudentResults />} />
           <Route path="assignments" element={<StudentAssignments />} />
           <Route path="payments" element={<StudentPayments />} />
+
+          <Route path="timetable" element={<StudentTimetable />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
         </Route>
 
@@ -169,6 +179,7 @@ export default function App() {
           <Route path="results" element={<ParentResults />} />
           <Route path="payments" element={<ParentPayments />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
+          <Route path="timetable" element={<ParentTimetable />} />
         </Route>
 
         <Route

@@ -22,6 +22,7 @@ const submissionRoutes = require('./src/routes/submissions');
 const announcementRoutes = require('./src/routes/announcements');
 const dashboardRoutes = require('./src/routes/dashboard');
 const parentRoutes = require('./src/routes/parent');
+const timetableRoutes = require('./src/routes/timetables');
 
 const app = express();
 
@@ -94,6 +95,7 @@ app.use('/api/v1/submissions', submissionRoutes);
 app.use('/api/v1/announcements', announcementRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/parents', parentRoutes);
+app.use('/api/v1/timetables', timetableRoutes);
 
 // 404 Handler
 app.use('*', (req, res) => {

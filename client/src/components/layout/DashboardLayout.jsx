@@ -40,6 +40,7 @@ const NAV_CONFIG = {
       items: [
         { to: '/admin/classes', icon: School, label: 'Classes' },
         { to: '/admin/subjects', icon: BookOpen, label: 'Subjects' },
+        { to: '/admin/timetables', icon: Calendar, label: 'Timetables' },
         { to: '/admin/results', icon: BarChart3, label: 'Results & Reports' },
       ],
     },
@@ -73,13 +74,14 @@ const NAV_CONFIG = {
     {
       section: 'Classroom',
       items: [
-        { to: '/teacher/attendance', icon: Calendar, label: 'Attendance' },
+        { to: '/teacher/attendance', icon: Users, label: 'Attendance' },
         { to: '/teacher/grades', icon: BarChart3, label: 'Grades & Results' },
         {
           to: '/teacher/assignments',
           icon: ClipboardList,
           label: 'Assignments',
         },
+        { to: '/teacher/timetable', icon: Calendar, label: 'My Timetable' },
       ],
     },
     {
@@ -111,6 +113,7 @@ const NAV_CONFIG = {
           icon: ClipboardList,
           label: 'Assignments',
         },
+        { to: '/student/timetable', icon: Calendar, label: 'Timetable' },
       ],
     },
     {
@@ -137,6 +140,7 @@ const NAV_CONFIG = {
       items: [
         { to: '/parent/results', icon: BarChart3, label: 'Academic Results' },
         { to: '/parent/payments', icon: CreditCard, label: 'Fee Payments' },
+        { to: '/parent/timetable', icon: Calendar, label: 'Timetables' },
       ],
     },
     {

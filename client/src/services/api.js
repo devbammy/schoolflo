@@ -234,3 +234,19 @@ export const dashboardService = {
   getStudent: (params) => api.get('/dashboard/student', { params }),
   getParent: (params) => api.get('/dashboard/parent', { params }),
 };
+
+export const timetableService = {
+  // Admin
+  getAll: (params) => api.get('/timetables', { params }),
+  getById: (id) => api.get(`/timetables/${id}`),
+  create: (data) => api.post('/timetables', data),
+  update: (id, data) => api.put(`/timetables/${id}`, data),
+  delete: (id) => api.delete(`/timetables/${id}`),
+  upsertPeriod: (id, data) => api.patch(`/timetables/${id}/period`, data),
+  deletePeriod: (id, data) =>
+    api.patch(`/timetables/${id}/period/delete`, data),
+  publish: (id) => api.patch(`/timetables/${id}/publish`),
+  unpublish: (id) => api.patch(`/timetables/${id}/unpublish`),
+  // All roles — contextual
+  getMine: (params) => api.get('/timetables/mine', { params }),
+};
