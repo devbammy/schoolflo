@@ -16,6 +16,7 @@ import {
   School,
   CreditCard,
   Heart,
+  BookMarked,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 
@@ -42,6 +43,7 @@ const NAV_CONFIG = {
         { to: '/admin/subjects', icon: BookOpen, label: 'Subjects' },
         { to: '/admin/timetables', icon: Calendar, label: 'Timetables' },
         { to: '/admin/results', icon: BarChart3, label: 'Results & Reports' },
+        { to: '/admin/library', icon: BookMarked, label: 'Library' },
       ],
     },
     {
@@ -82,6 +84,7 @@ const NAV_CONFIG = {
           label: 'Assignments',
         },
         { to: '/teacher/timetable', icon: Calendar, label: 'My Timetable' },
+        { to: '/teacher/library', icon: BookMarked, label: 'Library' },
       ],
     },
     {
@@ -114,6 +117,7 @@ const NAV_CONFIG = {
           label: 'Assignments',
         },
         { to: '/student/timetable', icon: Calendar, label: 'Timetable' },
+        { to: '/student/library', icon: BookMarked, label: 'Library' },
       ],
     },
     {

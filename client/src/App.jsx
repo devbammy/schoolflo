@@ -25,6 +25,7 @@ import PaymentsPage from './pages/admin/PaymentsPage';
 import AnnouncementsPage from './pages/admin/AnnouncementsPage';
 import ResultsAdminPage from './pages/admin/ResultsAdminPage';
 import TimetablePage from './pages/admin/TimetablePage';
+import LibraryPage from './pages/admin/LibraryPage';
 
 // Teacher Pages
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
@@ -45,6 +46,9 @@ import ParentDashboard from './pages/parent/ParentDashboard';
 import ParentResults from './pages/parent/ParentResults';
 import ParentPayments from './pages/parent/ParentPayments';
 import ParentTimetable from './pages/parent/ParentTimetable';
+
+// Shared Pages
+import MyLibraryPage from './pages/shared/MyLibraryPage';
 
 // Guards
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -128,6 +132,7 @@ export default function App() {
           <Route path="payments" element={<PaymentsPage />} />
           <Route path="results" element={<ResultsAdminPage />} />
           <Route path="timetables" element={<TimetablePage />} />
+          <Route path="library" element={<LibraryPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
         </Route>
 
@@ -144,6 +149,7 @@ export default function App() {
           <Route path="attendance" element={<AttendancePage />} />
           <Route path="assignments" element={<AssignmentsTeacherPage />} />
           <Route path="grades" element={<GradesPage />} />
+          <Route path="library" element={<MyLibraryPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="timetable" element={<TeacherTimetable />} />
         </Route>
@@ -161,7 +167,7 @@ export default function App() {
           <Route path="results" element={<StudentResults />} />
           <Route path="assignments" element={<StudentAssignments />} />
           <Route path="payments" element={<StudentPayments />} />
-
+          <Route path="library" element={<MyLibraryPage />} />
           <Route path="timetable" element={<StudentTimetable />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
         </Route>

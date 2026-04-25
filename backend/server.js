@@ -23,6 +23,7 @@ const announcementRoutes = require('./src/routes/announcements');
 const dashboardRoutes = require('./src/routes/dashboard');
 const parentRoutes = require('./src/routes/parent');
 const timetableRoutes = require('./src/routes/timetables');
+const libraryRoutes = require('./src/routes/library');
 
 const app = express();
 
@@ -96,6 +97,7 @@ app.use('/api/v1/announcements', announcementRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/parents', parentRoutes);
 app.use('/api/v1/timetables', timetableRoutes);
+app.use('/api/v1/library', libraryRoutes);
 
 // 404 Handler
 app.use('*', (req, res) => {
