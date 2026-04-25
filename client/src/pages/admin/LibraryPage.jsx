@@ -161,16 +161,15 @@ export default function LibraryPage() {
   }, []);
 
   useEffect(() => {
-    if (tab === 'Books') loadBooks();
-  }, [tab, loadBooks]);
-  useEffect(() => {
-    if (tab === 'Borrow / Return') loadRecords();
-  }, [tab, loadRecords]);
-  useEffect(() => {
-    if (tab === 'Overdue') loadOverdue();
-  }, [tab, loadOverdue]);
-  useEffect(() => {
-    if (tab === 'Statistics') loadStats();
+    if (tab === 'Books') {
+      loadBooks();
+    } else if (tab === 'Borrow / Return') {
+      loadRecords();
+    } else if (tab === 'Overdue') {
+      loadOverdue();
+    } else if (tab === 'Statistics') {
+      loadStats();
+    }
   }, [tab, loadStats]);
 
   // ── Book CRUD ──────────────────────────────────────────────────────────
