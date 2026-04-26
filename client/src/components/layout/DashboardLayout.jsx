@@ -16,6 +16,8 @@ import {
   School,
   CreditCard,
   Heart,
+  BookMarked,
+  CalendarDays,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 
@@ -40,7 +42,14 @@ const NAV_CONFIG = {
       items: [
         { to: '/admin/classes', icon: School, label: 'Classes' },
         { to: '/admin/subjects', icon: BookOpen, label: 'Subjects' },
+        {
+          to: '/admin/calendar',
+          icon: CalendarDays,
+          label: 'Academic Calendar',
+        },
+        { to: '/admin/timetables', icon: Calendar, label: 'Timetables' },
         { to: '/admin/results', icon: BarChart3, label: 'Results & Reports' },
+        { to: '/admin/library', icon: BookMarked, label: 'Library' },
       ],
     },
     {
@@ -73,13 +82,20 @@ const NAV_CONFIG = {
     {
       section: 'Classroom',
       items: [
-        { to: '/teacher/attendance', icon: Calendar, label: 'Attendance' },
+        { to: '/teacher/attendance', icon: Users, label: 'Attendance' },
         { to: '/teacher/grades', icon: BarChart3, label: 'Grades & Results' },
         {
           to: '/teacher/assignments',
           icon: ClipboardList,
           label: 'Assignments',
         },
+        { to: '/teacher/timetable', icon: Calendar, label: 'My Timetable' },
+        {
+          to: '/teacher/calendar',
+          icon: CalendarDays,
+          label: 'School Calendar',
+        },
+        { to: '/teacher/library', icon: BookMarked, label: 'Library' },
       ],
     },
     {
@@ -111,6 +127,13 @@ const NAV_CONFIG = {
           icon: ClipboardList,
           label: 'Assignments',
         },
+        { to: '/student/timetable', icon: Calendar, label: 'Timetable' },
+        {
+          to: '/student/calendar',
+          icon: CalendarDays,
+          label: 'School Calendar',
+        },
+        { to: '/student/library', icon: BookMarked, label: 'Library' },
       ],
     },
     {
@@ -137,6 +160,12 @@ const NAV_CONFIG = {
       items: [
         { to: '/parent/results', icon: BarChart3, label: 'Academic Results' },
         { to: '/parent/payments', icon: CreditCard, label: 'Fee Payments' },
+        { to: '/parent/timetable', icon: Calendar, label: 'Timetables' },
+        {
+          to: '/parent/calendar',
+          icon: CalendarDays,
+          label: 'School Calendar',
+        },
       ],
     },
     {

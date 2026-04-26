@@ -234,3 +234,41 @@ export const dashboardService = {
   getStudent: (params) => api.get('/dashboard/student', { params }),
   getParent: (params) => api.get('/dashboard/parent', { params }),
 };
+
+export const timetableService = {
+  // Admin
+  getAll: (params) => api.get('/timetables', { params }),
+  getById: (id) => api.get(`/timetables/${id}`),
+  create: (data) => api.post('/timetables', data),
+  update: (id, data) => api.put(`/timetables/${id}`, data),
+  delete: (id) => api.delete(`/timetables/${id}`),
+  upsertPeriod: (id, data) => api.patch(`/timetables/${id}/period`, data),
+  deletePeriod: (id, data) =>
+    api.patch(`/timetables/${id}/period/delete`, data),
+  publish: (id) => api.patch(`/timetables/${id}/publish`),
+  unpublish: (id) => api.patch(`/timetables/${id}/unpublish`),
+  // All roles — contextual
+  getMine: (params) => api.get('/timetables/mine', { params }),
+};
+
+export const libraryService = {
+  // Books
+  getBooks: (params) => api.get('/library/books', { params }),
+  getBook: (id) => api.get(`/library/books/${id}`),
+  getCategories: () => api.get('/library/books/categories'),
+  createBook: (data) => api.post('/library/books', data),
+  updateBook: (id, d) => api.put(`/library/books/${id}`, d),
+  deleteBook: (id) => api.delete(`/library/books/${id}`),
+  // Borrow
+  borrowBook: (data) => api.post('/library/borrow', data),
+  returnBook: (id) => api.post(`/library/return/${id}`),
+  renewBook: (id) => api.post(`/library/renew/${id}`),
+  payFine: (id) => api.patch(`/library/fine/${id}/pay`),
+  // Records
+  getRecords: (params) => api.get('/library/records', { params }),
+  getMyRecords: () => api.get('/library/records/mine'),
+  getOverdue: () => api.get('/library/overdue'),
+  getStats: () => api.get('/library/stats'),
+};
+
+export const calendarService = {};
