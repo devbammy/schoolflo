@@ -26,6 +26,7 @@ import AnnouncementsPage from './pages/admin/AnnouncementsPage';
 import ResultsAdminPage from './pages/admin/ResultsAdminPage';
 import TimetablePage from './pages/admin/TimetablePage';
 import LibraryPage from './pages/admin/LibraryPage';
+import AcademicCalendarPage from './pages/admin/AcademicCalendarPage';
 
 // Teacher Pages
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
@@ -49,6 +50,7 @@ import ParentTimetable from './pages/parent/ParentTimetable';
 
 // Shared Pages
 import MyLibraryPage from './pages/shared/MyLibraryPage';
+import CalendarViewPage from './pages/shared/CalendarViewPage';
 
 // Guards
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -133,6 +135,7 @@ export default function App() {
           <Route path="results" element={<ResultsAdminPage />} />
           <Route path="timetables" element={<TimetablePage />} />
           <Route path="library" element={<LibraryPage />} />
+          <Route path="calendar" element={<AcademicCalendarPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
         </Route>
 
@@ -151,6 +154,7 @@ export default function App() {
           <Route path="grades" element={<GradesPage />} />
           <Route path="library" element={<MyLibraryPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
+          <Route path="calendar" element={<CalendarViewPage />} />
           <Route path="timetable" element={<TeacherTimetable />} />
         </Route>
 
@@ -169,6 +173,7 @@ export default function App() {
           <Route path="payments" element={<StudentPayments />} />
           <Route path="library" element={<MyLibraryPage />} />
           <Route path="timetable" element={<StudentTimetable />} />
+          <Route path="calendar" element={<CalendarViewPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
         </Route>
 
@@ -184,8 +189,9 @@ export default function App() {
           <Route index element={<ParentDashboard />} />
           <Route path="results" element={<ParentResults />} />
           <Route path="payments" element={<ParentPayments />} />
-          <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="timetable" element={<ParentTimetable />} />
+          <Route path="calendar" element={<CalendarViewPage />} />
+          <Route path="announcements" element={<AnnouncementsPage />} />
         </Route>
 
         <Route

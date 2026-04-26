@@ -270,3 +270,5 @@ export const libraryService = {
   getOverdue: () => api.get('/library/overdue'),
   getStats: () => api.get('/library/stats'),
 };
+
+export const calendarService = {};
