@@ -18,6 +18,11 @@ import {
   Heart,
   BookMarked,
   CalendarDays,
+  CalendarCheck,
+  Medal,
+  ShieldCheck,
+  Printer,
+  BookCheck,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 
@@ -50,6 +55,21 @@ const NAV_CONFIG = {
         { to: '/admin/timetables', icon: Calendar, label: 'Timetables' },
         { to: '/admin/results', icon: BarChart3, label: 'Results & Reports' },
         { to: '/admin/library', icon: BookMarked, label: 'Library' },
+        {
+          label: 'Exam Schedules',
+          icon: CalendarCheck,
+          to: '/admin/exam-schedules',
+        },
+        {
+          label: 'Promotions',
+          icon: Medal,
+          to: '/admin/promotions',
+        },
+        {
+          label: 'Certificates',
+          icon: ShieldCheck,
+          to: '/admin/certificates',
+        },
       ],
     },
     {
@@ -134,6 +154,16 @@ const NAV_CONFIG = {
           label: 'School Calendar',
         },
         { to: '/student/library', icon: BookMarked, label: 'Library' },
+        {
+          label: 'CA Tracking',
+          icon: BookCheck,
+          to: '/student/ca-tracking',
+        },
+        {
+          label: 'Print My Results',
+          icon: Printer,
+          to: '/student/print-results',
+        },
       ],
     },
     {

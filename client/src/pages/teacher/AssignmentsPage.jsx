@@ -53,8 +53,6 @@ export default function AssignmentsPage() {
   const [filterTerm, setFilterTerm] = useState('');
   const [filterClass, setFilterClass] = useState('');
 
-  console.log(assignments.assignments);
-
   const load = useCallback(async () => {
     setLoading(true);
     try {

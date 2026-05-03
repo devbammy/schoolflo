@@ -1,14 +1,42 @@
-const sendSuccess = (res, statusCode = 200, message = 'Success', data = {}, meta = {}) => {
+const sendSuccess = (
+  res,
+  statusCode = 200,
+  message = 'Success',
+  data = {},
+  meta = {},
+) => {
+  if (typeof statusCode !== 'number') statusCode = 200;
   const response = { success: true, message, data };
   if (Object.keys(meta).length > 0) response.meta = meta;
   return res.status(statusCode).json(response);
 };
 
 const sendError = (res, statusCode = 500, message = 'Error', errors = null) => {
+  if (typeof statusCode !== 'number') statusCode = 200;
   const response = { success: false, message };
   if (errors) response.errors = errors;
   return res.status(statusCode).json(response);
 };
+
+// const sendSuccess = (
+//   res,
+//   data = {},
+//   message = 'Success',
+//   statusCode = 200,
+//   meta = {},
+// ) => {
+//   if (typeof statusCode !== 'number') statusCode = 200;
+//   const response = { success: true, message, data };
+//   if (Object.keys(meta).length > 0) response.meta = meta;
+//   return res.status(statusCode).json(response);
+// };
+
+// const sendError = (res, message = 'Error', statusCode = 500, errors = null) => {
+//   if (typeof statusCode !== 'number') statusCode = 200;
+//   const response = { success: false, message };
+//   if (errors) response.errors = errors;
+//   return res.status(statusCode).json(response);
+// };
 
 const sendPaginated = (res, data, total, page, limit) => {
   return res.status(200).json({

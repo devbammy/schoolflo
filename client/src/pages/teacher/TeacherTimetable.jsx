@@ -21,7 +21,6 @@ export default function TeacherTimetable() {
         setTimetables(r.data.data?.timetables || []);
       })
       .catch((err) => {
-        console.log(err);
         toast.error('Failed to load timetable');
       })
       .finally(() => setLoading(false));

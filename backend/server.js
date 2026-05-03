@@ -25,6 +25,10 @@ const parentRoutes = require('./src/routes/parent');
 const timetableRoutes = require('./src/routes/timetables');
 const libraryRoutes = require('./src/routes/library');
 const calendarRoutes = require('./src/routes/calendar');
+const examScheduleRoutes = require('./src/routes/examSchedule.routes');
+const caTrackingRoutes = require('./src/routes/caTracking.routes');
+const promotionRoutes = require('./src/routes/promotion.routes');
+const certificateRoutes = require('./src/routes/certificate.routes');
 
 const app = express();
 
@@ -100,6 +104,10 @@ app.use('/api/v1/parents', parentRoutes);
 app.use('/api/v1/timetables', timetableRoutes);
 app.use('/api/v1/library', libraryRoutes);
 app.use('/api/v1/calendar', calendarRoutes);
+app.use('/api/v1/exam-schedules', examScheduleRoutes);
+app.use('/api/v1/ca-tracking', caTrackingRoutes);
+app.use('/api/v1/promotions', promotionRoutes);
+app.use('/api/v1/certificates', certificateRoutes);
 
 // 404 Handler
 app.use('*', (req, res) => {

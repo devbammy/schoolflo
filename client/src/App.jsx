@@ -27,6 +27,9 @@ import ResultsAdminPage from './pages/admin/ResultsAdminPage';
 import TimetablePage from './pages/admin/TimetablePage';
 import LibraryPage from './pages/admin/LibraryPage';
 import AcademicCalendarPage from './pages/admin/AcademicCalendarPage';
+import ExamSchedules from './pages/admin/ExamSchedules';
+import Promotions from './pages/admin/Promotions';
+import Certificates from './pages/admin/Certificates';
 
 // Teacher Pages
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
@@ -41,6 +44,7 @@ import StudentResults from './pages/student/StudentResults';
 import StudentAssignments from './pages/student/StudentAssignments';
 import StudentPayments from './pages/student/StudentPayments';
 import StudentTimetable from './pages/student/StudentTimetable';
+import CATracking from './pages/student/CATracking';
 
 // Parent Pages
 import ParentDashboard from './pages/parent/ParentDashboard';
@@ -51,6 +55,7 @@ import ParentTimetable from './pages/parent/ParentTimetable';
 // Shared Pages
 import MyLibraryPage from './pages/shared/MyLibraryPage';
 import CalendarViewPage from './pages/shared/CalendarViewPage';
+import ViewResults from './pages/shared/ViewResults';
 
 // Guards
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -65,7 +70,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 const RoleRedirect = () => {
   const { user } = useAuthStore();
 
-  console.log(user);
   const map = {
     Admin: '/admin',
     Teacher: '/teacher',
@@ -137,6 +141,9 @@ export default function App() {
           <Route path="library" element={<LibraryPage />} />
           <Route path="calendar" element={<AcademicCalendarPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
+          <Route path="exam-schedules" element={<ExamSchedules />} />
+          <Route path="promotions" element={<Promotions />} />
+          <Route path="certificates" element={<Certificates />} />
         </Route>
 
         {/* Teacher */}
@@ -175,6 +182,8 @@ export default function App() {
           <Route path="timetable" element={<StudentTimetable />} />
           <Route path="calendar" element={<CalendarViewPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
+          <Route path="print-results" element={<ViewResults />} />
+          <Route path="ca-tracking" element={<CATracking />} />
         </Route>
 
         {/* Parent */}
@@ -192,6 +201,7 @@ export default function App() {
           <Route path="timetable" element={<ParentTimetable />} />
           <Route path="calendar" element={<CalendarViewPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
+          <Route path="print-results" element={<ViewResults />} />
         </Route>
 
         <Route

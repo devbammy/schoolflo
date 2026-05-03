@@ -271,4 +271,64 @@ export const libraryService = {
   getStats: () => api.get('/library/stats'),
 };
 
-export const calendarService = {};
+export const calendarService = {
+  getAll: () => api.get('/calendar'),
+  getActive: () => api.get('/calendar/active'),
+  getById: (id) => api.get(`/calendar/${id}`),
+  create: (data) => api.post('/calendar', data),
+  update: (id, d) => api.put(`/calendar/${id}`, d),
+  delete: (id) => api.delete(`/calendar/${id}`),
+  addEvent: (id, d) => api.post(`/calendar/${id}/event`, d),
+  updateEvent: (id, eid, d) => api.put(`/calendar/${id}/event/${eid}`, d),
+  deleteEvent: (id, eid) => api.delete(`/calendar/${id}/event/${eid}`),
+  publish: (id) => api.patch(`/calendar/${id}/publish`),
+  activate: (id) => api.patch(`/calendar/${id}/activate`),
+};
+
+// Exam Schedule API
+export const examScheduleService = {
+  create: (data) => api.post('/exam-schedules', data),
+  getAll: (params) => api.get('/exam-schedules', { params }),
+  getById: (id) => api.get(`/exam-schedules/${id}`),
+  update: (id, data) => api.put(`/exam-schedules/${id}`, data),
+  publish: (id) => api.post(`/exam-schedules/${id}/publish`),
+  delete: (id) => api.delete(`/exam-schedules/${id}`),
+  getTeacherInvigilations: (params) =>
+    api.get('/exam-schedules/teacher/invigilations', { params }),
+  checkConflicts: (data) => api.post('/exam-schedules/check-conflicts', data),
+};
+
+export const caTrackingService = {
+  sync: (data) => api.post('/ca-tracking/sync', data),
+  getStudentTracking: (studentId, params) =>
+    api.get(`/ca-tracking/student/${studentId}`, { params }),
+  getClassTracking: (classId, subjectId, params) =>
+    api.get(`/ca-tracking/class/${classId}/subject/${subjectId}`, { params }),
+  getAnalytics: (studentId, params) =>
+    api.get(`/ca-tracking/analytics/${studentId}`, { params }),
+  getChartData: (studentId, subjectId, params) =>
+    api.get(`/ca-tracking/chart/${studentId}/${subjectId}`, { params }),
+};
+
+export const promotionService = {
+  create: (data) => api.post('/promotions', data),
+  getAll: (params) => api.get('/promotions', { params }),
+  getById: (id) => api.get(`/promotions/${id}`),
+  autoProcess: (id) => api.post(`/promotions/${id}/auto-process`),
+  updateStudentStatus: (id, studentId, data) =>
+    api.put(`/promotions/${id}/student/${studentId}`, data),
+  apply: (id) => api.post(`/promotions/${id}/apply`),
+  delete: (id) => api.delete(`/promotions/${id}`),
+  getStats: (id) => api.get(`/promotions/${id}/stats`),
+};
+
+export const certificateService = {
+  generateReportCard: (data) => api.post('/certificates/report-card', data),
+  generateLeavingCertificate: (data) =>
+    api.post('/certificates/leaving-certificate', data),
+  generateAdmissionLetter: (data) =>
+    api.post('/certificates/admission-letter', data),
+  getAll: (params) => api.get('/certificates', { params }),
+  getById: (id) => api.get(`/certificates/${id}`),
+  revoke: (id, data) => api.put(`/certificates/${id}/revoke`, data),
+};

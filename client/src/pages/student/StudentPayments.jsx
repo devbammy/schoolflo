@@ -40,7 +40,6 @@ export default function StudentPayments() {
       window.open(res.data.data.authorizationUrl, '_blank');
       toast.success('Redirecting to payment gateway...');
     } catch (err) {
-      console.log(err);
       toast.error(err.response?.data?.message || 'Payment init failed');
     } finally {
       setPaying(null);

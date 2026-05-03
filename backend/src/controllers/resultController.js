@@ -152,8 +152,6 @@ const bulkUpsertResults = async (req, res) => {
 const publishResults = async (req, res) => {
   const showResults = await Result.findOne().select('scores totalScore grade');
 
-  console.log(showResults);
-
   try {
     const { class: classId, term, academicYear } = req.body;
 

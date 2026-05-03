@@ -28,7 +28,6 @@ const useAuthStore = create(
             `Bearer ${accessToken}`;
           return { success: true, role: user.role };
         } catch (err) {
-          console.log(err);
           const msg = err.response?.data?.message || 'Login failed';
           set({ error: msg, isLoading: false });
           return { success: false, error: msg };

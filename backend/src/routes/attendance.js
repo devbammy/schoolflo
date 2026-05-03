@@ -73,11 +73,7 @@ router.get(
   authorize('Admin', 'Teacher'),
   async (req, res) => {
     const sample = await User.findOne({ role: 'Student' });
-    console.log(
-      'STUDENT CLASS:',
-      sample.studentProfile.class,
-      typeof sample.studentProfile.class,
-    );
+
     try {
       const students = await User.find({
         role: 'Student',

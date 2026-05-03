@@ -43,8 +43,6 @@ const register = async (req, res) => {
           : undefined,
     });
 
-    console.log(user.studentProfile);
-
     await sendEmail({
       to: email,
       subject: 'Welcome to School Management Portal',
