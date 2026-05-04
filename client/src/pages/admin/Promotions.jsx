@@ -7,7 +7,7 @@ const Promotions = () => {
   const [promotions, setPromotions] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [modal, setModal] = useState(null);
   const [selectedPromotion, setSelectedPromotion] = useState(null);
   const [stats, setStats] = useState(null);
   const [saving, setSaving] = useState(null);
@@ -33,7 +33,6 @@ const Promotions = () => {
     try {
       setLoading(true);
       const response = await promotionService.getAll();
-
       setPromotions(response?.data?.data);
     } catch (error) {
       toast.error('Failed to fetch promotions');
@@ -52,13 +51,18 @@ const Promotions = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-
+    if (e) e.preventDefault();
     try {
+      if (!formData.fromClass || !formData.toClass) {
+        toast.warn('All fields are required');
+        return;
+      }
+      setSaving(true);
       setLoading(true);
+
       await promotionService.create(formData);
       toast.success('Promotion batch created successfully');
-      setShowModal(false);
+      setModal(null);
       resetForm();
       fetchPromotions();
     } catch (error) {
@@ -66,7 +70,7 @@ const Promotions = () => {
         error.response?.data?.message || 'Failed to create promotion batch',
       );
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -126,6 +130,7 @@ const Promotions = () => {
 
       setSelectedPromotion(detailsRes.data.data);
       setStats(statsRes.data.data);
+      setModal('details');
     } catch (error) {
       toast.error('Failed to load promotion details');
     } finally {
@@ -171,13 +176,20 @@ const Promotions = () => {
   return (
     <div className="promotions-page">
       <div className="page-header">
-        <h1>Class Promotion & Advancement</h1>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+        <div>
+          <h1 className="page-header__title">Class Promotion & Advancement</h1>
+          <p className="page-header__subtitle">
+            {promotions.length} batches configured
+          </p>
+        </div>
+        <button className="btn btn--primary" onClick={() => setModal('form')}>
           Create Promotion Batch
         </button>
       </div>
 
-      {loading && <div className="loading-spinner">Loading...</div>}
+      {loading && !modal && (
+        <div className="loading-spinner" style={{ margin: '40px auto' }} />
+      )}
 
       <div className="promotions-list">
         {promotions.length > 0 &&
@@ -257,30 +269,10 @@ const Promotions = () => {
           ))}
       </div>
 
-      {/* Create Modal */}
-      {/* {showModal && (
-        <div className="modal-overlay">
-          <div className="modal-content promotion-modal">
-            <div className="modal-header">
-              <h2>Create Promotion Batch</h2>
-              <button
-                className="close-btn"
-                onClick={() => {
-                  setShowModal(false);
-                  resetForm();
-                }}
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        </div>
-      )} */}
-
       <Modal
-        open={showModal === true}
+        open={modal === 'form'}
         onClose={() => {
-          setShowModal(null);
+          setModal(null);
           resetForm();
         }}
         title="Create Promotion Batch"
@@ -288,21 +280,20 @@ const Promotions = () => {
         footer={
           <>
             <button
-              type="button"
               className="btn btn--secondary"
               onClick={() => {
-                setShowModal(false);
+                setModal(null);
                 resetForm();
               }}
             >
               Cancel
             </button>
             <button
-              type="submit"
               className="btn btn--primary"
-              disabled={loading}
+              disabled={saving}
+              onClick={handleSubmit}
             >
-              {loading ? 'Creating...' : 'Create Batch'}
+              {saving ? 'Creating...' : 'Create Batch'}
             </button>
           </>
         }
@@ -348,6 +339,7 @@ const Promotions = () => {
               onChange={(e) =>
                 setFormData({ ...formData, toClass: e.target.value })
               }
+              required
             >
               <option value="">Graduation (No next class)</option>
               {classes.map((cls) => (
@@ -420,105 +412,93 @@ const Promotions = () => {
               Core subjects must be passed
             </label>
           </div>
-
-          {/* <div className="modal-footer">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => {
-                setShowModal(false);
-                resetForm();
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-            >
-              {loading ? 'Creating...' : 'Create Batch'}
-            </button>
-          </div> */}
         </form>
       </Modal>
 
       {/* Details Modal */}
-      {selectedPromotion && stats && (
-        <div
-          className="modal-overlay"
-          onClick={() => setSelectedPromotion(null)}
-        >
+
+      <Modal
+        open={modal === 'details'}
+        onClose={() => setModal(null)}
+        title="Promotion Details"
+        maxWidth={800}
+      >
+        {selectedPromotion && stats && (
           <div
-            className="modal-content promotion-details-modal"
-            onClick={(e) => e.stopPropagation()}
+            className="modal-overlay"
+            onClick={() => setSelectedPromotion(null)}
           >
-            <div className="modal-header">
-              <h2>Promotion Details</h2>
-              <button
-                className="close-btn"
-                onClick={() => setSelectedPromotion(null)}
-              >
-                ×
-              </button>
-            </div>
+            <div
+              className="modal-content promotion-details-modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2>Promotion Details</h2>
+                <button
+                  className="close-btn"
+                  onClick={() => setSelectedPromotion(null)}
+                >
+                  ×
+                </button>
+              </div>
 
-            <div className="stats-grid">
-              <div className="stat-card">
-                <label>Total Students</label>
-                <p className="big-number">{stats.total}</p>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <label>Total Students</label>
+                  <p className="big-number">{stats.total}</p>
+                </div>
+                <div className="stat-card success">
+                  <label>Promoted</label>
+                  <p className="big-number">{stats.promoted}</p>
+                </div>
+                <div className="stat-card warning">
+                  <label>Repeated</label>
+                  <p className="big-number">{stats.repeated}</p>
+                </div>
+                <div className="stat-card info">
+                  <label>Pass Rate</label>
+                  <p className="big-number">{stats.passRate}%</p>
+                </div>
               </div>
-              <div className="stat-card success">
-                <label>Promoted</label>
-                <p className="big-number">{stats.promoted}</p>
-              </div>
-              <div className="stat-card warning">
-                <label>Repeated</label>
-                <p className="big-number">{stats.repeated}</p>
-              </div>
-              <div className="stat-card info">
-                <label>Pass Rate</label>
-                <p className="big-number">{stats.passRate}%</p>
-              </div>
-            </div>
 
-            <div className="students-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Student</th>
-                    <th>Average</th>
-                    <th>Position</th>
-                    <th>Status</th>
-                    <th>Promoted To</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedPromotion.students.map((entry) => (
-                    <tr key={entry.student._id}>
-                      <td>
-                        {entry.student.firstName} {entry.student.lastName}
-                      </td>
-                      <td>{entry.yearlyAverage}%</td>
-                      <td>
-                        {entry.yearlyPosition}/{entry.totalStudents}
-                      </td>
-                      <td>
-                        <span
-                          className={`status-badge status-${entry.status.toLowerCase()}`}
-                        >
-                          {entry.status}
-                        </span>
-                      </td>
-                      <td>{entry.promotedTo?.name || '-'}</td>
+              <div className="students-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Average</th>
+                      <th>Position</th>
+                      <th>Status</th>
+                      <th>Promoted To</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {selectedPromotion.students.map((entry) => (
+                      <tr key={entry.student._id}>
+                        <td>
+                          {entry.student.firstName} {entry.student.lastName}
+                        </td>
+                        <td>{entry.yearlyAverage}%</td>
+                        <td>
+                          {entry.yearlyPosition}/{entry.totalStudents}
+                        </td>
+                        <td>
+                          <span
+                            className={`status-badge status-${entry.status.toLowerCase()}`}
+                          >
+                            {entry.status}
+                          </span>
+                        </td>
+                        <td>{entry.promotedTo?.name || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 };

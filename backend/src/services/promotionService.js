@@ -12,6 +12,8 @@ class PromotionService {
       createdBy: userId,
     });
 
+    console.log(promotion);
+
     await promotion.populate([
       { path: 'fromClass', select: 'name level' },
       { path: 'toClass', select: 'name level' },

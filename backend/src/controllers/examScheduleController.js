@@ -8,7 +8,7 @@ exports.createSchedule = async (req, res) => {
       req.body,
       req.user._id,
     );
-    sendSuccess(res, schedule, 'Exam schedule created successfully', 201);
+    sendSuccess(res, 201, 'Exam schedule created successfully', schedule);
   } catch (error) {
     sendError(res, error.message, 400);
   }
@@ -18,7 +18,7 @@ exports.createSchedule = async (req, res) => {
 exports.getSchedules = async (req, res) => {
   try {
     const schedules = await examScheduleService.getSchedules(req.query);
-    sendSuccess(res, schedules, 'Schedules retrieved successfully');
+    sendSuccess(res, 200, 'Schedules retrieved successfully', schedules);
   } catch (error) {
     sendError(res, error.message, 500);
   }
@@ -28,7 +28,7 @@ exports.getSchedules = async (req, res) => {
 exports.getScheduleById = async (req, res) => {
   try {
     const schedule = await examScheduleService.getScheduleById(req.params.id);
-    sendSuccess(res, schedule, 'Schedule retrieved successfully');
+    sendSuccess(res, 201, 'Schedule retrieved successfully', schedule);
   } catch (error) {
     sendError(res, error.message, 404);
   }
@@ -41,7 +41,7 @@ exports.updateSchedule = async (req, res) => {
       req.params.id,
       req.body,
     );
-    sendSuccess(res, schedule, 'Schedule updated successfully');
+    sendSuccess(res, 201, 'Schedule updated successfully', schedule);
   } catch (error) {
     sendError(res, error.message, 400);
   }
@@ -54,7 +54,12 @@ exports.publishSchedule = async (req, res) => {
       req.params.id,
       req.user._id,
     );
-    sendSuccess(res, schedule, 'Schedule published and notifications sent');
+    sendSuccess(
+      res,
+      201,
+      'Schedule published and notifications sent',
+      schedule,
+    );
   } catch (error) {
     sendError(res, error.message, 400);
   }
@@ -67,7 +72,12 @@ exports.getTeacherInvigilations = async (req, res) => {
       req.user._id,
       req.query,
     );
-    sendSuccess(res, schedules, 'Invigilation schedule retrieved successfully');
+    sendSuccess(
+      res,
+      201,
+      'Invigilation schedule retrieved successfully',
+      schedules,
+    );
   } catch (error) {
     sendError(res, error.message, 500);
   }
@@ -77,7 +87,7 @@ exports.getTeacherInvigilations = async (req, res) => {
 exports.deleteSchedule = async (req, res) => {
   try {
     const result = await examScheduleService.deleteSchedule(req.params.id);
-    sendSuccess(res, result, 'Schedule deleted successfully');
+    sendSuccess(res, 201, 'Schedule deleted successfully', result);
   } catch (error) {
     sendError(res, error.message, 400);
   }
@@ -94,11 +104,10 @@ exports.checkConflicts = async (req, res) => {
       endTime,
       excludeScheduleId,
     );
-    sendSuccess(
-      res,
-      { conflicts, hasConflicts: conflicts.length > 0 },
-      'Conflict check completed',
-    );
+    sendSuccess(res, 201, 'Conflict check completed', {
+      conflicts,
+      hasConflicts: conflicts.length > 0,
+    });
   } catch (error) {
     sendError(res, error.message, 500);
   }

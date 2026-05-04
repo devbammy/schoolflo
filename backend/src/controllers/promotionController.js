@@ -8,8 +8,10 @@ exports.createPromotionBatch = async (req, res) => {
       req.body,
       req.user._id,
     );
+
     sendSuccess(res, 201, 'Promotion batch created successfully', promotion);
   } catch (error) {
+    console.error('CREATE PROMOTION ERROR:', error);
     sendError(res, error.message, 400);
   }
 };
@@ -60,6 +62,7 @@ exports.applyPromotions = async (req, res) => {
 exports.getPromotionById = async (req, res) => {
   try {
     const promotion = await promotionService.getPromotionById(req.params.id);
+
     sendSuccess(res, 201, 'Promotion retrieved successfully', promotion);
   } catch (error) {
     sendError(res, error.message, 404);
@@ -70,7 +73,8 @@ exports.getPromotionById = async (req, res) => {
 exports.getAllPromotions = async (req, res) => {
   try {
     const promotions = await promotionService.getAllPromotions(req.query);
-    sendSuccess(res, 201, 'Promotions retrieved successfully', promotions);
+    console.log('promotions', promotions);
+    sendSuccess(res, 200, 'Promotions retrieved successfully', promotions);
   } catch (error) {
     sendError(res, error.message, 500);
   }

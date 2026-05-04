@@ -5,13 +5,14 @@ import {
   subjectService,
 } from '../../services/api';
 import { toast } from 'react-hot-toast';
+import Modal from '../../components/common/Modal';
 
 const ExamSchedules = () => {
   const [schedules, setSchedules] = useState([]);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -54,7 +55,6 @@ const ExamSchedules = () => {
   const handleClassChange = async (classId) => {
     setFormData({ ...formData, class: classId });
 
-    // Fetch subjects for selected class
     try {
       const response = await classService.getById(classId);
       setSubjects(response.data.data.subjects || []);
@@ -95,23 +95,25 @@ const ExamSchedules = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
 
     try {
       setLoading(true);
 
       if (editingSchedule) {
-        await examScheduleAPI.update(editingSchedule._id, formData);
+        await examScheduleService.update(editingSchedule._id, formData);
+
         toast.success('Exam schedule updated successfully');
       } else {
-        await examScheduleAPI.create(formData);
+        await examScheduleService.create(formData);
         toast.success('Exam schedule created successfully');
       }
 
-      setShowModal(false);
+      setModalOpen(false);
       resetForm();
       fetchSchedules();
     } catch (error) {
+      console.log(error);
       toast.error(
         error.response?.data?.message || 'Failed to save exam schedule',
       );
@@ -131,7 +133,7 @@ const ExamSchedules = () => {
 
     try {
       setLoading(true);
-      await examScheduleAPI.publish(id);
+      await examScheduleService.publish(id);
       toast.success('Exam schedule published successfully');
       fetchSchedules();
     } catch (error) {
@@ -152,7 +154,7 @@ const ExamSchedules = () => {
 
     try {
       setLoading(true);
-      await examScheduleAPI.delete(id);
+      await examScheduleService.delete(id);
       toast.success('Exam schedule deleted successfully');
       fetchSchedules();
     } catch (error) {
@@ -179,13 +181,20 @@ const ExamSchedules = () => {
   return (
     <div className="exam-schedules-page">
       <div className="page-header">
-        <h1>Examination Scheduling</h1>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+        <div>
+          <h1 className="page-header__title">Examination Scheduling</h1>
+          <p className="page-header__subtitle">
+            {schedules.length} schedules managed
+          </p>
+        </div>
+        <button className="btn btn--primary" onClick={() => setModalOpen(true)}>
           Create Exam Schedule
         </button>
       </div>
 
-      {loading && <div className="loading-spinner">Loading...</div>}
+      {loading && !modalOpen && (
+        <div className="loading-spinner" style={{ margin: '40px auto' }} />
+      )}
 
       <div className="schedules-list">
         {schedules.length > 0 &&
@@ -226,7 +235,7 @@ const ExamSchedules = () => {
                   onClick={() => {
                     setEditingSchedule(schedule);
                     setFormData(schedule);
-                    setShowModal(true);
+                    setModalOpen(true);
                   }}
                 >
                   Edit
@@ -253,277 +262,283 @@ const ExamSchedules = () => {
           ))}
       </div>
 
-      {/* Modal for Create/Edit */}
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal-content exam-schedule-modal">
-            <div className="modal-header">
-              <h2>
-                {editingSchedule
-                  ? 'Edit Exam Schedule'
-                  : 'Create Exam Schedule'}
-              </h2>
-              <button
-                className="close-btn"
-                onClick={() => {
-                  setShowModal(false);
-                  resetForm();
-                }}
+      <Modal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          resetForm();
+        }}
+        title={editingSchedule ? 'Edit Exam Schedule' : 'Create Exam Schedule'}
+        maxWidth={800}
+        footer={
+          <>
+            <button
+              className="btn btn--secondary"
+              onClick={() => {
+                setModalOpen(false);
+                resetForm();
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn--primary"
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {loading
+                ? 'Saving...'
+                : editingSchedule
+                  ? 'Update Schedule'
+                  : 'Create Schedule'}
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <div className="form-group">
+              <label>Title *</label>
+              <input
+                className="form-control"
+                type="text"
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Exam Type *</label>
+              <select
+                className="form-control"
+                value={formData.examType}
+                onChange={(e) =>
+                  setFormData({ ...formData, examType: e.target.value })
+                }
+                required
               >
-                ×
+                <option value="Mid-Term">Mid-Term</option>
+                <option value="Final Exam">Final Exam</option>
+                <option value="Mock Exam">Mock Exam</option>
+                <option value="External Exam">External Exam</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Class *</label>
+              <select
+                className="form-control"
+                value={formData.class}
+                onChange={(e) => handleClassChange(e.target.value)}
+                required
+              >
+                <option value="">Select Class</option>
+                {classes.map((cls) => (
+                  <option key={cls._id} value={cls._id}>
+                    {cls.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Term *</label>
+              <select
+                className="form-control"
+                value={formData.term}
+                onChange={(e) =>
+                  setFormData({ ...formData, term: e.target.value })
+                }
+                required
+              >
+                <option value="First Term">First Term</option>
+                <option value="Second Term">Second Term</option>
+                <option value="Third Term">Third Term</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Academic Year *</label>
+              <input
+                className="form-control"
+                type="text"
+                value={formData.academicYear}
+                onChange={(e) =>
+                  setFormData({ ...formData, academicYear: e.target.value })
+                }
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Start Date *</label>
+              <input
+                className="form-control"
+                type="date"
+                value={formData.startDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, startDate: e.target.value })
+                }
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>End Date *</label>
+              <input
+                className="form-control"
+                type="date"
+                value={formData.endDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, endDate: e.target.value })
+                }
+                required
+              />
+            </div>
+          </div>
+
+          {/* Exam Sessions */}
+          <div className="sessions-section">
+            <div className="section-header">
+              <h3>Exam Sessions</h3>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={addSession}
+              >
+                Add Session
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label>Title *</label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) =>
-                      setFormData({ ...formData, title: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Exam Type *</label>
-                  <select
-                    value={formData.examType}
-                    onChange={(e) =>
-                      setFormData({ ...formData, examType: e.target.value })
-                    }
-                    required
-                  >
-                    <option value="Mid-Term">Mid-Term</option>
-                    <option value="Final Exam">Final Exam</option>
-                    <option value="Mock Exam">Mock Exam</option>
-                    <option value="External Exam">External Exam</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Class *</label>
-                  <select
-                    value={formData.class}
-                    onChange={(e) => handleClassChange(e.target.value)}
-                    required
-                  >
-                    <option value="">Select Class</option>
-                    {classes.map((cls) => (
-                      <option key={cls._id} value={cls._id}>
-                        {cls.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Term *</label>
-                  <select
-                    value={formData.term}
-                    onChange={(e) =>
-                      setFormData({ ...formData, term: e.target.value })
-                    }
-                    required
-                  >
-                    <option value="First Term">First Term</option>
-                    <option value="Second Term">Second Term</option>
-                    <option value="Third Term">Third Term</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Academic Year *</label>
-                  <input
-                    type="text"
-                    value={formData.academicYear}
-                    onChange={(e) =>
-                      setFormData({ ...formData, academicYear: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Start Date *</label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startDate: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>End Date *</label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, endDate: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Exam Sessions */}
-              <div className="sessions-section">
-                <div className="section-header">
-                  <h3>Exam Sessions</h3>
+            {formData.sessions.map((session, index) => (
+              <div key={index} className="session-card">
+                <div className="session-header">
+                  <h4>Session {index + 1}</h4>
                   <button
                     type="button"
-                    className="btn btn-sm btn-secondary"
-                    onClick={addSession}
+                    className="btn btn-sm btn-danger"
+                    onClick={() => removeSession(index)}
                   >
-                    Add Session
+                    Remove
                   </button>
                 </div>
 
-                {formData.sessions.map((session, index) => (
-                  <div key={index} className="session-card">
-                    <div className="session-header">
-                      <h4>Session {index + 1}</h4>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-danger"
-                        onClick={() => removeSession(index)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-
-                    <div className="form-grid">
-                      <div className="form-group">
-                        <label>Subject *</label>
-                        <select
-                          value={session.subject}
-                          onChange={(e) =>
-                            updateSession(index, 'subject', e.target.value)
-                          }
-                          required
-                        >
-                          <option value="">Select Subject</option>
-                          {subjects.map((subject) => (
-                            <option key={subject._id} value={subject._id}>
-                              {subject.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="form-group">
-                        <label>Date *</label>
-                        <input
-                          type="date"
-                          value={session.date}
-                          onChange={(e) =>
-                            updateSession(index, 'date', e.target.value)
-                          }
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Start Time *</label>
-                        <input
-                          type="time"
-                          value={session.startTime}
-                          onChange={(e) =>
-                            updateSession(index, 'startTime', e.target.value)
-                          }
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>End Time *</label>
-                        <input
-                          type="time"
-                          value={session.endTime}
-                          onChange={(e) =>
-                            updateSession(index, 'endTime', e.target.value)
-                          }
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Venue *</label>
-                        <input
-                          type="text"
-                          value={session.venue}
-                          onChange={(e) =>
-                            updateSession(index, 'venue', e.target.value)
-                          }
-                          placeholder="e.g., Hall A, Room 101"
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Max Marks</label>
-                        <input
-                          type="number"
-                          value={session.maxMarks}
-                          onChange={(e) =>
-                            updateSession(
-                              index,
-                              'maxMarks',
-                              parseInt(e.target.value),
-                            )
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label>Instructions</label>
-                      <textarea
-                        value={session.instructions}
-                        onChange={(e) =>
-                          updateSession(index, 'instructions', e.target.value)
-                        }
-                        rows="2"
-                        placeholder="Special instructions for this exam session"
-                      />
-                    </div>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Subject *</label>
+                    <select
+                      className="form-control"
+                      value={session.subject}
+                      onChange={(e) =>
+                        updateSession(index, 'subject', e.target.value)
+                      }
+                      required
+                    >
+                      <option value="">Select Subject</option>
+                      {subjects.map((subject) => (
+                        <option key={subject._id} value={subject._id}>
+                          {subject.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                ))}
-              </div>
 
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loading}
-                >
-                  {loading
-                    ? 'Saving...'
-                    : editingSchedule
-                      ? 'Update Schedule'
-                      : 'Create Schedule'}
-                </button>
+                  <div className="form-group">
+                    <label>Date *</label>
+                    <input
+                      className="form-control"
+                      type="date"
+                      value={session.date}
+                      onChange={(e) =>
+                        updateSession(index, 'date', e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Start Time *</label>
+                    <input
+                      className="form-control"
+                      type="time"
+                      value={session.startTime}
+                      onChange={(e) =>
+                        updateSession(index, 'startTime', e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>End Time *</label>
+                    <input
+                      className="form-control"
+                      type="time"
+                      value={session.endTime}
+                      onChange={(e) =>
+                        updateSession(index, 'endTime', e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Venue *</label>
+                    <input
+                      className="form-control"
+                      type="text"
+                      value={session.venue}
+                      onChange={(e) =>
+                        updateSession(index, 'venue', e.target.value)
+                      }
+                      placeholder="e.g., Hall A, Room 101"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Max Marks</label>
+                    <input
+                      className="form-control"
+                      type="number"
+                      value={session.maxMarks}
+                      onChange={(e) =>
+                        updateSession(
+                          index,
+                          'maxMarks',
+                          parseInt(e.target.value),
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Instructions</label>
+                  <textarea
+                    style={{
+                      width: '100%',
+                      borderRadius: '10px',
+                      minHeight: '150px',
+                      padding: '10px',
+                      resize: 'none',
+                    }}
+                    value={session.instructions}
+                    onChange={(e) =>
+                      updateSession(index, 'instructions', e.target.value)
+                    }
+                    rows="2"
+                    placeholder="Special instructions for this exam session"
+                  />
+                </div>
               </div>
-            </form>
+            ))}
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   );
 };
