@@ -254,16 +254,7 @@ const Certificates = () => {
       >
         <form onSubmit={handleGenerate}>
           <div className="form-group">
-            <label
-              style={{
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                display: 'block',
-                marginBottom: 8,
-              }}
-            >
-              Certificate Type *
-            </label>
+            <label>Certificate Type *</label>
             <select
               className="form-control"
               value={certificateType}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { promotionService, classService } from '../../services/api';
 import { toast } from 'react-hot-toast';
+import Modal from '../../components/common/Modal';
 
 const Promotions = () => {
   const [promotions, setPromotions] = useState([]);
@@ -9,6 +10,7 @@ const Promotions = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState(null);
   const [stats, setStats] = useState(null);
+  const [saving, setSaving] = useState(null);
 
   const [formData, setFormData] = useState({
     academicYear: new Date().getFullYear().toString(),
@@ -256,7 +258,7 @@ const Promotions = () => {
       </div>
 
       {/* Create Modal */}
-      {showModal && (
+      {/* {showModal && (
         <div className="modal-overlay">
           <div className="modal-content promotion-modal">
             <div className="modal-header">
@@ -271,138 +273,175 @@ const Promotions = () => {
                 ×
               </button>
             </div>
-
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Academic Year *</label>
-                <input
-                  type="text"
-                  value={formData.academicYear}
-                  onChange={(e) =>
-                    setFormData({ ...formData, academicYear: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>From Class *</label>
-                <select
-                  value={formData.fromClass}
-                  onChange={(e) =>
-                    setFormData({ ...formData, fromClass: e.target.value })
-                  }
-                  required
-                >
-                  <option value="">Select Class</option>
-                  {classes.map((cls) => (
-                    <option key={cls._id} value={cls._id}>
-                      {cls.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>To Class</label>
-                <select
-                  value={formData.toClass}
-                  onChange={(e) =>
-                    setFormData({ ...formData, toClass: e.target.value })
-                  }
-                >
-                  <option value="">Graduation (No next class)</option>
-                  {classes.map((cls) => (
-                    <option key={cls._id} value={cls._id}>
-                      {cls.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <h3>Promotion Criteria</h3>
-
-              <div className="form-group">
-                <label>Minimum Average (%) *</label>
-                <input
-                  type="number"
-                  value={formData.criteria.minimumAverage}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      criteria: {
-                        ...formData.criteria,
-                        minimumAverage: parseInt(e.target.value),
-                      },
-                    })
-                  }
-                  min="0"
-                  max="100"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Maximum Failed Subjects *</label>
-                <input
-                  type="number"
-                  value={formData.criteria.maximumFailures}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      criteria: {
-                        ...formData.criteria,
-                        maximumFailures: parseInt(e.target.value),
-                      },
-                    })
-                  }
-                  min="0"
-                  required
-                />
-              </div>
-
-              <div className="form-group checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={formData.criteria.coreSubjectsMustPass}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        criteria: {
-                          ...formData.criteria,
-                          coreSubjectsMustPass: e.target.checked,
-                        },
-                      })
-                    }
-                  />
-                  Core subjects must be passed
-                </label>
-              </div>
-
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loading}
-                >
-                  {loading ? 'Creating...' : 'Create Batch'}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
-      )}
+      )} */}
+
+      <Modal
+        open={showModal === true}
+        onClose={() => {
+          setShowModal(null);
+          resetForm();
+        }}
+        title="Create Promotion Batch"
+        maxWidth={600}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => {
+                setShowModal(false);
+                resetForm();
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={loading}
+            >
+              {loading ? 'Creating...' : 'Create Batch'}
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Academic Year *</label>
+            <input
+              className="form-control"
+              type="text"
+              value={formData.academicYear}
+              onChange={(e) =>
+                setFormData({ ...formData, academicYear: e.target.value })
+              }
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>From Class *</label>
+            <select
+              className="form-control"
+              value={formData.fromClass}
+              onChange={(e) =>
+                setFormData({ ...formData, fromClass: e.target.value })
+              }
+              required
+            >
+              <option value="">Select Class</option>
+              {classes.map((cls) => (
+                <option key={cls._id} value={cls._id}>
+                  {cls.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>To Class</label>
+            <select
+              className="form-control"
+              value={formData.toClass}
+              onChange={(e) =>
+                setFormData({ ...formData, toClass: e.target.value })
+              }
+            >
+              <option value="">Graduation (No next class)</option>
+              {classes.map((cls) => (
+                <option key={cls._id} value={cls._id}>
+                  {cls.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <h3>Promotion Criteria</h3>
+
+          <div className="form-group">
+            <label>Minimum Average (%) *</label>
+            <input
+              className="form-control"
+              type="number"
+              value={formData.criteria.minimumAverage}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  criteria: {
+                    ...formData.criteria,
+                    minimumAverage: parseInt(e.target.value),
+                  },
+                })
+              }
+              min="0"
+              max="100"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Maximum Failed Subjects *</label>
+            <input
+              className="form-control"
+              type="number"
+              value={formData.criteria.maximumFailures}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  criteria: {
+                    ...formData.criteria,
+                    maximumFailures: parseInt(e.target.value),
+                  },
+                })
+              }
+              min="0"
+              required
+            />
+          </div>
+
+          <div className="form-group checkbox-group">
+            <label>
+              <input
+                className="form-control"
+                type="checkbox"
+                checked={formData.criteria.coreSubjectsMustPass}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    criteria: {
+                      ...formData.criteria,
+                      coreSubjectsMustPass: e.target.checked,
+                    },
+                  })
+                }
+              />
+              Core subjects must be passed
+            </label>
+          </div>
+
+          {/* <div className="modal-footer">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowModal(false);
+                resetForm();
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+            >
+              {loading ? 'Creating...' : 'Create Batch'}
+            </button>
+          </div> */}
+        </form>
+      </Modal>
 
       {/* Details Modal */}
       {selectedPromotion && stats && (
