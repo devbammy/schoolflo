@@ -140,6 +140,7 @@ const Certificates = () => {
     });
   };
 
+
   return (
     <div className="certificates-page">
       <div className="page-header">

@@ -17,6 +17,7 @@ const useAuthStore = create(
         try {
           const { data } = await api.post('/auth/login', { email, password });
           const { user, accessToken, refreshToken } = data.data;
+
           set({
             user,
             accessToken,
@@ -24,8 +25,10 @@ const useAuthStore = create(
             isAuthenticated: true,
             isLoading: false,
           });
+
           api.defaults.headers.common['Authorization'] =
             `Bearer ${accessToken}`;
+
           return { success: true, role: user.role };
         } catch (err) {
           const msg = err.response?.data?.message || 'Login failed';

@@ -40,7 +40,12 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/login') &&
+      !originalRequest.url?.includes('/auth/refresh')
+    ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -57,7 +62,11 @@ api.interceptors.response.use(
 
       try {
         const stored = localStorage.getItem('smp-auth');
-        const { state } = JSON.parse(stored);
+        if (!stored) throw new Error('No stored auth state');
+        const parsed = JSON.parse(stored);
+        const state = parsed.state || {};
+        if (!state.refreshToken) throw new Error('No refresh token');
+
         const { data } = await api.post('/auth/refresh', {
           refreshToken: state.refreshToken,
         });
@@ -77,7 +86,9 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         localStorage.removeItem('smp-auth');
-        window.location.href = '/login';
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

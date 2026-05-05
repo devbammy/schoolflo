@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail, School } from 'lucide-react';
+import { CloudCog, Eye, EyeOff, Lock, Mail, School } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useAuthStore from '../../store/authStore';
 
@@ -17,24 +17,19 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const { login, isLoading, error } = useAuthStore();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
 
+  
+  
   const handleSubmit = async (e) => {
-    try {
-      e.preventDefault();
-      setLoading(true);
-      const result = await login(email, password);
-      if (result.success) {
-        toast.success('Welcome back!');
-        navigate(ROLE_REDIRECTS[result.role] || '/');
-      } else {
-        toast.error(result.error);
-      }
-    } catch (error) {
-      setLoading(false);
-      toast.error('An unexpected error occurred. Please try again.');
-    } finally {
-      setLoading(false);
+    e.preventDefault();
+
+    const result = await login(email, password);
+
+    if (result.success) {
+      toast.success('Welcome back!');
+      navigate(ROLE_REDIRECTS[result.role] || '/');
+    } else {
+      toast.error(result.error);
     }
   };
 
@@ -319,9 +314,9 @@ export default function LoginPage() {
             <button
               type="submit"
               className="btn btn--primary btn--full btn--lg"
-              disabled={loading}
+              disabled={isLoading}
             >
-              {loading ? (
+              {isLoading ? (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span
                     className="spinner"

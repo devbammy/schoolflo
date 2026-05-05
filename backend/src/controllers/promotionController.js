@@ -73,7 +73,6 @@ exports.getPromotionById = async (req, res) => {
 exports.getAllPromotions = async (req, res) => {
   try {
     const promotions = await promotionService.getAllPromotions(req.query);
-    console.log('promotions', promotions);
     sendSuccess(res, 200, 'Promotions retrieved successfully', promotions);
   } catch (error) {
     sendError(res, error.message, 500);
