@@ -92,6 +92,8 @@ exports.generateAdmissionLetter = async (req, res) => {
 
     await certificate.populate('student', 'firstName lastName');
 
+    console.log(certificate);
+
     sendSuccess(
       res,
       201,
@@ -111,7 +113,7 @@ exports.getAllCertificates = async (req, res) => {
 
     if (certificateType) query.certificateType = certificateType;
     if (student) query.student = student;
-    if (academicYear) query['data.academicYear'] = academicYear;
+    if (academicYear) query.academicYear = academicYear;
 
     const certificates = await Certificate.find(query)
       .populate('student', 'firstName lastName studentProfile')

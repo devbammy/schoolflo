@@ -68,14 +68,16 @@ const Certificates = () => {
         case 'School Leaving Certificate':
           response = await certificateService.generateLeavingCertificate({
             studentId: leavingCertData.studentId,
-            data: { ...leavingCertData, certificateNumber: '' },
+            data: { ...leavingCertData },
           });
           break;
         case 'Admission Letter':
           response = await certificateService.generateAdmissionLetter({
             studentId: admissionLetterData.studentId,
-            data: { ...admissionLetterData, certificateNumber: '' },
+            data: { ...admissionLetterData },
           });
+
+          console.log(response);
           break;
         default:
           throw new Error('Invalid certificate type');
@@ -87,8 +89,9 @@ const Certificates = () => {
       fetchCertificates();
 
       // Open PDF in new tab
-      window.open(response.data.data.pdfUrl, '_blank');
+      // window.open(response.data.data.pdfUrl, '_blank');
     } catch (error) {
+      console.log(error);
       toast.error(
         error.response?.data?.message || 'Failed to generate certificate',
       );
@@ -139,7 +142,6 @@ const Certificates = () => {
       city: '',
     });
   };
-
 
   return (
     <div className="certificates-page">

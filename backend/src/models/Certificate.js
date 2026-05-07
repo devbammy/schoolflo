@@ -27,7 +27,6 @@ const certificateSchema = new mongoose.Schema(
     certificateNumber: {
       type: String,
       unique: true,
-      required: true,
     },
     issueDate: {
       type: Date,
@@ -67,8 +66,8 @@ const certificateSchema = new mongoose.Schema(
 // Auto-generate certificate number
 certificateSchema.pre('save', async function (next) {
   if (!this.certificateNumber) {
-    const count = await mongoose.model('Certificate').countDocuments();
     const year = new Date().getFullYear();
+
     const typePrefix = {
       'Report Card': 'RC',
       'School Leaving Certificate': 'SLC',
@@ -77,8 +76,25 @@ certificateSchema.pre('save', async function (next) {
       'Transfer Certificate': 'TC',
     }[this.certificateType];
 
-    this.certificateNumber = `${typePrefix}/${year}/${String(count + 1).padStart(5, '0')}`;
+    const lastCertificate = await mongoose
+      .model('Certificate')
+      .findOne({
+        certificateType: this.certificateType,
+      })
+      .sort({ createdAt: -1 });
+
+    let nextNumber = 1;
+
+    if (lastCertificate?.certificateNumber) {
+      const parts = lastCertificate.certificateNumber.split('/');
+      nextNumber = parseInt(parts[2]) + 1;
+    }
+
+    this.certificateNumber = `${typePrefix}/${year}/${String(
+      nextNumber,
+    ).padStart(5, '0')}`;
   }
+
   next();
 });
 
