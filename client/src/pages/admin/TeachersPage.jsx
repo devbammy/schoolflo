@@ -137,6 +137,7 @@ export default function TeachersPage() {
       setModal(null);
       load();
     } catch (err) {
+      console.log(err.response?.data?.message);
       toast.error(err.response?.data?.message || 'Operation failed');
     } finally {
       setSaving(false);

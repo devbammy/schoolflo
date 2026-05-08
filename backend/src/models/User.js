@@ -119,10 +119,7 @@ UserSchema.virtual('fullName').get(function () {
 });
 
 // Indexes
-UserSchema.index({ email: 1 });
 UserSchema.index({ role: 1 });
-UserSchema.index({ 'studentProfile.admissionNumber': 1 });
-UserSchema.index({ 'teacherProfile.staffId': 1 });
 
 // Admission Number and harshed password
 UserSchema.pre('save', async function (next) {
@@ -140,10 +137,17 @@ UserSchema.pre('save', async function (next) {
 
       const Counter = require('./Counter');
 
-      const prefix = (this.lastName || 'XX')
-        .substring(0, 2)
+      const firstNamePrefix = (this.firstName || 'XX')
+        .substring(0, 1)
         .toUpperCase()
-        .padEnd(2, 'X');
+        .padEnd(1, 'X');
+
+      const lastNamePrefix = (this.lastName || 'XX')
+        .substring(0, 1)
+        .toUpperCase()
+        .padEnd(1, 'X');
+
+      const prefix = `${firstNamePrefix}${lastNamePrefix}`;
 
       const year = new Date().getFullYear().toString().slice(-2);
 
@@ -163,10 +167,17 @@ UserSchema.pre('save', async function (next) {
 
       const Counter = require('./Counter');
 
-      const prefix = (this.lastName || 'XX')
-        .substring(0, 2)
+      const firstNamePrefix = (this.firstName || 'XX')
+        .substring(0, 1)
         .toUpperCase()
-        .padEnd(2, 'X');
+        .padEnd(1, 'X');
+
+      const lastNamePrefix = (this.lastName || 'XX')
+        .substring(0, 1)
+        .toUpperCase()
+        .padEnd(1, 'X');
+
+      const prefix = `${firstNamePrefix}${lastNamePrefix}`;
 
       const year = new Date().getFullYear().toString().slice(-2);
 

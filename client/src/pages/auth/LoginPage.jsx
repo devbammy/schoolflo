@@ -18,8 +18,6 @@ export default function LoginPage() {
   const { login, isLoading, error } = useAuthStore();
   const navigate = useNavigate();
 
-  
-  
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -127,7 +125,7 @@ export default function LoginPage() {
                 style={{
                   width: 8,
                   height: 8,
-                  borderRadius: '50%',
+                  // borderRadius: '50%',
                   background: 'var(--clr-accent)',
                   marginTop: 8,
                   flexShrink: 0,

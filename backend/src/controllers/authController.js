@@ -19,11 +19,16 @@ const register = async (req, res) => {
       password,
       role,
       phone,
-      classId, // ✅ ADD THIS
+      studentProfile,
+      teacherProfile,
+      parentProfile,
     } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) return sendError(res, 400, 'Email already registered');
+
+    // Helper to convert empty strings to null for ObjectId fields
+    const cleanObjectId = (val) => (val === '' || !val ? null : val);
 
     const user = await User.create({
       firstName,
@@ -37,10 +42,24 @@ const register = async (req, res) => {
       studentProfile:
         role === 'Student'
           ? {
-              class: classId || null, // ✅ THIS FIXES YOUR ATTENDANCE BUG
+              class: cleanObjectId(studentProfile?.class),
+              section: studentProfile?.section || null,
+              dateOfBirth: studentProfile?.dateOfBirth || null,
+              gender: studentProfile?.gender || null,
+              address: studentProfile?.address || null,
+              bloodGroup: studentProfile?.bloodGroup || null,
+              medicalNotes: studentProfile?.medicalNotes || null,
               profileStatus: 'Active',
             }
           : undefined,
+      teacherProfile:
+        role === 'Teacher'
+          ? {
+              ...teacherProfile,
+              classTeacherOf: cleanObjectId(teacherProfile?.classTeacherOf),
+            }
+          : undefined,
+      parentProfile: role === 'Parent' ? parentProfile : undefined,
     });
 
     await sendEmail({

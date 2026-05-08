@@ -100,6 +100,5 @@ certificateSchema.pre('save', async function (next) {
 
 // Index for queries
 certificateSchema.index({ student: 1, certificateType: 1, academicYear: 1 });
-certificateSchema.index({ certificateNumber: 1 });
 
 module.exports = mongoose.model('Certificate', certificateSchema);

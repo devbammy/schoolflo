@@ -182,7 +182,6 @@ AcademicCalendarSchema.virtual('upcomingEvents').get(function () {
     .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
 });
 
-AcademicCalendarSchema.index({ academicYear: 1 }, { unique: true });
 AcademicCalendarSchema.index({ isActive: 1 });
 
 module.exports = mongoose.model('AcademicCalendar', AcademicCalendarSchema);

@@ -20,24 +20,6 @@ const seedUsers = async () => {
         isVerified: true,
         status: 'active',
       },
-      {
-        firstName: 'Class',
-        lastName: 'Teacher',
-        email: 'teacher@school.com',
-        password: hashedPassword,
-        role: 'Teacher',
-        isVerified: true,
-        status: 'active',
-      },
-      {
-        firstName: 'Emmanuel',
-        lastName: 'Bamidele',
-        email: 'student@school.com',
-        password: hashedPassword,
-        role: 'Student',
-        isVerified: true,
-        status: 'active',
-      },
     ];
 
     await User.insertMany(users);

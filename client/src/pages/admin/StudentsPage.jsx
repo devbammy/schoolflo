@@ -29,6 +29,8 @@ const EMPTY_FORM = {
     section: '',
     dateOfBirth: '',
     address: '',
+    bloodGroup: '',
+    medicalNotes: '',
   },
 };
 
@@ -91,6 +93,8 @@ export default function StudentsPage() {
           ? s.studentProfile.dateOfBirth.split('T')[0]
           : '',
         address: s.studentProfile?.address || '',
+        bloodGroup: s.studentProfile?.bloodGroup || '',
+        medicalNotes: s.studentProfile?.medicalNotes || '',
       },
     });
     setModal('edit');
@@ -217,6 +221,7 @@ export default function StudentsPage() {
                 <th>Admission No.</th>
                 <th>Class</th>
                 <th>Gender</th>
+                <th>Bld Grp</th>
                 <th>Status</th>
                 <th>Joined</th>
                 <th>Actions</th>
@@ -308,6 +313,7 @@ export default function StudentsPage() {
                     </td>
                     <td>{s.studentProfile?.class?.name || '—'}</td>
                     <td>{s.studentProfile?.gender || '—'}</td>
+                    <td>{s.studentProfile?.bloodGroup || '—'}</td>
                     <td>
                       <span
                         className={`badge badge--${s.isActive ? 'success' : 'danger'}`}
@@ -517,6 +523,44 @@ export default function StudentsPage() {
                       }
                     />
                   </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Blood Group</label>
+                    <select
+                      className="form-control"
+                      value={form.studentProfile.bloodGroup}
+                      onChange={(e) =>
+                        setField('studentProfile.bloodGroup', e.target.value)
+                      }
+                    >
+                      <option value="">Select Blood Group</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                    </select>
+                  </div>
+                  <div
+                    className="form-group"
+                    style={{
+                      gridColumn: '1/-1',
+                      marginBottom: 0,
+                    }}
+                  >
+                    <label>Medical Notes (Optional)</label>
+                    <textarea
+                      className="form-control"
+                      value={form.studentProfile.medicalNotes}
+                      onChange={(e) =>
+                        setField('studentProfile.medicalNotes', e.target.value)
+                      }
+                      style={{ resize: 'none' }}
+                    />
+                  </div>
+
                   <div
                     className="form-group"
                     style={{ gridColumn: '1/-1', marginBottom: 0 }}

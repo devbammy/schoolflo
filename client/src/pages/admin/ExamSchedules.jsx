@@ -35,6 +35,7 @@ const ExamSchedules = () => {
     try {
       setLoading(true);
       const response = await examScheduleService.getAll();
+
       setSchedules(response?.data?.data);
     } catch (error) {
       toast.error('Failed to fetch exam schedules');
@@ -57,7 +58,8 @@ const ExamSchedules = () => {
 
     try {
       const response = await classService.getById(classId);
-      setSubjects(response.data.data.subjects || []);
+
+      setSubjects(response.data.data?.class?.subjects || []);
     } catch (error) {
       console.error('Failed to fetch subjects');
     }
@@ -438,11 +440,12 @@ const ExamSchedules = () => {
                       required
                     >
                       <option value="">Select Subject</option>
-                      {subjects.map((subject) => (
-                        <option key={subject._id} value={subject._id}>
-                          {subject.name}
-                        </option>
-                      ))}
+                      {subjects &&
+                        subjects.map((subject) => (
+                          <option key={subject._id} value={subject._id}>
+                            {subject.name}
+                          </option>
+                        ))}
                     </select>
                   </div>
 
