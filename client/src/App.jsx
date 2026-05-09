@@ -54,6 +54,7 @@ import ParentResults from './pages/parent/ParentResults';
 import ParentPayments from './pages/parent/ParentPayments';
 import ParentTimetable from './pages/parent/ParentTimetable';
 import ParentExamSchedule from './pages/parent/ParentExamSchedule';
+import ParentAssignments from './pages/parent/ParentAssignments';
 
 // Shared Pages
 import MyLibraryPage from './pages/shared/MyLibraryPage';
@@ -203,6 +204,7 @@ export default function App() {
           <Route index element={<ParentDashboard />} />
           <Route path="results" element={<ParentResults />} />
           <Route path="payments" element={<ParentPayments />} />
+          <Route path="assignments" element={<ParentAssignments />} />
           <Route path="timetable" element={<ParentTimetable />} />
           <Route path="calendar" element={<CalendarViewPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />

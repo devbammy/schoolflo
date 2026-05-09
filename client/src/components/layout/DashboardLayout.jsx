@@ -199,6 +199,11 @@ const NAV_CONFIG = {
       section: 'My Children',
       items: [
         { to: '/parent/results', icon: BarChart3, label: 'Academic Results' },
+        {
+          to: '/parent/assignments',
+          icon: ClipboardList,
+          label: 'Assignments',
+        },
         { to: '/parent/payments', icon: CreditCard, label: 'Fee Payments' },
         { to: '/parent/timetable', icon: Calendar, label: 'Timetables' },
         {

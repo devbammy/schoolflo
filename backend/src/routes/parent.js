@@ -241,4 +241,93 @@ router.get(
   },
 );
 
+// GET children's assignments and submissions for parent
+router.get(
+  '/children/assignments',
+  protect,
+  authorize('Parent'),
+  async (req, res) => {
+    try {
+      const parent = await User.findById(req.user._id).populate(
+        'parentProfile.children',
+      );
+
+      if (!parent || !parent.parentProfile.children.length) {
+        return sendSuccess(res, 200, 'No children found', { assignments: [] });
+      }
+
+      const { Assignment } = require('../models/Assignment');
+      const { Submission } = require('../models/Assignment');
+
+      const childrenIds = parent.parentProfile.children.map(
+        (child) => child._id,
+      );
+
+      // Get all assignments for classes where children are enrolled
+      const childClasses = parent.parentProfile.children
+        .map((child) => child.studentProfile?.class)
+        .filter(Boolean);
+
+      const assignments = await Assignment.find({
+        class: { $in: childClasses },
+        isActive: true,
+      })
+        .populate('class', 'name')
+        .populate('subject', 'name code')
+        .populate('teacher', 'firstName lastName')
+        .sort({ dueDate: -1 });
+
+      // Get all submissions for these children
+      const submissions = await Submission.find({
+        student: { $in: childrenIds },
+      })
+        .populate('student', 'firstName lastName')
+        .lean();
+
+      // Combine data: for each assignment, show submission status for each child
+      const assignmentData = assignments.map((assignment) => {
+        const childSubmissions = {};
+        parent.parentProfile.children.forEach((child) => {
+          const submission = submissions.find(
+            (sub) =>
+              String(sub.assignment) === String(assignment._id) &&
+              String(sub.student._id) === String(child._id),
+          );
+          childSubmissions[String(child._id)] = {
+            childName: `${child.firstName} ${child.lastName}`,
+            status: submission?.status || 'Not Submitted',
+            submittedAt: submission?.submittedAt || null,
+            isLate: submission?.isLate || false,
+            score: submission?.score || null,
+            feedback: submission?.feedback || null,
+          };
+        });
+
+        return {
+          _id: assignment._id,
+          title: assignment.title,
+          description: assignment.description,
+          subject: assignment.subject,
+          class: assignment.class,
+          dueDate: assignment.dueDate,
+          totalMarks: assignment.totalMarks,
+          isOverdue: new Date() > assignment.dueDate,
+          childrenData: childSubmissions,
+        };
+      });
+
+      return sendSuccess(res, 200, 'Children assignments retrieved', {
+        assignments: assignmentData,
+        children: parent.parentProfile.children.map((child) => ({
+          _id: child._id,
+          name: `${child.firstName} ${child.lastName}`,
+          class: child.studentProfile?.class?.name,
+        })),
+      });
+    } catch (error) {
+      return sendError(res, 500, error.message);
+    }
+  },
+);
+
 module.exports = router;

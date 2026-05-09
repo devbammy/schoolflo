@@ -231,6 +231,7 @@ export const parentService = {
     api.patch(`/parents/${parentId}/children`, { action: 'unlink', childId }),
   getUnlinkedStudents: (params) =>
     api.get('/parents/students/unlinked', { params }),
+  getChildrenAssignments: () => api.get('/parents/children/assignments'),
 };
 
 export const announcementService = {
