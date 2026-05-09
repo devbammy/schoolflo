@@ -13,6 +13,12 @@ const STATUS_BADGE = {
   Overdue: 'danger',
 };
 
+const getDefaultAcademicYear = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  return now.getMonth() >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+};
+
 // Small inline avatar
 function ChildAvatar({ child, size = 36, active = false }) {
   const initials = `${child.firstName?.[0] || ''}${child.lastName?.[0] || ''}`;
@@ -58,7 +64,7 @@ export default function ParentPayments() {
 
   const [selectedChild, setSelectedChild] = useState(null);
   const [term, setTerm] = useState('First Term');
-  const [academicYear, setAcademicYear] = useState('2024/2025');
+  const [academicYear, setAcademicYear] = useState('');
   const [fees, setFees] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -79,24 +85,24 @@ export default function ParentPayments() {
     setFees([]);
     setPayments([]);
 
+    const childClassId =
+      selectedChild.studentProfile?.class?._id ||
+      selectedChild.studentProfile?.class;
+
     Promise.all([
       paymentService.getStudentPayments(selectedChild._id, {
         term,
         academicYear,
       }),
-      feeService.getAll({ term, academicYear }),
+      feeService.getAll({
+        term,
+        academicYear,
+        ...(childClassId ? { classId: childClassId } : {}),
+      }),
     ])
       .then(([pRes, fRes]) => {
         setPayments(pRes.data.data?.payments || []);
-        // Only show fee structures relevant to this child's class
-        const allFees = fRes.data.data?.fees || [];
-        const childClassId =
-          selectedChild.studentProfile?.class?._id ||
-          selectedChild.studentProfile?.class;
-        const filtered = childClassId
-          ? allFees.filter((f) => (f.class?._id || f.class) === childClassId)
-          : allFees;
-        setFees(filtered);
+        setFees(fRes.data.data?.fees || []);
       })
       .catch(() => toast.error('Failed to load payment data'))
       .finally(() => setLoading(false));
@@ -259,7 +265,7 @@ export default function ParentPayments() {
           style={{ width: 130 }}
           value={academicYear}
           onChange={(e) => setAcademicYear(e.target.value)}
-          placeholder="2024/2025"
+          placeholder={getDefaultAcademicYear()}
         />
       </div>
 

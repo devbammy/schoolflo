@@ -1,35 +1,54 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, CheckCircle, ExternalLink } from 'lucide-react';
+import { CreditCard, CheckCircle } from 'lucide-react';
 import { paymentService, feeService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
+const TERMS = ['First Term', 'Second Term', 'Third Term'];
+
+const getDefaultAcademicYear = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  return now.getMonth() >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+};
+
 export default function StudentPayments() {
   const { user } = useAuthStore();
+  const [term, setTerm] = useState('First Term');
   const [payments, setPayments] = useState([]);
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(null);
+  const [academicYear, setAcademicYear] = useState('');
 
   const studentId = user?.studentProfile
     ? user._id
     : user?.parentProfile?.children?.[0]?._id || user?._id;
+  const studentClassId =
+    user?.studentProfile?.class?._id ||
+    user?.studentProfile?.class ||
+    user?.parentProfile?.children?.[0]?.studentProfile?.class?._id ||
+    user?.parentProfile?.children?.[0]?.studentProfile?.class;
 
   useEffect(() => {
+    if (!studentId) return;
+
     Promise.all([
-      paymentService.getStudentPayments(studentId),
-      feeService.getAll({ term: 'First Term', academicYear: '2024/2025' }),
+      paymentService.getStudentPayments(studentId, { term, academicYear }),
+      feeService.getAll({
+        term,
+        academicYear,
+        ...(studentClassId ? { classId: studentClassId } : {}),
+      }),
     ])
       .then(([pRes, fRes]) => {
-        console.log(pRes.data.data);
-        console.log(fRes.data.data);
         setPayments(pRes.data.data.payments || []);
         setFees(fRes.data.data?.fees || []);
       })
       .catch(() => toast.error('Failed to load payments'))
       .finally(() => setLoading(false));
-  }, [studentId]);
+  }, [studentId, studentClassId, term, academicYear]);
 
   const handlePaystack = async (fee) => {
     setPaying(fee._id);
@@ -62,6 +81,27 @@ export default function StudentPayments() {
           <h1 className="page-header__title">Fee Payments</h1>
           <p className="page-header__subtitle">Manage school fee payments</p>
         </div>
+      </div>
+
+      <div
+        style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 28 }}
+      >
+        {TERMS.map((t) => (
+          <button
+            key={t}
+            className={`btn btn--${term === t ? 'primary' : 'secondary'} btn--sm`}
+            onClick={() => setTerm(t)}
+          >
+            {t}
+          </button>
+        ))}
+        <input
+          className="form-control"
+          style={{ width: 130 }}
+          value={academicYear}
+          onChange={(e) => setAcademicYear(e.target.value)}
+          placeholder={getDefaultAcademicYear()}
+        />
       </div>
 
       {fees.length > 0 && (
