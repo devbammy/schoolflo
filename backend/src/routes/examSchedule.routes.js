@@ -45,6 +45,22 @@ router.get(
   examScheduleController.getTeacherInvigilations,
 );
 
+// Student-specific routes
+router.get(
+  '/student/my-schedules',
+  protect,
+  authorize('Student'),
+  examScheduleController.getStudentSchedules,
+);
+
+// Parent-specific routes
+router.get(
+  '/parent/children-schedules',
+  protect,
+  authorize('Parent'),
+  examScheduleController.getParentSchedules,
+);
+
 // Conflict checking
 router.post(
   '/check-conflicts',

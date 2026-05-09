@@ -37,6 +37,7 @@ import AttendancePage from './pages/teacher/AttendancePage';
 import AssignmentsTeacherPage from './pages/teacher/AssignmentsPage';
 import GradesPage from './pages/teacher/GradesPage';
 import TeacherTimetable from './pages/teacher/TeacherTimetable';
+import TeacherExamSchedule from './pages/teacher/TeacherExamSchedule';
 
 // Student Pages
 import StudentDashboard from './pages/student/StudentDashboard';
@@ -44,6 +45,7 @@ import StudentResults from './pages/student/StudentResults';
 import StudentAssignments from './pages/student/StudentAssignments';
 import StudentPayments from './pages/student/StudentPayments';
 import StudentTimetable from './pages/student/StudentTimetable';
+import StudentExamSchedule from './pages/student/StudentExamSchedule';
 import CATracking from './pages/student/CATracking';
 
 // Parent Pages
@@ -51,6 +53,7 @@ import ParentDashboard from './pages/parent/ParentDashboard';
 import ParentResults from './pages/parent/ParentResults';
 import ParentPayments from './pages/parent/ParentPayments';
 import ParentTimetable from './pages/parent/ParentTimetable';
+import ParentExamSchedule from './pages/parent/ParentExamSchedule';
 
 // Shared Pages
 import MyLibraryPage from './pages/shared/MyLibraryPage';
@@ -163,6 +166,7 @@ export default function App() {
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="calendar" element={<CalendarViewPage />} />
           <Route path="timetable" element={<TeacherTimetable />} />
+          <Route path="exam-schedules" element={<TeacherExamSchedule />} />
         </Route>
 
         {/* Student */}
@@ -184,6 +188,7 @@ export default function App() {
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="print-results" element={<ViewResults />} />
           <Route path="ca-tracking" element={<CATracking />} />
+          <Route path="exam-schedules" element={<StudentExamSchedule />} />
         </Route>
 
         {/* Parent */}
@@ -202,6 +207,7 @@ export default function App() {
           <Route path="calendar" element={<CalendarViewPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="print-results" element={<ViewResults />} />
+          <Route path="exam-schedules" element={<ParentExamSchedule />} />
         </Route>
 
         <Route

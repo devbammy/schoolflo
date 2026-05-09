@@ -61,12 +61,10 @@ const examScheduleSchema = new mongoose.Schema(
           type: String,
           required: true,
         },
-        invigilators: [
-          {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
-          },
-        ],
+        invigilator: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+        },
         maxMarks: {
           type: Number,
           default: 70, // For final exam

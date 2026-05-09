@@ -48,7 +48,7 @@ router.get('/', protect, authorize('Admin'), async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /timetables/mine
 // Contextual — returns the relevant timetable for the current user:
-//   Teacher  → timetable(s) where they appear in any period
+//   Teacher  → timetable(s) where they appear in any period OR are class teacher
 //   Student  → timetable for their class
 //   Parent   → timetables for all their children's classes
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,17 +57,26 @@ router.get('/mine', protect, async (req, res) => {
     const { user } = req;
     const { term, academicYear } = req.query;
 
+    // Get current academic year if not provided
+    const currentYear = new Date().getFullYear();
+    const defaultAcademicYear = `${currentYear}/${currentYear + 1}`;
+
     const baseFilter = { isPublished: true };
     if (term) baseFilter.term = term;
-    if (academicYear) baseFilter.academicYear = academicYear;
+    // Use provided academicYear or default to current year
+    baseFilter.academicYear = academicYear || defaultAcademicYear;
 
     let timetables = [];
 
     if (user.role === 'Teacher') {
-      // All timetables where this teacher teaches at least one period
+      // All timetables where this teacher teaches at least one period OR is the class teacher
+      const teacherProfile = user.teacherProfile || {};
       timetables = await Timetable.find({
         ...baseFilter,
-        'periods.teacher': user._id,
+        $or: [
+          { 'periods.teacher': user._id }, // Teaches a specific period
+          { class: teacherProfile.classTeacherOf }, // Is the class teacher
+        ],
       }).populate(BASE_POPULATE);
     } else if (user.role === 'Student') {
       const classId = user.studentProfile?.class;

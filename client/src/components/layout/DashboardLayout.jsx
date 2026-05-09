@@ -111,6 +111,11 @@ const NAV_CONFIG = {
         },
         { to: '/teacher/timetable', icon: Calendar, label: 'My Timetable' },
         {
+          to: '/teacher/exam-schedules',
+          icon: CalendarCheck,
+          label: 'Exam Schedules',
+        },
+        {
           to: '/teacher/calendar',
           icon: CalendarDays,
           label: 'School Calendar',
@@ -148,6 +153,11 @@ const NAV_CONFIG = {
           label: 'Assignments',
         },
         { to: '/student/timetable', icon: Calendar, label: 'Timetable' },
+        {
+          to: '/student/exam-schedules',
+          icon: CalendarCheck,
+          label: 'Exam Schedules',
+        },
         {
           to: '/student/calendar',
           icon: CalendarDays,
@@ -191,6 +201,11 @@ const NAV_CONFIG = {
         { to: '/parent/results', icon: BarChart3, label: 'Academic Results' },
         { to: '/parent/payments', icon: CreditCard, label: 'Fee Payments' },
         { to: '/parent/timetable', icon: Calendar, label: 'Timetables' },
+        {
+          to: '/parent/exam-schedules',
+          icon: CalendarCheck,
+          label: 'Exam Schedules',
+        },
         {
           to: '/parent/calendar',
           icon: CalendarDays,

@@ -22,6 +22,8 @@ export default function StudentPayments() {
       feeService.getAll({ term: 'First Term', academicYear: '2024/2025' }),
     ])
       .then(([pRes, fRes]) => {
+        console.log(pRes.data.data);
+        console.log(fRes.data.data);
         setPayments(pRes.data.data.payments || []);
         setFees(fRes.data.data?.fees || []);
       })

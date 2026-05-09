@@ -11,7 +11,10 @@ export default function StudentTimetable() {
   const [timetables, setTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [term, setTerm] = useState('First Term');
-  const [academicYear, setAcademicYear] = useState('2024/2025');
+  const currentYear = new Date().getFullYear();
+  const [academicYear, setAcademicYear] = useState(
+    `${currentYear - 1}/${currentYear}`,
+  );
 
   useEffect(() => {
     setLoading(true);

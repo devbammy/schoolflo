@@ -72,12 +72,9 @@ exports.getTeacherInvigilations = async (req, res) => {
       req.user._id,
       req.query,
     );
-    sendSuccess(
-      res,
-      201,
-      'Invigilation schedule retrieved successfully',
+    sendSuccess(res, 200, 'Invigilation schedule retrieved successfully', {
       schedules,
-    );
+    });
   } catch (error) {
     sendError(res, error.message, 500);
   }
@@ -108,6 +105,34 @@ exports.checkConflicts = async (req, res) => {
       conflicts,
       hasConflicts: conflicts.length > 0,
     });
+  } catch (error) {
+    sendError(res, error.message, 500);
+  }
+};
+
+// Get exam schedules for student (their class)
+exports.getStudentSchedules = async (req, res) => {
+  try {
+    const schedules = await examScheduleService.getStudentSchedules(
+      req.user._id,
+      req.query,
+    );
+
+    sendSuccess(res, 200, 'Student exam schedules retrieved', { schedules });
+  } catch (error) {
+    sendError(res, error.message, 500);
+  }
+};
+
+// Get exam schedules for parent (their children's classes)
+exports.getParentSchedules = async (req, res) => {
+  try {
+    const schedules = await examScheduleService.getParentSchedules(
+      req.user._id,
+      req.query,
+    );
+
+    sendSuccess(res, 200, 'Parent exam schedules retrieved', { schedules });
   } catch (error) {
     sendError(res, error.message, 500);
   }

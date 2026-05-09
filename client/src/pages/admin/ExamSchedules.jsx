@@ -3,6 +3,7 @@ import {
   examScheduleService,
   classService,
   subjectService,
+  userService,
 } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import Modal from '../../components/common/Modal';
@@ -11,6 +12,7 @@ const ExamSchedules = () => {
   const [schedules, setSchedules] = useState([]);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
@@ -29,6 +31,7 @@ const ExamSchedules = () => {
   useEffect(() => {
     fetchSchedules();
     fetchClasses();
+    fetchTeachers();
   }, []);
 
   const fetchSchedules = async () => {
@@ -50,6 +53,19 @@ const ExamSchedules = () => {
       setClasses(response?.data?.data?.classes);
     } catch (error) {
       console.error('Failed to fetch classes');
+    }
+  };
+
+  const fetchTeachers = async () => {
+    try {
+      const response = await userService.getAll({
+        role: 'Teacher',
+        limit: 100,
+      });
+
+      setTeachers(response?.data?.data || []);
+    } catch (error) {
+      console.error('Failed to fetch teachers');
     }
   };
 
@@ -77,7 +93,7 @@ const ExamSchedules = () => {
           endTime: '',
           duration: 120,
           venue: '',
-          invigilators: [],
+          invigilator: '',
           maxMarks: 70,
           instructions: '',
         },
@@ -517,6 +533,24 @@ const ExamSchedules = () => {
                       }
                     />
                   </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Invigilator</label>
+                  <select
+                    className="form-control"
+                    value={session.invigilator}
+                    onChange={(e) =>
+                      updateSession(index, 'invigilator', e.target.value)
+                    }
+                  >
+                    <option value="">Select Invigilator</option>
+                    {teachers.map((teacher) => (
+                      <option key={teacher._id} value={teacher._id}>
+                        {teacher.firstName} {teacher.lastName}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-group">

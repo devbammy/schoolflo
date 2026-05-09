@@ -15,7 +15,7 @@ class ExamScheduleService {
     await schedule.populate([
       { path: 'class', select: 'name level' },
       { path: 'sessions.subject', select: 'name code' },
-      { path: 'sessions.invigilators', select: 'firstName lastName email' },
+      { path: 'sessions.invigilator', select: 'firstName lastName email' },
       { path: 'createdBy', select: 'firstName lastName' },
     ]);
 
@@ -34,7 +34,7 @@ class ExamScheduleService {
     const schedules = await ExamSchedule.find(query)
       .populate('class', 'name level')
       .populate('sessions.subject', 'name code')
-      .populate('sessions.invigilators', 'firstName lastName email')
+      .populate('sessions.invigilator', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName')
       .sort({ startDate: -1 });
 
@@ -47,7 +47,7 @@ class ExamScheduleService {
       .populate('class', 'name level sections')
       .populate('sessions.subject', 'name code creditUnit')
       .populate(
-        'sessions.invigilators',
+        'sessions.invigilator',
         'firstName lastName email teacherProfile',
       )
       .populate('createdBy', 'firstName lastName');
@@ -67,7 +67,7 @@ class ExamScheduleService {
     }).populate([
       { path: 'class', select: 'name level' },
       { path: 'sessions.subject', select: 'name code' },
-      { path: 'sessions.invigilators', select: 'firstName lastName email' },
+      { path: 'sessions.invigilator', select: 'firstName lastName email' },
     ]);
 
     if (!schedule) {
@@ -82,7 +82,7 @@ class ExamScheduleService {
     const schedule = await ExamSchedule.findById(id)
       .populate('class')
       .populate('sessions.subject')
-      .populate('sessions.invigilators');
+      .populate('sessions.invigilator');
 
     if (!schedule) {
       throw new Error('Exam schedule not found');
@@ -104,14 +104,12 @@ class ExamScheduleService {
     });
 
     // Notify all invigilators
-    const invigilators = [];
-    schedule.sessions.forEach((session) => {
-      session.invigilators.forEach((inv) => {
-        if (!invigilators.some((i) => i._id.equals(inv._id))) {
-          invigilators.push(inv);
-        }
-      });
-    });
+    const invigilators = schedule.sessions
+      .map((session) => session.invigilator)
+      .filter(
+        (inv, index, arr) =>
+          inv && arr.findIndex((i) => i._id.equals(inv._id)) === index,
+      );
 
     // Send email notifications
     const emailPromises = [
@@ -157,22 +155,28 @@ class ExamScheduleService {
   // Get teacher's invigilation schedule
   async getTeacherInvigilations(teacherId, filters = {}) {
     const query = {
-      'sessions.invigilators': teacherId,
+      'sessions.invigilator': teacherId,
     };
 
     if (filters.term) query.term = filters.term;
-    if (filters.academicYear) query.academicYear = filters.academicYear;
+    if (filters.academicYear) {
+      const filter = this._buildAcademicYearFilter(filters.academicYear);
+      if (filter) query.academicYear = filter;
+    }
 
     const schedules = await ExamSchedule.find(query)
       .populate('class', 'name level')
       .populate('sessions.subject', 'name code')
+      .populate('sessions.invigilator', 'firstName lastName email')
       .sort({ 'sessions.date': 1 });
 
     // Filter sessions to only include those where teacher is invigilator
     const teacherSchedule = schedules
       .map((schedule) => {
-        const relevantSessions = schedule.sessions.filter((session) =>
-          session.invigilators.some((inv) => inv._id.equals(teacherId)),
+        const relevantSessions = schedule.sessions.filter(
+          (session) =>
+            session.invigilator &&
+            String(session.invigilator._id) === String(teacherId),
         );
 
         return {
@@ -261,6 +265,109 @@ class ExamScheduleService {
     if (period === 'AM' && hours === 12) hours = 0;
 
     return hours * 60 + minutes;
+  }
+
+  _buildAcademicYearFilter(value) {
+    const year = String(value || '').trim();
+    if (!year) return null;
+
+    if (year.includes('/')) {
+      const normalizedRange = year.replace(/\s*\/\s*/g, '/');
+      const [startYear, endYear] = normalizedRange
+        .split('/')
+        .map((y) => y.trim())
+        .filter(Boolean);
+      const candidates = [normalizedRange];
+
+      if (startYear) {
+        candidates.push(startYear);
+        candidates.push(new RegExp(`^${startYear}`));
+      }
+      if (endYear) {
+        candidates.push(endYear);
+        candidates.push(new RegExp(`^${endYear}`));
+      }
+
+      return { $in: candidates };
+    }
+
+    return { $in: [year, new RegExp(`^${year}`)] };
+  }
+
+  // Get exam schedules for a student (their class)
+  async getStudentSchedules(studentId, filters = {}) {
+    const student = await User.findById(studentId)
+      .select('studentProfile')
+      .populate('studentProfile.class', '_id');
+
+    if (!student || !student.studentProfile?.class) {
+      return [];
+    }
+
+    const classId = student.studentProfile.class._id;
+    const query = {
+      class: classId,
+      isPublished: true,
+    };
+
+    if (filters.term) query.term = filters.term;
+    if (filters.academicYear) {
+      const academicYearFilter = this._buildAcademicYearFilter(
+        filters.academicYear,
+      );
+      if (academicYearFilter) query.academicYear = academicYearFilter;
+    }
+
+    const schedules = await ExamSchedule.find(query)
+      .populate('class', 'name level')
+      .populate('sessions.subject', 'name code')
+      .populate('sessions.invigilator', 'firstName lastName')
+      .populate('createdBy', 'firstName lastName')
+      .sort({ startDate: -1 });
+
+    return schedules;
+  }
+
+  // Get exam schedules for a parent (their children's classes)
+  async getParentSchedules(parentId, filters = {}) {
+    const parent = await User.findById(parentId).populate(
+      'parentProfile.children',
+      'studentProfile',
+    );
+
+    if (!parent || !parent.parentProfile?.children?.length) {
+      return [];
+    }
+
+    const classIds = parent.parentProfile.children
+      .map((child) => child.studentProfile?.class)
+      .filter(Boolean);
+
+    if (!classIds.length) {
+      return [];
+    }
+
+    const query = {
+      class: { $in: classIds },
+      isPublished: true,
+    };
+
+    if (filters.term) query.term = filters.term;
+    if (filters.academicYear) {
+      const academicYearFilter = this._buildAcademicYearFilter(
+        filters.academicYear,
+      );
+      if (academicYearFilter) query.academicYear = academicYearFilter;
+    }
+
+    const schedules = await ExamSchedule.find(query)
+      .populate('class', 'name level')
+      .populate('sessions.subject', 'name code')
+      .populate('sessions.invigilator', 'firstName lastName')
+      .populate('createdBy', 'firstName lastName')
+      .sort({ startDate: -1 });
+
+    return schedules;
   }
 }
 

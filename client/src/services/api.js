@@ -306,6 +306,10 @@ export const examScheduleService = {
   delete: (id) => api.delete(`/exam-schedules/${id}`),
   getTeacherInvigilations: (params) =>
     api.get('/exam-schedules/teacher/invigilations', { params }),
+  getStudentSchedules: (params) =>
+    api.get('/exam-schedules/student/my-schedules', { params }),
+  getParentSchedules: (params) =>
+    api.get('/exam-schedules/parent/children-schedules', { params }),
   checkConflicts: (data) => api.post('/exam-schedules/check-conflicts', data),
 };
 
