@@ -74,12 +74,19 @@ export default function AnnouncementsPage() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 14,
+          }}
+        >
           {list.map((a) => (
             <div
               key={a._id}
               className="card"
               style={{
+                borderRadius: 0,
                 borderLeft: `4px solid ${a.priority === 'Urgent' ? 'var(--clr-danger)' : a.priority === 'High' ? 'var(--clr-warning)' : 'var(--clr-primary)'}`,
               }}
             >

@@ -1,6 +1,106 @@
 const Certificate = require('../models/Certificate');
 const pdfService = require('../services/pdfService');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
+const {
+  sendEmail,
+  emailTemplates,
+} = require('../services/notificationService');
+
+const getCertificateNotificationRecipients = async (certificate) => {
+  await certificate.populate({
+    path: 'student',
+    select: 'firstName lastName email studentProfile.parentId',
+    populate: {
+      path: 'studentProfile.parentId',
+      select: 'firstName lastName email',
+    },
+  });
+
+  const student = certificate.student;
+  if (!student?.email) return [];
+
+  const recipients = [
+    {
+      name: `${student.firstName} ${student.lastName}`,
+      email: student.email,
+    },
+  ];
+
+  const parent = student.studentProfile?.parentId;
+  if (parent?.email) {
+    recipients.push({
+      name: `${parent.firstName} ${parent.lastName}`,
+      email: parent.email,
+    });
+  }
+
+  return recipients;
+};
+
+const notifyCertificateIssued = async (certificate) => {
+  await certificate.populate('issuedBy', 'firstName lastName');
+
+  const recipients = await getCertificateNotificationRecipients(certificate);
+  if (!recipients.length) return;
+
+  const payload = {
+    studentName: `${certificate.student.firstName} ${certificate.student.lastName}`,
+    certificateType: certificate.certificateType,
+    certificateNumber: certificate.certificateNumber || 'N/A',
+    issueDate: new Date(certificate.issueDate).toLocaleDateString('en-NG', {
+      dateStyle: 'long',
+    }),
+    downloadUrl: certificate.pdfUrl || process.env.CLIENT_URL,
+    issuerName: certificate.issuedBy
+      ? `${certificate.issuedBy.firstName} ${certificate.issuedBy.lastName}`
+      : 'School Administration',
+  };
+
+  await Promise.all(
+    recipients.map((recipient) =>
+      sendEmail({
+        to: recipient.email,
+        subject: `${payload.certificateType} Issued — ${payload.certificateNumber}`,
+        html: emailTemplates.certificateIssued({
+          recipientName: recipient.name,
+          ...payload,
+        }),
+      }),
+    ),
+  );
+};
+
+const notifyCertificateRevoked = async (certificate) => {
+  const recipients = await getCertificateNotificationRecipients(certificate);
+  if (!recipients.length) return;
+
+  const payload = {
+    studentName: `${certificate.student.firstName} ${certificate.student.lastName}`,
+    certificateType: certificate.certificateType,
+    certificateNumber: certificate.certificateNumber || 'N/A',
+    revokeReason: certificate.revokeReason || 'No reason provided',
+    revokedAt: new Date(certificate.revokedAt || Date.now()).toLocaleDateString(
+      'en-NG',
+      {
+        dateStyle: 'long',
+      },
+    ),
+    helpUrl: process.env.CLIENT_URL,
+  };
+
+  await Promise.all(
+    recipients.map((recipient) =>
+      sendEmail({
+        to: recipient.email,
+        subject: `${payload.certificateType} Revoked — ${payload.certificateNumber}`,
+        html: emailTemplates.certificateRevoked({
+          recipientName: recipient.name,
+          ...payload,
+        }),
+      }),
+    ),
+  );
+};
 
 // Generate Report Card
 exports.generateReportCard = async (req, res) => {
@@ -28,6 +128,10 @@ exports.generateReportCard = async (req, res) => {
     });
 
     await certificate.populate('student', 'firstName lastName studentProfile');
+
+    notifyCertificateIssued(certificate).catch((err) =>
+      console.error('Certificate issuance notification failed:', err.message),
+    );
 
     sendSuccess(res, 201, 'Report card generated successfully', certificate);
   } catch (error) {
@@ -58,6 +162,10 @@ exports.generateLeavingCertificate = async (req, res) => {
     });
 
     await certificate.populate('student', 'firstName lastName studentProfile');
+
+    notifyCertificateIssued(certificate).catch((err) =>
+      console.error('Certificate issuance notification failed:', err.message),
+    );
 
     sendSuccess(
       res,
@@ -91,6 +199,10 @@ exports.generateAdmissionLetter = async (req, res) => {
     });
 
     await certificate.populate('student', 'firstName lastName');
+
+    notifyCertificateIssued(certificate).catch((err) =>
+      console.error('Certificate issuance notification failed:', err.message),
+    );
 
     console.log(certificate);
 
@@ -161,6 +273,10 @@ exports.revokeCertificate = async (req, res) => {
     certificate.revokeReason = revokeReason;
 
     await certificate.save();
+
+    notifyCertificateRevoked(certificate).catch((err) =>
+      console.error('Certificate revocation notification failed:', err.message),
+    );
 
     sendSuccess(res, 201, 'Certificate revoked successfully', certificate);
   } catch (error) {

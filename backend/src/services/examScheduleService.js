@@ -197,10 +197,6 @@ class ExamScheduleService {
       throw new Error('Exam schedule not found');
     }
 
-    if (schedule.isPublished) {
-      throw new Error('Cannot delete published schedule');
-    }
-
     await schedule.deleteOne();
     return { message: 'Schedule deleted successfully' };
   }

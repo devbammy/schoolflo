@@ -56,7 +56,6 @@ export default function StudentTimetable() {
           style={{ width: 130 }}
           value={academicYear}
           onChange={(e) => setAcademicYear(e.target.value)}
-          placeholder="2024/2025"
         />
       </div>
 

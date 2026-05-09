@@ -155,6 +155,7 @@ export const examService = {
   getAll: (params) => api.get('/exams', { params }),
   create: (data) => api.post('/exams', data),
   update: (id, data) => api.put(`/exams/${id}`, data),
+  delete: (id) => api.delete(`/exams/${id}`),
 };
 
 export const resultService = {

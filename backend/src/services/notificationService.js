@@ -157,6 +157,36 @@ const emailTemplates = {
     </div>
   `,
 
+  assignmentGiven: ({ subject, title, dueDate, teacherName, portalUrl }) => `
+    <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; border-left: 6px solid #7c3aed;">
+        <div style="padding: 30px;">
+          <div style="color: #7c3aed; font-size: 12px; font-weight: 800; text-transform: uppercase; margin-bottom: 5px;">New Assignment</div>
+          <h2 style="color: #0f1c3f; margin: 0 0 10px 0;">${title}</h2>
+          <p style="color: #3d4f73; margin: 0;"><strong>Subject:</strong> ${subject}</p>
+          <p style="color: #3d4f73; margin: 5px 0 20px 0;"><strong>Teacher:</strong> ${teacherName}</p>
+          
+          <div style="background: #f5f3ff; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+            <p style="margin: 0; color: #5b21b6; font-size: 14px;">📅 Deadline: <strong>${new Date(dueDate).toLocaleDateString('en-GB', { dateStyle: 'full' })}</strong></p>
+          </div>
+          
+          <a href="${portalUrl}" style="display: inline-block; background: #7c3aed; color: #ffffff; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600;">Open Assignment</a>
+        </div>
+      </div>
+    </div>
+  `,
+
+  assignmentSubmitted: ({ studentName, title, submissionTime }) => `
+    <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; text-align: center; padding: 40px;">
+        <div style="width: 60px; height: 60px; background: #d1fae5; color: #059669; border-radius: 50%; line-height: 60px; font-size: 24px; margin: 0 auto 20px;">✓</div>
+        <h2 style="color: #0f1c3f; margin: 0;">Submission Received</h2>
+        <p style="color: #3d4f73; margin: 15px 0;">Hi ${studentName}, your work for <strong>"${title}"</strong> was successfully uploaded.</p>
+        <p style="color: #7889a8; font-size: 13px;">Time: ${submissionTime}</p>
+      </div>
+    </div>
+  `,
+
   announcement: ({ title, body, senderName, schoolName }) => `
     <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
       <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border-top: 6px solid #1a4fab;">
@@ -175,6 +205,54 @@ const emailTemplates = {
               <p style="margin: 0; color: #7889a8; font-size: 13px;">${schoolName || 'Administration'}</p>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  `,
+
+  examSchedule: ({ studentName, examTitle, sessions, viewUrl }) => `
+    <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden;">
+        <div style="background: #0f1c3f; padding: 30px; text-align: center;">
+          <h2 style="color: #ffffff; margin: 0; font-size: 20px;">${examTitle} Timetable</h2>
+        </div>
+        <div style="padding: 30px;">
+          <p style="color: #3d4f73;">Hi ${studentName}, here are your upcoming exam sessions:</p>
+          <div style="margin: 20px 0;">
+            ${sessions
+              .map(
+                (s) => `
+              <div style="padding: 15px; border-bottom: 1px solid #f0f4fb; display: flex; justify-content: space-between; align-items: center;">
+                <div style="flex: 1;">
+                  <div style="font-weight: 700; color: #0f1c3f;">${s.subject}</div>
+                  <div style="font-size: 13px; color: #7889a8;">${s.date} • ${s.time}</div>
+                </div>
+                <div style="background: #f0f4fb; padding: 4px 10px; border-radius: 6px; font-size: 12px; color: #1a4fab; font-weight: 600;">${s.venue}</div>
+              </div>
+            `,
+              )
+              .join('')}
+          </div>
+          <a href="${viewUrl}" style="display: block; background: #1a4fab; color: #ffffff; padding: 14px; border-radius: 10px; text-decoration: none; text-align: center; font-weight: 600; margin-top: 20px;">Download Full Timetable</a>
+        </div>
+      </div>
+    </div>
+  `,
+
+  libraryDue: ({ studentName, bookTitle, dueDate, renewalUrl }) => `
+    <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border-top: 6px solid #ef4444;">
+        <div style="padding: 30px; text-align: center;">
+          <div style="font-size: 40px; margin-bottom: 10px;">📚</div>
+          <h2 style="color: #0f1c3f; margin: 0;">Library Book Due Soon</h2>
+          <p style="color: #3d4f73; margin-top: 10px;">Hi ${studentName}, the following book is due for return.</p>
+          
+          <div style="margin: 25px 0; padding: 20px; background: #fff5f5; border-radius: 12px; border: 1px solid #fee2e2;">
+            <p style="margin: 0; color: #991b1b; font-weight: 700; font-size: 18px;">${bookTitle}</p>
+            <p style="margin: 5px 0 0 0; color: #b91c1c; font-size: 14px;">Return by: <strong>${new Date(dueDate).toLocaleDateString()}</strong></p>
+          </div>
+          
+          <a href="${renewalUrl}" style="color: #1a4fab; font-weight: 600; text-decoration: none; font-size: 15px;">Request a Renewal &rarr;</a>
         </div>
       </div>
     </div>
@@ -209,6 +287,87 @@ const emailTemplates = {
           </div>
 
           <a href="${loginUrl}" style="display: block; background: #1a4fab; color: #ffffff; padding: 16px; border-radius: 10px; text-decoration: none; text-align: center; font-weight: 600; font-size: 16px;">View Full Report Card</a>
+        </div>
+      </div>
+    </div>
+  `,
+
+  certificateIssued: ({
+    recipientName,
+    studentName,
+    certificateType,
+    certificateNumber,
+    issueDate,
+    downloadUrl,
+    issuerName,
+  }) => `
+    <div style="background-color: #f7fafc; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(15, 28, 63, 0.08);">
+        <div style="background: #1a4fab; padding: 30px; text-align: center; color: #ffffff;">
+          <h1 style="margin: 0; font-size: 24px;">${certificateType} Issued</h1>
+          <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.85;">Hello ${recipientName}, your document is ready.</p>
+        </div>
+        <div style="padding: 35px; color: #3d4f73; line-height: 1.7;">
+          <p style="margin: 0 0 20px 0;">${studentName}'s <strong>${certificateType}</strong> has been issued successfully.</p>
+          <p style="margin: 0 0 10px 0;"><strong>Certificate Number:</strong> ${certificateNumber}</p>
+          <p style="margin: 0 0 10px 0;"><strong>Issued On:</strong> ${issueDate}</p>
+          <p style="margin: 0 0 24px 0;">You can download or view the certificate using the button below.</p>
+          <a href="${downloadUrl}" style="display: inline-block; background: #1a4fab; color: #ffffff; padding: 14px 24px; border-radius: 10px; text-decoration: none; font-weight: 600;">View Certificate</a>
+          <div style="margin-top: 28px; padding: 20px; background: #eff6ff; border-radius: 14px;">
+            <p style="margin: 0; font-size: 14px; color: #475569;">If you have questions, contact ${issuerName} or visit the school portal.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `,
+
+  certificateRevoked: ({
+    recipientName,
+    studentName,
+    certificateType,
+    certificateNumber,
+    revokeReason,
+    revokedAt,
+    helpUrl,
+  }) => `
+    <div style="background-color: #f8fafc; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(15, 28, 63, 0.08);">
+        <div style="background: #dc2626; padding: 30px; text-align: center; color: #ffffff;">
+          <h1 style="margin: 0; font-size: 24px;">Certificate Revoked</h1>
+          <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.85;">Hello ${recipientName}, please review the update below.</p>
+        </div>
+        <div style="padding: 35px; color: #334155; line-height: 1.7;">
+          <p style="margin: 0 0 20px 0;">The <strong>${certificateType}</strong> for <strong>${studentName}</strong> has been revoked.</p>
+          <p style="margin: 0 0 10px 0;"><strong>Certificate Number:</strong> ${certificateNumber}</p>
+          <p style="margin: 0 0 10px 0;"><strong>Revoked On:</strong> ${revokedAt}</p>
+          <p style="margin: 0 0 24px 0;"><strong>Reason:</strong> ${revokeReason}</p>
+          <a href="${helpUrl}" style="display: inline-block; background: #1a4fab; color: #ffffff; padding: 14px 24px; border-radius: 10px; text-decoration: none; font-weight: 600;">Visit Portal for Details</a>
+        </div>
+      </div>
+    </div>
+  `,
+
+  leavingCertificate: ({
+    studentName,
+    academicYear,
+    completionDate,
+    schoolName,
+  }) => `
+    <div style="background-color: #f0f4fb; padding: 50px 20px; font-family: 'Georgia', serif;">
+      <div style="max-width: 700px; margin: 0 auto; background: #ffffff; border: 15px double #1a4fab; padding: 50px; text-align: center; position: relative;">
+        <h1 style="color: #0f1c3f; font-size: 32px; margin-bottom: 10px;">Certificate of Completion</h1>
+        <p style="font-size: 18px; font-style: italic; color: #7889a8;">This is to certify that</p>
+        <h2 style="font-size: 36px; color: #1a4fab; margin: 20px 0; border-bottom: 2px solid #f0f4fb; display: inline-block; padding: 0 30px;">${studentName}</h2>
+        <p style="font-size: 18px; color: #3d4f73; line-height: 1.6;">has satisfactorily completed the course of study prescribed by<br><strong>${schoolName}</strong></p>
+        <p style="font-size: 18px; color: #3d4f73;">during the academic year <strong>${academicYear}</strong></p>
+        
+        <div style="margin-top: 50px; display: flex; justify-content: space-between; border-top: 1px solid #dde3f0; padding-top: 20px;">
+          <div style="text-align: left;">
+            <p style="font-size: 14px; margin: 0;">Date: ${completionDate}</p>
+          </div>
+          <div style="text-align: right;">
+            <p style="font-size: 14px; margin: 0; font-weight: bold;">School Principal</p>
+          </div>
         </div>
       </div>
     </div>

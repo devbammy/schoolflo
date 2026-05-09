@@ -260,21 +260,20 @@ const ExamSchedules = () => {
                 </button>
 
                 {!schedule.isPublished && (
-                  <>
-                    <button
-                      className="btn btn-sm btn-success"
-                      onClick={() => handlePublish(schedule._id)}
-                    >
-                      Publish
-                    </button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => handleDelete(schedule._id)}
-                    >
-                      Delete
-                    </button>
-                  </>
+                  <button
+                    className="btn btn-sm btn-success"
+                    onClick={() => handlePublish(schedule._id)}
+                  >
+                    Publish
+                  </button>
                 )}
+
+                <button
+                  className="btn btn-sm btn-danger"
+                  onClick={() => handleDelete(schedule._id)}
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))}

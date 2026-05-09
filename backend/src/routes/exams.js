@@ -19,21 +19,43 @@ router.get('/', protect, async (req, res) => {
       .populate('teacher', 'firstName lastName')
       .sort({ startDate: -1 });
     return sendSuccess(res, 200, 'Exams fetched', { exams });
-  } catch (err) { return sendError(res, 500, err.message); }
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
 });
 
 router.post('/', protect, authorize('Admin', 'Teacher'), async (req, res) => {
   try {
     const exam = await Exam.create({ ...req.body, teacher: req.user._id });
     return sendSuccess(res, 201, 'Exam created', { exam });
-  } catch (err) { return sendError(res, 500, err.message); }
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
 });
 
 router.put('/:id', protect, authorize('Admin', 'Teacher'), async (req, res) => {
   try {
-    const exam = await Exam.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const exam = await Exam.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
     return sendSuccess(res, 200, 'Exam updated', { exam });
-  } catch (err) { return sendError(res, 500, err.message); }
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
 });
+
+router.delete(
+  '/:id',
+  protect,
+  authorize('Admin', 'Teacher'),
+  async (req, res) => {
+    try {
+      await Exam.findByIdAndDelete(req.params.id);
+      return sendSuccess(res, 200, 'Exam deleted');
+    } catch (err) {
+      return sendError(res, 500, err.message);
+    }
+  },
+);
 
 module.exports = router;
