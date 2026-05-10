@@ -226,6 +226,11 @@ const NAV_CONFIG = {
           icon: ShieldCheck,
           to: '/parent/certificates',
         },
+        {
+          label: 'Print My Results',
+          icon: Printer,
+          to: '/parent/print-results',
+        },
       ],
     },
     {

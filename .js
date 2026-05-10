@@ -1,204 +1,213 @@
-import React, { useState, useEffect } from 'react';
-import { caTrackingService } from '../../services/api';
+import React, { useState, useEffect, useMemo } from 'react';
+import { resultService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
-import { Line } from 'react-chartjs-2';
+import PrintableReportCard from '../../components/results/PrintableReportCard';
 import { toast } from 'react-hot-toast';
 import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Activity,
-  Award,
-  AlertCircle,
+  Printer,
+  Layout,
+  FileText,
   Calendar,
-  ChevronRight,
+  Award,
+  ChevronDown,
+  User,
 } from 'lucide-react';
+import {
+  getCurrentAcademicYear,
+  generateAcademicYearOptions,
+} from '../../utils/academicYear';
 
-const CATracking = () => {
+const ViewResults = () => {
   const { user } = useAuthStore();
-  const [tracking, setTracking] = useState([]);
-  const [analytics, setAnalytics] = useState(null);
-  const [selectedSubject, setSelectedSubject] = useState(null);
-  const [chartData, setChartData] = useState(null);
+  const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [academicYear, setAcademicYear] = useState(
-    new Date().getFullYear().toString(),
-  );
+  const [selectedTerm, setSelectedTerm] = useState('First Term');
+  const [selectedYear, setSelectedYear] = useState(getCurrentAcademicYear());
+  const [showPrintView, setShowPrintView] = useState(false);
+
+  // Determine the student ID (handles Parent vs Student roles)
+  const studentId = useMemo(() => {
+    return user.role === 'Parent'
+      ? user.parentProfile?.children[0]?._id || user.parentProfile?.children[0]
+      : user._id;
+  }, [user]);
 
   useEffect(() => {
-    fetchTracking();
-    fetchAnalytics();
-  }, [academicYear]);
+    fetchResults();
+    // Close print view when filters change for a fresh look
+    setShowPrintView(false);
+  }, [selectedTerm, selectedYear, studentId]);
 
-  // ... (fetchTracking and fetchAnalytics stay the same)
+  const fetchResults = async () => {
+    try {
+      setLoading(true);
+      const response = await resultService.getReportCard(studentId, {
+        term: selectedTerm,
+        academicYear: selectedYear,
+      });
 
-  const getTrendUI = (trend) => {
-    switch (trend) {
-      case 'Improving':
-        return {
-          icon: <TrendingUp size={18} />,
-          class: 'trend-up',
-          label: 'Improving',
-        };
-      case 'Declining':
-        return {
-          icon: <TrendingDown size={18} />,
-          class: 'trend-down',
-          label: 'Declining',
-        };
-      case 'Stable':
-        return {
-          icon: <Minus size={18} />,
-          class: 'trend-stable',
-          label: 'Stable',
-        };
-      default:
-        return {
-          icon: <Activity size={18} />,
-          class: 'trend-mixed',
-          label: 'Inconsistent',
-        };
+      // Safely access nested data based on your specific response structure
+      setResults(response?.data?.data?.results || []);
+    } catch (error) {
+      console.error('Fetch results error:', error);
+      toast.error('Failed to fetch results');
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Calculate quick stats for the summary bar
+  const gpa = useMemo(() => {
+    if (!results.length) return 0;
+    const total = results.reduce((sum, r) => sum + (r.totalScore || 0), 0);
+    return (total / results.length).toFixed(2);
+  }, [results]);
+
   return (
-    <div className="ca-container">
-      <header className="dashboard-header">
-        <div>
-          <h1>Academic Progress</h1>
-          <p>Tracking Continuous Assessment for {user.name}</p>
+    <div className="view-results-container">
+      <header className="results-header">
+        <div className="header-text">
+          <h1>Academic Report</h1>
+          <p className="subtitle">
+            Official term records and performance breakdown
+          </p>
         </div>
-        <div className="year-filter">
-          <Calendar size={18} />
-          <select
-            value={academicYear}
-            onChange={(e) => setAcademicYear(e.target.value)}
+
+        <div className="filter-bar">
+          <div className="select-wrapper">
+            <Calendar size={16} />
+            <select
+              value={selectedTerm}
+              onChange={(e) => setSelectedTerm(e.target.value)}
+            >
+              <option value="First Term">First Term</option>
+              <option value="Second Term">Second Term</option>
+              <option value="Third Term">Third Term</option>
+            </select>
+          </div>
+
+          <div className="select-wrapper">
+            <User size={16} />
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+            >
+              {generateAcademicYearOptions(5).map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            className={`btn-action ${showPrintView ? 'view-mode' : 'print-mode'}`}
+            onClick={() => setShowPrintView(!showPrintView)}
+            disabled={results.length === 0 || loading}
           >
-            <option value="2024">2024/2025</option>
-            <option value="2023">2023/2024</option>
-          </select>
+            {showPrintView ? (
+              <>
+                <Layout size={18} /> Table View
+              </>
+            ) : (
+              <>
+                <Printer size={18} /> Print View
+              </>
+            )}
+          </button>
         </div>
       </header>
 
-      {analytics && (
-        <section className="stats-grid">
-          <div className="stat-card main">
-            <label>Overall Average</label>
-            <div className="value-group">
-              <span className="big-number">{analytics.overallAverage}%</span>
-              <Award className="icon-bg" />
-            </div>
-            <div className="progress-bar-sm">
-              <div
-                className="fill"
-                style={{ width: `${analytics.overallAverage}%` }}
-              ></div>
-            </div>
-          </div>
-          <div className="stat-card border-green">
-            <label>Improving Subjects</label>
-            <span className="count-val text-green">
-              {analytics.trends.improving}
+      {results.length > 0 && !showPrintView && (
+        <div className="results-stats-strip">
+          <div className="stat-pill">
+            <Award size={18} className="text-primary" />
+            <span>
+              Average Score: <strong>{gpa}%</strong>
             </span>
-            <TrendingUp size={24} className="icon-fade" />
           </div>
-          <div className="stat-card border-red">
-            <label>Needs Attention</label>
-            <span className="count-val text-red">
-              {analytics.trends.declining}
+          <div className="stat-pill">
+            <FileText size={18} className="text-secondary" />
+            <span>
+              Subjects: <strong>{results.length}</strong>
             </span>
-            <AlertCircle size={24} className="icon-fade" />
           </div>
-        </section>
+        </div>
       )}
 
-      <div className="content-layout">
-        <main className="tracking-section">
-          <h3>Subject Breakdown</h3>
-          <div className="subject-cards">
-            {tracking.map((tracker) => {
-              const trend = getTrendUI(tracker.trend);
-              return (
-                <div key={tracker._id} className="subject-card">
-                  <div className="card-top">
-                    <h4>{tracker.subject.name}</h4>
-                    <span className={`trend-pill ${trend.class}`}>
-                      {trend.icon} {trend.label}
-                    </span>
-                  </div>
-
-                  <div className="score-row">
-                    <div className="score-circle">
-                      <span className="score">{tracker.yearlyAverage}%</span>
-                      <span className="label">Average</span>
-                    </div>
-                    <div className="grade-box">
-                      <span className="grade">{tracker.yearlyGrade}</span>
-                      <span className="label">Grade</span>
-                    </div>
-                  </div>
-
-                  <table className="mini-table">
-                    <thead>
-                      <tr>
-                        <th>Term</th>
-                        <th>Score</th>
-                        <th>Pos.</th>
-                        <th>+/-</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tracker.termRecords.map((record, idx) => (
-                        <tr key={idx}>
-                          <td>{record.term}</td>
-                          <td>
-                            <strong>{record.total}%</strong>
-                          </td>
-                          <td>#{record.position}</td>
-                          <td
-                            className={
-                              record.improvement >= 0
-                                ? 'text-green'
-                                : 'text-red'
-                            }
-                          >
-                            {record.improvement > 0
-                              ? `+${record.improvement}`
-                              : record.improvement}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <button
-                    className="btn-view-chart"
-                    onClick={() => viewSubjectChart(tracker.subject._id)}
-                  >
-                    Insights & Trends <ChevronRight size={14} />
-                  </button>
-                </div>
-              );
-            })}
+      <main className="results-main">
+        {loading ? (
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <p>Loading records...</p>
           </div>
-        </main>
-
-        {analytics && (
-          <aside className="insights-sidebar">
-            <div className="insight-box">
-              <h4>
-                <Award size={18} /> Top Performers
-              </h4>
-              {analytics.bestPerformance.map((item, i) => (
-                <div key={i} className="insight-item">
-                  <span>{item.subject}</span>
-                  <span className="badge-green">{item.average}%</span>
-                </div>
-              ))}
-            </div>
-          </aside>
+        ) : !showPrintView ? (
+          <div className="table-card">
+            {results.length === 0 ? (
+              <div className="empty-results">
+                <div className="empty-icon">📂</div>
+                <h3>No Results Published</h3>
+                <p>
+                  Records for {selectedTerm}, {selectedYear} haven't been
+                  released yet.
+                </p>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="results-table">
+                  <thead>
+                    <tr>
+                      <th>Subject</th>
+                      <th className="text-center">CA1</th>
+                      <th className="text-center">CA2</th>
+                      <th className="text-center">Mid-Term</th>
+                      <th className="text-center">Exam</th>
+                      <th className="text-center">Total</th>
+                      <th className="text-center">Grade</th>
+                      <th className="text-center">Remark</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.map((result) => (
+                      <tr key={result._id}>
+                        <td className="subject-col">{result.subject?.name}</td>
+                        <td className="text-center">{result.scores.ca1}</td>
+                        <td className="text-center">{result.scores.ca2}</td>
+                        <td className="text-center">{result.scores.midTerm}</td>
+                        <td className="text-center">{result.scores.exam}</td>
+                        <td className="text-center font-bold text-primary">
+                          {result.totalScore}
+                        </td>
+                        <td className="text-center">
+                          <span
+                            className={`grade-tag grade-${result.grade?.toLowerCase()}`}
+                          >
+                            {result.grade}
+                          </span>
+                        </td>
+                        <td className="text-center italic text-sm text-gray">
+                          {result.remark}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="print-section-wrapper anim-fade-in">
+            <PrintableReportCard
+              student={user}
+              results={results}
+              term={selectedTerm}
+              academicYear={selectedYear}
+            />
+          </div>
         )}
-      </div>
+      </main>
     </div>
   );
 };
+
+export default ViewResults;

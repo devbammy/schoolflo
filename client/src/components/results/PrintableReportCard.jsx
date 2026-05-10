@@ -3,10 +3,10 @@ import { useReactToPrint } from 'react-to-print';
 import './PrintableReportCard.scss';
 
 const PrintableReportCard = ({ student, results, term, academicYear }) => {
-  const componentRef = useRef();
+  const componentRef = useRef(null);
 
   const handlePrint = useReactToPrint({
-    content: () => componentRef.current,
+    contentRef: componentRef,
     documentTitle: `${student.firstName}_${student.lastName}_${term}_${academicYear}`,
   });
 

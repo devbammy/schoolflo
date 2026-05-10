@@ -67,8 +67,6 @@ const CATracking = () => {
         academicYear,
       });
 
-      console.log(res.data.data);
-
       const subject = tracking.find((t) => t.subject?._id === subjectId);
 
       setSelectedSubject(subject || null);
