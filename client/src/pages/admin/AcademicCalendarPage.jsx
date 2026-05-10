@@ -864,7 +864,7 @@ export default function AcademicCalendarPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Calendar info card */}
             <div className="card">
-              <div className="card__body" style={{ padding: '14px 16px' }}>
+              <div style={{ padding: '14px 16px' }}>
                 <div
                   style={{
                     display: 'flex',
@@ -1076,7 +1076,6 @@ export default function AcademicCalendarPage() {
                   <span className="card__title">Term Dates</span>
                 </div>
                 <div
-                  className="card__body"
                   style={{
                     padding: '12px 16px',
                     display: 'flex',

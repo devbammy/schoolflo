@@ -276,7 +276,7 @@ export default function MyLibraryPage() {
                       />
                     )}
                   </div>
-                  <div className="card__body" style={{ padding: '12px 14px' }}>
+                  <div style={{ padding: '12px 14px' }}>
                     <div
                       style={{
                         fontWeight: 700,

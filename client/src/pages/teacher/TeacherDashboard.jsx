@@ -365,7 +365,7 @@ export default function TeacherDashboard() {
                 </span>
               )}
             </div>
-            <div className="card__body">
+            <div>
               {!className ? (
                 <p
                   style={{
