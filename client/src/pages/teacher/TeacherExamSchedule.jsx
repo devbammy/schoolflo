@@ -11,6 +11,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { getCurrentAcademicYear, generateAcademicYearOptions } from '../../utils/academicYear';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 
@@ -19,10 +20,7 @@ export default function TeacherExamSchedule() {
   const [invigilations, setInvigilations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [term, setTerm] = useState('First Term');
-  const currentYear = new Date().getFullYear();
-  const [academicYear, setAcademicYear] = useState(
-    `${currentYear - 1}/${currentYear}`,
-  );
+  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
 
   useEffect(() => {
     setLoading(true);
@@ -69,12 +67,18 @@ export default function TeacherExamSchedule() {
             {t}
           </button>
         ))}
-        <input
+        <select
           className="form-control"
           style={{ width: 140 }}
           value={academicYear}
           onChange={(e) => setAcademicYear(e.target.value)}
-          placeholder="Year"
+        >
+          {generateAcademicYearOptions(5).map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
         />
       </div>
 

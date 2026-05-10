@@ -3,15 +3,17 @@ import { resultService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import PrintableReportCard from '../../components/results/PrintableReportCard';
 import { toast } from 'react-hot-toast';
+import {
+  getCurrentAcademicYear,
+  generateAcademicYearOptions,
+} from '../../utils/academicYear';
 
 const ViewResults = () => {
   const { user } = useAuthStore();
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTerm, setSelectedTerm] = useState('First Term');
-  const [selectedYear, setSelectedYear] = useState(
-    new Date().getFullYear().toString(),
-  );
+  const [selectedYear, setSelectedYear] = useState(getCurrentAcademicYear());
   const [showPrintView, setShowPrintView] = useState(false);
 
   useEffect(() => {
@@ -28,6 +30,8 @@ const ViewResults = () => {
         term: selectedTerm,
         academicYear: selectedYear,
       });
+
+      console.log(response);
 
       setResults(response.data.data);
     } catch (error) {
@@ -54,12 +58,11 @@ const ViewResults = () => {
             value={selectedYear}
             onChange={(e) => setSelectedYear(e.target.value)}
           >
-            <option value={(new Date().getFullYear() - 1).toString()}>
-              {new Date().getFullYear() - 1}
-            </option>
-            <option value={new Date().getFullYear().toString()}>
-              {new Date().getFullYear()}
-            </option>
+            {generateAcademicYearOptions(5).map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
           </select>
           <button
             className="btn btn-primary"

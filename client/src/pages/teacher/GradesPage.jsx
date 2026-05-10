@@ -7,6 +7,10 @@ import {
   userService,
 } from '../../services/api';
 import toast from 'react-hot-toast';
+import {
+  getCurrentAcademicYear,
+  generateAcademicYearOptions,
+} from '../../utils/academicYear';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 const SCORE_CAPS = { ca1: 10, ca2: 10, midTerm: 10, exam: 70 };
@@ -21,7 +25,7 @@ export default function GradesPage() {
     class: '',
     subject: '',
     term: 'First Term',
-    academicYear: '2024/2025',
+    academicYear: getCurrentAcademicYear(),
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);

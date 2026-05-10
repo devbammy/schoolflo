@@ -77,7 +77,14 @@ router.get(
         student: { $in: childrenIds },
         status: { $ne: 'Revoked' },
       })
-        .populate('student', 'firstName lastName studentProfile')
+        .populate({
+          path: 'student',
+          select: 'firstName lastName studentProfile',
+          populate: {
+            path: 'studentProfile.class',
+            select: 'name level',
+          },
+        })
         .populate('issuedBy', 'firstName lastName')
         .sort({ createdAt: -1 });
 

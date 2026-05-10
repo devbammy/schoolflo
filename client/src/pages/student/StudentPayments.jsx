@@ -4,14 +4,12 @@ import { paymentService, feeService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import {
+  getCurrentAcademicYear,
+  generateAcademicYearOptions,
+} from '../../utils/academicYear';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
-
-const getDefaultAcademicYear = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  return now.getMonth() >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
-};
 
 export default function StudentPayments() {
   const { user } = useAuthStore();
@@ -20,7 +18,7 @@ export default function StudentPayments() {
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(null);
-  const [academicYear, setAcademicYear] = useState('');
+  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
 
   const studentId = user?.studentProfile
     ? user._id
@@ -95,13 +93,18 @@ export default function StudentPayments() {
             {t}
           </button>
         ))}
-        <input
+        <select
           className="form-control"
-          style={{ width: 130 }}
+          style={{ width: 140 }}
           value={academicYear}
           onChange={(e) => setAcademicYear(e.target.value)}
-          placeholder={getDefaultAcademicYear()}
-        />
+        >
+          {generateAcademicYearOptions(5).map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
       </div>
 
       {fees.length > 0 && (

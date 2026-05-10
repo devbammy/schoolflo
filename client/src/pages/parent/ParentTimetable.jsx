@@ -4,6 +4,10 @@ import TimetableView from '../../components/common/TimetableView';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { Users } from 'lucide-react';
+import {
+  getCurrentAcademicYear,
+  generateAcademicYearOptions,
+} from '../../utils/academicYear';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 
@@ -12,7 +16,7 @@ export default function ParentTimetable() {
   const [timetables, setTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [term, setTerm] = useState('First Term');
-  const [academicYear, setAcademicYear] = useState('2024/2025');
+  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
 
   // normalise children — only populated objects
   const children = (user?.parentProfile?.children || []).filter(
@@ -73,13 +77,18 @@ export default function ParentTimetable() {
             {t}
           </button>
         ))}
-        <input
+        <select
           className="form-control"
           style={{ width: 130 }}
           value={academicYear}
           onChange={(e) => setAcademicYear(e.target.value)}
-          placeholder="2024/2025"
-        />
+        >
+          {generateAcademicYearOptions(5).map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
       </div>
 
       {loading ? (

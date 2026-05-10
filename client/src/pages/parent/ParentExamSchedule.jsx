@@ -4,6 +4,10 @@ import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { Calendar, Users, AlertCircle, BookOpen } from 'lucide-react';
 import { format, isPast } from 'date-fns';
+import {
+  getCurrentAcademicYear,
+  generateAcademicYearOptions,
+} from '../../utils/academicYear';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 
@@ -12,8 +16,7 @@ export default function ParentExamSchedule() {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [term, setTerm] = useState('First Term');
-  const currentYear = new Date().getFullYear();
-  const [academicYear, setAcademicYear] = useState(String(currentYear));
+  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
   const [selectedChild, setSelectedChild] = useState(null);
 
   const children = (user?.parentProfile?.children || []).filter((c) => c?._id);
@@ -77,12 +80,18 @@ export default function ParentExamSchedule() {
               {t}
             </button>
           ))}
-          <input
+          <select
             className="form-control"
-            style={{ width: 100 }}
+            style={{ width: 140 }}
             value={academicYear}
             onChange={(e) => setAcademicYear(e.target.value)}
-          />
+          >
+            {generateAcademicYearOptions(5).map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
         </div>
 
         <select

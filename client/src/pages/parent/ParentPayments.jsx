@@ -4,6 +4,10 @@ import { paymentService, feeService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import {
+  getCurrentAcademicYear,
+  generateAcademicYearOptions,
+} from '../../utils/academicYear';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 const STATUS_BADGE = {
@@ -11,12 +15,6 @@ const STATUS_BADGE = {
   Partial: 'info',
   Pending: 'warning',
   Overdue: 'danger',
-};
-
-const getDefaultAcademicYear = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  return now.getMonth() >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
 };
 
 // Small inline avatar
@@ -64,7 +62,7 @@ export default function ParentPayments() {
 
   const [selectedChild, setSelectedChild] = useState(null);
   const [term, setTerm] = useState('First Term');
-  const [academicYear, setAcademicYear] = useState('');
+  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
   const [fees, setFees] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -260,13 +258,18 @@ export default function ParentPayments() {
             {t}
           </button>
         ))}
-        <input
+        <select
           className="form-control"
-          style={{ width: 130 }}
+          style={{ width: 140 }}
           value={academicYear}
           onChange={(e) => setAcademicYear(e.target.value)}
-          placeholder={getDefaultAcademicYear()}
-        />
+        >
+          {generateAcademicYearOptions(5).map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* ── Loading ─────────────────────────────────────────────────────── */}

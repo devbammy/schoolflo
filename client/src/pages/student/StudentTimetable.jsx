@@ -3,6 +3,10 @@ import { timetableService } from '../../services/api';
 import TimetableView from '../../components/common/TimetableView';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
+import {
+  getCurrentAcademicYear,
+  generateAcademicYearOptions,
+} from '../../utils/academicYear';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 
@@ -11,10 +15,7 @@ export default function StudentTimetable() {
   const [timetables, setTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [term, setTerm] = useState('First Term');
-  const currentYear = new Date().getFullYear();
-  const [academicYear, setAcademicYear] = useState(
-    `${currentYear - 1}/${currentYear}`,
-  );
+  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
 
   useEffect(() => {
     setLoading(true);
@@ -51,12 +52,18 @@ export default function StudentTimetable() {
             {t}
           </button>
         ))}
-        <input
+        <select
           className="form-control"
           style={{ width: 130 }}
           value={academicYear}
           onChange={(e) => setAcademicYear(e.target.value)}
-        />
+        >
+          {generateAcademicYearOptions(5).map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
       </div>
 
       {loading ? (

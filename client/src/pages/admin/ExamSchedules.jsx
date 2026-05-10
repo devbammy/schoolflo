@@ -7,6 +7,7 @@ import {
 } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import Modal from '../../components/common/Modal';
+import { getCurrentAcademicYear } from '../../utils/academicYear';
 
 const ExamSchedules = () => {
   const [schedules, setSchedules] = useState([]);
@@ -22,7 +23,7 @@ const ExamSchedules = () => {
     examType: 'Final Exam',
     class: '',
     term: 'First Term',
-    academicYear: new Date().getFullYear().toString(),
+    academicYear: getCurrentAcademicYear(),
     startDate: '',
     endDate: '',
     sessions: [],

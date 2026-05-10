@@ -4,6 +4,10 @@ import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { Calendar, Clock, MapPin, AlertCircle, Info } from 'lucide-react';
 import { format } from 'date-fns';
+import {
+  getCurrentAcademicYear,
+  generateAcademicYearOptions,
+} from '../../utils/academicYear';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 
@@ -12,8 +16,7 @@ export default function StudentExamSchedule() {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [term, setTerm] = useState('First Term');
-  const currentYear = new Date().getFullYear();
-  const [academicYear, setAcademicYear] = useState(String(currentYear));
+  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
 
   useEffect(() => {
     setLoading(true);
@@ -47,12 +50,17 @@ export default function StudentExamSchedule() {
             {t}
           </button>
         ))}
-        <input
+        <select
           className="form-control year-input"
           value={academicYear}
           onChange={(e) => setAcademicYear(e.target.value)}
-          placeholder="Year"
-        />
+        >
+          {generateAcademicYearOptions(5).map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
       </div>
 
       {loading ? (

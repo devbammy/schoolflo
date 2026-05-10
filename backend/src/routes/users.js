@@ -17,21 +17,70 @@ const {
 } = require('../services/fileService');
 
 // GET all users (Admin)
+// router.get('/', protect, authorize('Admin'), async (req, res) => {
+//   try {
+//     const { role, search, isActive } = req.query;
+//     const { page, limit, skip } = getPaginationParams(req.query);
+
+//     const filter = {};
+//     if (role) filter.role = role;
+//     if (isActive !== undefined) filter.isActive = isActive === 'true';
+
+//     if (search) {
+//       filter.$or = [
+//         { firstName: new RegExp(search, 'i') },
+//         { lastName: new RegExp(search, 'i') },
+//         { email: new RegExp(search, 'i') },
+//         { 'studentProfile.admissionNumber': new RegExp(search, 'i') },
+//         { 'teacherProfile.staffId': new RegExp(search, 'i') },
+//       ];
+//     }
+
+//     const [users, total] = await Promise.all([
+//       User.find(filter)
+//         .populate('studentProfile.class', 'name level')
+//         .select('-password')
+//         .sort({ createdAt: -1 })
+//         .skip(skip)
+//         .limit(limit),
+//       User.countDocuments(filter),
+//     ]);
+
+//     return sendPaginated(res, users, total, page, limit);
+//   } catch (error) {
+//     return sendError(res, 500, error.message);
+//   }
+// });
+
 router.get('/', protect, authorize('Admin'), async (req, res) => {
   try {
-    const { role, search, isActive } = req.query;
+    const { role, search, isActive, class: classId } = req.query;
     const { page, limit, skip } = getPaginationParams(req.query);
 
     const filter = {};
+
     if (role) filter.role = role;
-    if (isActive !== undefined) filter.isActive = isActive === 'true';
+
+    if (isActive !== undefined) {
+      filter.isActive = isActive === 'true';
+    }
+
+    // ADD THIS
+    if (classId) {
+      filter['studentProfile.class'] = classId;
+    }
+
     if (search) {
       filter.$or = [
         { firstName: new RegExp(search, 'i') },
         { lastName: new RegExp(search, 'i') },
         { email: new RegExp(search, 'i') },
-        { 'studentProfile.admissionNumber': new RegExp(search, 'i') },
-        { 'teacherProfile.staffId': new RegExp(search, 'i') },
+        {
+          'studentProfile.admissionNumber': new RegExp(search, 'i'),
+        },
+        {
+          'teacherProfile.staffId': new RegExp(search, 'i'),
+        },
       ];
     }
 
@@ -42,6 +91,7 @@ router.get('/', protect, authorize('Admin'), async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
+
       User.countDocuments(filter),
     ]);
 
