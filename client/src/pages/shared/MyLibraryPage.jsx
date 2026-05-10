@@ -237,7 +237,7 @@ export default function MyLibraryPage() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
                 gap: 14,
               }}
             >
@@ -245,7 +245,7 @@ export default function MyLibraryPage() {
                 <div
                   key={book._id}
                   className="card"
-                  style={{ overflow: 'hidden' }}
+                  style={{ overflow: 'hidden', padding: '10px' }}
                 >
                   {/* Cover area */}
                   <div

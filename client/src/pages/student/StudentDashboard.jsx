@@ -84,7 +84,8 @@ export default function StudentDashboard() {
         <div>
           <h1 className="page-header__title">Welcome, {student?.firstName}!</h1>
           <p className="page-header__subtitle">
-            {student?.studentProfile?.class?.name} • First Term 2024/2025
+            {student?.studentProfile?.class?.name} •{' '}
+            {student?.studentProfile?.admissionNumber}
           </p>
         </div>
       </div>

@@ -15,6 +15,7 @@ const {
   sendBulkEmails,
   emailTemplates,
 } = require('../services/notificationService');
+const caTrackingService = require('../services/caTrackingService');
 
 // ✅ Helper (centralized calculation)
 const computeResultFields = (scores = {}) => {
@@ -169,8 +170,23 @@ const publishResults = async (req, res) => {
       { $set: { isPublished: true } },
     );
 
-    // Step 3: Notify parents via email
+    // Step 3: Sync CA Tracker for all students (auto-sync on publish)
     const publishedResults = await Result.find({
+      class: classId,
+      term,
+      academicYear,
+      isPublished: true,
+    }).distinct('student');
+
+    // Sync CA tracker for each student asynchronously
+    publishedResults.forEach((studentId) => {
+      caTrackingService
+        .syncFromResults(studentId, academicYear)
+        .catch(console.error);
+    });
+
+    // Step 4: Get student IDs for notifications
+    const studentsForNotification = await Result.find({
       class: classId,
       term,
       academicYear,
@@ -180,14 +196,14 @@ const publishResults = async (req, res) => {
       .distinct('student');
 
     // Fire notifications async (don't block response)
-    notifyParentsOfResults(publishedResults, term, academicYear).catch(
+    notifyParentsOfResults(studentsForNotification, term, academicYear).catch(
       console.error,
     );
 
     return sendSuccess(
       res,
       200,
-      `Results published. ${updated.modifiedCount} records updated.`,
+      `Results published. ${updated.modifiedCount} records updated. CA Tracker syncing in background.`,
       {
         processed: statsResult.processed,
         published: updated.modifiedCount,

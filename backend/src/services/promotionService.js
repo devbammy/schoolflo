@@ -59,12 +59,12 @@ class PromotionService {
       // Calculate yearly average
       const yearlyAverages = trackers
         .map((t) => t.yearlyAverage)
-        .filter((a) => a);
+        .filter((a) => a !== null && a !== undefined && a !== 0);
       const overallAverage =
         yearlyAverages.length > 0
           ? yearlyAverages.reduce((sum, val) => sum + val, 0) /
             yearlyAverages.length
-          : 0;
+          : null;
 
       // Find failed subjects (yearly average < 40)
       const failedSubjects = trackers
@@ -90,7 +90,13 @@ class PromotionService {
       let comment = 'Congratulations on your promotion!';
 
       // Check if student should repeat
-      if (overallAverage < promotion.criteria.minimumAverage) {
+      // Skip promotion if no tracker data exists
+      if (overallAverage === null) {
+        status = 'Repeated';
+        promotedTo = promotion.fromClass._id;
+        comment =
+          'No academic records found for this academic year. Will repeat class.';
+      } else if (overallAverage < promotion.criteria.minimumAverage) {
         status = 'Repeated';
         promotedTo = promotion.fromClass._id;
         comment = `Overall average (${overallAverage.toFixed(2)}%) below minimum required (${promotion.criteria.minimumAverage}%). Will repeat class.`;

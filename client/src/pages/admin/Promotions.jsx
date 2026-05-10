@@ -10,10 +10,19 @@ import {
   Users,
   Award,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
-import { promotionService, classService } from '../../services/api';
+import {
+  promotionService,
+  classService,
+  caTrackingService,
+} from '../../services/api';
 import { toast } from 'react-hot-toast';
 import Modal from '../../components/common/Modal';
+import {
+  generateAcademicYearOptions,
+  getCurrentAcademicYear,
+} from '../../utils/academicYear';
 
 const Promotions = () => {
   const [promotions, setPromotions] = useState([]);
@@ -23,9 +32,15 @@ const Promotions = () => {
   const [selectedPromotion, setSelectedPromotion] = useState(null);
   const [stats, setStats] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const academicYears = generateAcademicYearOptions({
+    count: 3,
+    includeFuture: true,
+  });
 
   const initialForm = {
-    academicYear: new Date().getFullYear().toString(),
+    academicYear: getCurrentAcademicYear(),
     fromClass: '',
     toClass: '',
     criteria: {
@@ -121,6 +136,36 @@ const Promotions = () => {
       toast.error('Failed to load details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncClassTrackers = async () => {
+    if (!formData.fromClass) {
+      return toast.error('Please select a class first');
+    }
+
+    const confirmSync = window.confirm(
+      'This will sync CA Tracker data from published results for all students in this class. Continue?',
+    );
+    if (!confirmSync) return;
+
+    const academicYear = formData.academicYear?.includes('/')
+      ? formData.academicYear
+      : getCurrentAcademicYear();
+
+    try {
+      setSyncing(true);
+      await caTrackingService.syncClass({
+        classId: formData.fromClass,
+        academicYear: formData.academicYear,
+      });
+      toast.success('CA Tracker synced successfully!');
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || 'Failed to sync CA Tracker data',
+      );
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -234,24 +279,32 @@ const Promotions = () => {
       </div>
 
       {/* CREATE MODAL */}
+
       <Modal
         open={modal === 'form'}
         onClose={() => setModal(null)}
         title="Configure New Promotion"
       >
         <form className="modern-form" onSubmit={handleSubmit}>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Academic Year</label>
-              <input
-                type="text"
-                value={formData.academicYear}
-                onChange={(e) =>
-                  handleInputChange('academicYear', e.target.value)
-                }
-              />
-            </div>
+          <div className="form-group">
+            <label>Academic Year</label>
+
+            <select
+              className="form-control"
+              required
+              value={formData.academicYear}
+              onChange={(e) =>
+                setFormData((f) => ({ ...f, academicYear: e.target.value }))
+              }
+            >
+              {academicYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
           </div>
+
           <div className="form-row">
             <div className="form-group">
               <label>From Class</label>
@@ -259,7 +312,7 @@ const Promotions = () => {
                 value={formData.fromClass}
                 onChange={(e) => handleInputChange('fromClass', e.target.value)}
               >
-                <option value="">Select...</option>
+                <option value="">Select source class...</option>
                 {classes.map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.name}
@@ -283,6 +336,21 @@ const Promotions = () => {
             </div>
           </div>
 
+          {/* Dedicated row for the Sync button so it doesn't crowd inputs */}
+          <div className="form-row full-width">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleSyncClassTrackers}
+              disabled={syncing || !formData.fromClass}
+            >
+              <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+              <span>
+                {syncing ? 'Synchronizing Data...' : 'Sync Class CA Tracker'}
+              </span>
+            </button>
+          </div>
+
           <div className="criteria-section">
             <h4>Promotion Criteria</h4>
             <div className="form-row">
@@ -297,7 +365,7 @@ const Promotions = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Max. Failures</label>
+                <label>Max. Failures Allowed</label>
                 <input
                   type="number"
                   value={formData.criteria.maximumFailures}
@@ -321,7 +389,7 @@ const Promotions = () => {
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Creating...' : 'Launch Batch'}
+              {saving ? 'Creating Batch...' : 'Initialize Promotion Batch'}
             </button>
           </div>
         </form>

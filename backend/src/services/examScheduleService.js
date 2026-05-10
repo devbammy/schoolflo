@@ -138,8 +138,10 @@ class ExamScheduleService {
             teacherName: `${teacher.firstName} ${teacher.lastName}`,
             examTitle: schedule.title,
             className: schedule.class.name,
-            sessionsCount: schedule.sessions.filter((s) =>
-              s.invigilators.some((i) => i._id.equals(teacher._id)),
+            sessionsCount: schedule.sessions.filter(
+              (s) =>
+                s.invigilator &&
+                s.invigilator._id.toString() === teacher._id.toString(),
             ).length,
             loginUrl: process.env.CLIENT_URL,
           },

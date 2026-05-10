@@ -217,6 +217,35 @@ class CATrackingService {
 
     return chartData;
   }
+
+  // Bulk sync CA tracker for all students in a class
+  async syncClassTrackers(classId, academicYear) {
+    // Get all students in the class
+    const students = await User.find({
+      role: 'Student',
+      'studentProfile.class': classId,
+      isActive: true,
+    }).select('_id');
+
+    const syncPromises = students.map((student) =>
+      this.syncFromResults(student._id, academicYear).catch((error) => {
+        console.error(
+          `Error syncing tracker for student ${student._id}:`,
+          error,
+        );
+        return [];
+      }),
+    );
+
+    const allTrackers = await Promise.all(syncPromises);
+
+    return {
+      classId,
+      academicYear,
+      studentsProcessed: students.length,
+      trackersCreated: allTrackers.flat().length,
+    };
+  }
 }
 
 module.exports = new CATrackingService();

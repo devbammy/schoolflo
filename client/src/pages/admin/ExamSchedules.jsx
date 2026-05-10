@@ -457,17 +457,6 @@ const ExamSchedules = () => {
 
           {/* Exam Sessions */}
           <div className="sessions-section">
-            <div className="section-header">
-              <h3>Exam Sessions</h3>
-              <button
-                type="button"
-                className="btn btn-sm btn-secondary"
-                onClick={addSession}
-              >
-                Add Session
-              </button>
-            </div>
-
             {formData.sessions.map((session, index) => (
               <div key={index} className="session-card">
                 <div className="session-header">
@@ -610,6 +599,17 @@ const ExamSchedules = () => {
                 </div>
               </div>
             ))}
+
+            <div className="section-header">
+              <h3>Exam Sessions</h3>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={addSession}
+              >
+                Add Session
+              </button>
+            </div>
           </div>
         </form>
       </Modal>

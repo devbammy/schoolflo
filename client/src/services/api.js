@@ -317,6 +317,7 @@ export const examScheduleService = {
 
 export const caTrackingService = {
   sync: (data) => api.post('/ca-tracking/sync', data),
+  syncClass: (data) => api.post('/ca-tracking/sync-class', data),
   getStudentTracking: (studentId, params) =>
     api.get(`/ca-tracking/student/${studentId}`, { params }),
   getClassTracking: (classId, subjectId, params) =>

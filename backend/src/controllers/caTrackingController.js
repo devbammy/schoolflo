@@ -80,3 +80,17 @@ exports.getChartData = async (req, res) => {
     sendError(res, error.message, 500);
   }
 };
+
+// Bulk sync CA trackers for entire class
+exports.syncClassTrackers = async (req, res) => {
+  try {
+    const { classId, academicYear } = req.body;
+    const result = await caTrackingService.syncClassTrackers(
+      classId,
+      academicYear,
+    );
+    sendSuccess(res, 200, 'Class CA trackers synced successfully', result);
+  } catch (error) {
+    sendError(res, error.message, 500);
+  }
+};

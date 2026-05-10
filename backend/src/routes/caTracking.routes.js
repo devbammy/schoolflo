@@ -12,6 +12,14 @@ router.post(
   caTrackingController.syncTrackers,
 );
 
+// Bulk sync trackers for entire class
+router.post(
+  '/sync-class',
+  protect,
+  authorize('Admin'),
+  caTrackingController.syncClassTrackers,
+);
+
 // Get student tracking
 router.get(
   '/student/:studentId',
