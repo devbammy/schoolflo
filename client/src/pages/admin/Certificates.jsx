@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { certificateService } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import Modal from '../../components/common/Modal';
+import {
+  generateAcademicYearOptions,
+  getCurrentAcademicYear,
+} from '../../utils/academicYear';
 
 const Certificates = () => {
   const [certificates, setcertificates] = useState([]);
@@ -10,11 +14,16 @@ const Certificates = () => {
   const [certificateType, setCertificateType] = useState('Report Card');
   const [saving, setSaving] = useState(false);
 
+  const academicYears = generateAcademicYearOptions({
+    count: 3,
+    includeFuture: true,
+  });
+
   // Form states for different certificate types
   const [reportCardData, setReportCardData] = useState({
     studentId: '',
     term: 'First Term',
-    academicYear: new Date().getFullYear().toString(),
+    academicYear: getCurrentAcademicYear(),
   });
 
   const [leavingCertData, setLeavingCertData] = useState({
@@ -30,7 +39,7 @@ const Certificates = () => {
     studentId: '',
     admissionNumber: '',
     className: '',
-    academicYear: new Date().getFullYear().toString(),
+    academicYear: getCurrentAcademicYear(),
     resumptionDate: '',
     fees: '',
     validUntil: '',
@@ -118,7 +127,7 @@ const Certificates = () => {
     setReportCardData({
       studentId: '',
       term: 'First Term',
-      academicYear: new Date().getFullYear().toString(),
+      academicYear: getCurrentAcademicYear(),
     });
     setLeavingCertData({
       studentId: '',
@@ -132,7 +141,7 @@ const Certificates = () => {
       studentId: '',
       admissionNumber: '',
       className: '',
-      academicYear: new Date().getFullYear().toString(),
+      academicYear: getCurrentAcademicYear(),
       resumptionDate: '',
       fees: '',
       validUntil: '',
@@ -308,9 +317,9 @@ const Certificates = () => {
                 </div>
                 <div className="form-group">
                   <label>Academic Year *</label>
-                  <input
+
+                  <select
                     className="form-control"
-                    type="text"
                     value={reportCardData.academicYear}
                     onChange={(e) =>
                       setReportCardData({
@@ -319,7 +328,13 @@ const Certificates = () => {
                       })
                     }
                     required
-                  />
+                  >
+                    {academicYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </>
             )}
@@ -476,11 +491,12 @@ const Certificates = () => {
                     required
                   />
                 </div>
+
                 <div className="form-group">
                   <label>Academic Year *</label>
-                  <input
+
+                  <select
                     className="form-control"
-                    type="text"
                     value={admissionLetterData.academicYear}
                     onChange={(e) =>
                       setAdmissionLetterData({
@@ -489,7 +505,13 @@ const Certificates = () => {
                       })
                     }
                     required
-                  />
+                  >
+                    {academicYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>Resumption Date *</label>

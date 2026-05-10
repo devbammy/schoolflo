@@ -1,51 +1,114 @@
+// src/utils/academicYear.js
+
 /**
- * Utility functions for academic year handling
- * Standardizes academic year format to YYYY/YYYY (e.g., 2024/2025)
+ * Academic Year Utilities
+ * Format: YYYY/YYYY
+ * Example: 2025/2026
  */
 
 /**
- * Get the current academic year in YYYY/YYYY format
- * @returns {string} Current academic year (e.g., "2024/2025")
+ * Returns the academic year based on today's date.
+ * Assumes academic session starts in September.
  */
-export const getCurrentAcademicYear = () => {
+export const getCurrentAcademicYear = (startMonth = 8, offset = 0) => {
   const now = new Date();
   const currentYear = now.getFullYear();
-  // If we're in Jan-Aug, we're in the previous year's academic year
-  // If we're in Sept-Dec, we're in the current year's academic year
-  const startYear = now.getMonth() < 8 ? currentYear - 1 : currentYear;
+
+  const baseStartYear =
+    now.getMonth() >= startMonth ? currentYear : currentYear - 1;
+
+  const startYear = baseStartYear + offset;
+
   return `${startYear}/${startYear + 1}`;
 };
 
 /**
- * Generate academic year options for a dropdown
- * @param {number} yearsBack - How many years back to include (default: 5)
- * @returns {string[]} Array of academic years
+ * Generate academic year options.
+ *
+ * @param {Object} options
+ * @param {number} options.count - Number of years
+ * @param {boolean} options.includeFuture - Include future sessions
+ * @param {number} options.futureCount - Number of future sessions
+ * @returns {string[]}
  */
-export const generateAcademicYearOptions = (yearsBack = 5) => {
-  const currentYear = new Date().getFullYear();
+export const generateAcademicYearOptions = ({
+  count = 5,
+  includeFuture = false,
+  futureCount = 1,
+} = {}) => {
+  const current = getCurrentAcademicYear();
+
+  const currentStartYear = parseAcademicYear(current).startYear;
+
   const years = [];
-  for (let i = 0; i < yearsBack; i++) {
-    const startYear = currentYear - i;
-    years.push(`${startYear - 1}/${startYear}`);
+
+  // Previous/current years
+  for (let i = 0; i < count; i++) {
+    const year = currentStartYear - i;
+    years.push(`${year}/${year + 1}`);
   }
+
+  // Future years
+  if (includeFuture) {
+    for (let i = 1; i <= futureCount; i++) {
+      const year = currentStartYear + i;
+      years.unshift(`${year}/${year + 1}`);
+    }
+  }
+
   return years;
 };
 
 /**
- * Validate academic year format
- * @param {string} academicYear - Academic year to validate
- * @returns {boolean} True if valid YYYY/YYYY format
+ * Validate academic year format and logical sequence.
  */
 export const isValidAcademicYear = (academicYear) => {
-  return /^\d{4}\/\d{4}$/.test(academicYear);
+  if (!/^\d{4}\/\d{4}$/.test(academicYear)) {
+    return false;
+  }
+
+  const { startYear, endYear } = parseAcademicYear(academicYear);
+
+  return endYear === startYear + 1;
 };
 
 /**
- * Parse academic year string to get start and end years
- * @param {string} academicYear - Academic year string (e.g., "2024/2025")
- * @returns {object} Object with startYear and endYear
+ * Parse academic year string.
  */
 export const parseAcademicYear = (academicYear) => {
   const [startYear, endYear] = academicYear.split('/').map(Number);
-  return { startYear, endYear };
+
+  return {
+    startYear,
+    endYear,
+  };
+};
+
+/**
+ * Get next academic year.
+ */
+export const getNextAcademicYear = (academicYear) => {
+  const { startYear } = parseAcademicYear(academicYear);
+
+  return `${startYear + 1}/${startYear + 2}`;
+};
+
+/**
+ * Get previous academic year.
+ */
+export const getPreviousAcademicYear = (academicYear) => {
+  const { startYear } = parseAcademicYear(academicYear);
+
+  return `${startYear - 1}/${startYear}`;
+};
+
+/**
+ * Compare academic years.
+ * Useful for sorting.
+ */
+export const compareAcademicYears = (a, b) => {
+  const yearA = parseAcademicYear(a).startYear;
+  const yearB = parseAcademicYear(b).startYear;
+
+  return yearB - yearA;
 };

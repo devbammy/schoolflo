@@ -23,6 +23,10 @@ import Modal from '../../components/common/Modal';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import {
+  generateAcademicYearOptions,
+  getCurrentAcademicYear,
+} from '../../utils/academicYear';
 
 ChartJS.register(
   CategoryScale,
@@ -32,6 +36,11 @@ ChartJS.register(
   Tooltip,
   Legend,
 );
+
+const academicYears = generateAcademicYearOptions({
+  count: 3,
+  includeFuture: true,
+});
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 const GATEWAYS = ['Cash', 'Bank Transfer', 'Paystack', 'Flutterwave'];
@@ -50,7 +59,7 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     term: 'First Term',
-    academicYear: '2024/2025',
+    academicYear: getCurrentAcademicYear(),
   });
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -180,15 +189,21 @@ export default function PaymentsPage() {
             {t}
           </button>
         ))}
-        <input
+        <select
           className="form-control"
-          style={{ width: 140 }}
+          style={{ width: 'auto', minWidth: 160 }}
           value={filters.academicYear}
           onChange={(e) =>
             setFilters((f) => ({ ...f, academicYear: e.target.value }))
           }
-          placeholder="2024/2025"
-        />
+          required
+        >
+          {academicYears.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Overview Stats */}

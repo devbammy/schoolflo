@@ -25,6 +25,10 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import TimetableView from '../../components/common/TimetableView';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import {
+  generateAcademicYearOptions,
+  getCurrentAcademicYear,
+} from '../../utils/academicYear';
 
 const DAYS = [
   'Monday',
@@ -509,6 +513,7 @@ function TimetableEditor({
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ─────────────────────────────────────────────────────────────────────────────
+
 export default function TimetablePage() {
   const [timetables, setTimetables] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -517,6 +522,9 @@ export default function TimetablePage() {
   const [loading, setLoading] = useState(true);
   const [filterCls, setFilterCls] = useState('');
   const [filterTerm, setFilterTerm] = useState('');
+  const [filterAcademicYear, setFilterAcademicYear] = useState(
+    getCurrentAcademicYear(),
+  );
   const [expanded, setExpanded] = useState(null);
   const [previewTT, setPreviewTT] = useState(null); // timetable to show in preview modal
   const [createModal, setCreateModal] = useState(false);
@@ -524,12 +532,16 @@ export default function TimetablePage() {
     class: '',
     section: '',
     term: 'First Term',
-    academicYear: '2024/2025',
+    academicYear: getCurrentAcademicYear(),
     notes: '',
   });
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  const academicYears = generateAcademicYearOptions({
+    count: 3,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -537,6 +549,10 @@ export default function TimetablePage() {
       const params = {};
       if (filterCls) params.classId = filterCls;
       if (filterTerm) params.term = filterTerm;
+
+      if (filterAcademicYear) {
+        params.academicYear = filterAcademicYear;
+      }
       const res = await timetableService.getAll(params);
       setTimetables(res.data.data?.timetables || []);
     } catch (err) {
@@ -688,6 +704,19 @@ export default function TimetablePage() {
           <option value="">All Terms</option>
           {TERMS.map((t) => (
             <option key={t}>{t}</option>
+          ))}
+        </select>
+
+        <select
+          className="form-control"
+          style={{ width: 'auto', minWidth: 160 }}
+          value={filterAcademicYear}
+          onChange={(e) => setFilterAcademicYear(e.target.value)}
+        >
+          {academicYears.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
           ))}
         </select>
       </div>
@@ -1022,15 +1051,23 @@ export default function TimetablePage() {
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Academic Year *</label>
-              <input
+              <select
                 className="form-control"
                 required
                 value={createForm.academicYear}
-                placeholder="2024/2025"
                 onChange={(e) =>
-                  setCreateForm((f) => ({ ...f, academicYear: e.target.value }))
+                  setCreateForm((f) => ({
+                    ...f,
+                    academicYear: e.target.value,
+                  }))
                 }
-              />
+              >
+                {academicYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>

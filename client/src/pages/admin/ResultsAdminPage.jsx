@@ -8,6 +8,10 @@ import {
 } from '../../services/api';
 import Modal from '../../components/common/Modal';
 import toast from 'react-hot-toast';
+import {
+  generateAcademicYearOptions,
+  getCurrentAcademicYear,
+} from '../../utils/academicYear';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 const SCORE_CAPS = { ca1: 10, ca2: 10, midTerm: 10, exam: 70 };
@@ -31,7 +35,7 @@ export default function ResultsAdminPage() {
     class: '',
     subject: '',
     term: 'First Term',
-    academicYear: '2024/2025',
+    academicYear: getCurrentAcademicYear(),
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -192,6 +196,10 @@ export default function ResultsAdminPage() {
     return Object.values(r).some((res) => res.isPublished);
   }).length;
 
+  const academicYears = generateAcademicYearOptions({
+    count: 5,
+  });
+
   return (
     <>
       <div className="page-header">
@@ -290,13 +298,23 @@ export default function ResultsAdminPage() {
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label>Academic Year</label>
-            <input
+
+            <select
               className="form-control"
               value={filters.academicYear}
               onChange={(e) =>
-                setFilters((f) => ({ ...f, academicYear: e.target.value }))
+                setFilters((f) => ({
+                  ...f,
+                  academicYear: e.target.value,
+                }))
               }
-            />
+            >
+              {academicYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         {filters.class && students.length > 0 && (

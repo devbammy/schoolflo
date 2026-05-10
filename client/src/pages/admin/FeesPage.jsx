@@ -5,14 +5,22 @@ import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import {
+  generateAcademicYearOptions,
+  getCurrentAcademicYear,
+} from '../../utils/academicYear';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
+const academicYears = generateAcademicYearOptions({
+  count: 3,
+  includeFuture: true,
+});
 const EMPTY_ITEM = { label: '', amount: '', isCompulsory: true };
 const EMPTY_FORM = {
   title: '',
   class: '',
   term: 'First Term',
-  academicYear: '2024/2025',
+  academicYear: getCurrentAcademicYear(),
   dueDate: '',
   lateFee: 0,
   items: [
@@ -156,15 +164,25 @@ export default function FeesPage() {
             <option key={t}>{t}</option>
           ))}
         </select>
-        <input
+        <select
           className="form-control"
-          style={{ width: 140 }}
-          placeholder="Academic Year"
+          style={{ width: 180 }}
           value={filters.academicYear}
           onChange={(e) =>
-            setFilters((f) => ({ ...f, academicYear: e.target.value }))
+            setFilters((f) => ({
+              ...f,
+              academicYear: e.target.value,
+            }))
           }
-        />
+        >
+          <option value="">All Academic Years</option>
+
+          {academicYears.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Fee Cards */}
@@ -416,17 +434,27 @@ export default function FeesPage() {
                 ))}
               </select>
             </div>
+
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Academic Year *</label>
-              <input
+
+              <select
                 className="form-control"
                 required
                 value={form.academicYear}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, academicYear: e.target.value }))
+                  setForm((f) => ({
+                    ...f,
+                    academicYear: e.target.value,
+                  }))
                 }
-                placeholder="2024/2025"
-              />
+              >
+                {academicYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Payment Due Date *</label>

@@ -13,14 +13,22 @@ import { classService, subjectService, userService } from '../../services/api';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from 'react-hot-toast';
+import {
+  generateAcademicYearOptions,
+  getCurrentAcademicYear,
+} from '../../utils/academicYear';
 
-const LEVELS = ['JSS', 'SS', 'Primary'];
+const LEVELS = ['JSS', 'SS', 'Primary', 'College'];
 const EMPTY_FORM = {
   name: '',
   level: 'JSS',
-  academicYear: '2024/2025',
+  academicYear: getCurrentAcademicYear(),
   sections: [{ name: 'A', capacity: 40, classTeacher: '' }],
 };
+
+const academicYears = generateAcademicYearOptions({
+  count: 3,
+});
 
 export default function ClassesPage() {
   const [classes, setClasses] = useState([]);
@@ -132,7 +140,6 @@ export default function ClassesPage() {
       setModal(null);
       load();
     } catch (err) {
-      console.log(err.response?.data?.message);
       toast.error(err.response?.data?.message || 'Operation failed');
     } finally {
       setSaving(false);
@@ -498,15 +505,21 @@ export default function ClassesPage() {
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Academic Year *</label>
-              <input
+
+              <select
                 className="form-control"
                 required
                 value={form.academicYear}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, academicYear: e.target.value }))
                 }
-                placeholder="2024/2025"
-              />
+              >
+                {academicYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

@@ -31,6 +31,10 @@ import { calendarService } from '../../services/api';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from 'react-hot-toast';
+import {
+  generateAcademicYearOptions,
+  getCurrentAcademicYear,
+} from '../../utils/academicYear';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const EVENT_TYPES = [
@@ -71,6 +75,7 @@ const EMPTY_EVENT = {
   targetAudience: ['All'],
   color: '',
 };
+
 const EMPTY_TERM = {
   name: 'First Term',
   startDate: '',
@@ -82,7 +87,7 @@ const EMPTY_TERM = {
   resumptionDate: '',
 };
 const EMPTY_CALENDAR = {
-  academicYear: '',
+  academicYear: getCurrentAcademicYear(),
   sessionStartDate: '',
   sessionEndDate: '',
   notes: '',
@@ -117,6 +122,11 @@ function eventDot(color) {
     />
   );
 }
+
+const academicYears = generateAcademicYearOptions({
+  count: 3,
+  includeFuture: true,
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AcademicCalendarPage() {
@@ -1208,15 +1218,21 @@ export default function AcademicCalendarPage() {
           >
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Academic Year *</label>
-              <input
+
+              <select
                 className="form-control"
                 required
-                placeholder="2024/2025"
                 value={calForm.academicYear}
                 onChange={(e) =>
                   setCalForm((f) => ({ ...f, academicYear: e.target.value }))
                 }
-              />
+              >
+                {academicYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Session Start *</label>

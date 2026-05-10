@@ -7,7 +7,10 @@ import {
 } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import Modal from '../../components/common/Modal';
-import { getCurrentAcademicYear } from '../../utils/academicYear';
+import {
+  generateAcademicYearOptions,
+  getCurrentAcademicYear,
+} from '../../utils/academicYear';
 
 const ExamSchedules = () => {
   const [schedules, setSchedules] = useState([]);
@@ -17,6 +20,7 @@ const ExamSchedules = () => {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
+  const [filterAcademicYear, setFilterAcademicYear] = useState('');
 
   const [formData, setFormData] = useState({
     title: '',
@@ -29,8 +33,15 @@ const ExamSchedules = () => {
     sessions: [],
   });
 
+  const academicYears = generateAcademicYearOptions({
+    pastYears: 3,
+    includeFuture: true,
+  });
   useEffect(() => {
     fetchSchedules();
+  }, [filterAcademicYear]);
+
+  useEffect(() => {
     fetchClasses();
     fetchTeachers();
   }, []);
@@ -38,7 +49,13 @@ const ExamSchedules = () => {
   const fetchSchedules = async () => {
     try {
       setLoading(true);
-      const response = await examScheduleService.getAll();
+      const params = {};
+
+      if (filterAcademicYear) {
+        params.academicYear = filterAcademicYear;
+      }
+
+      const response = await examScheduleService.getAll(params);
 
       setSchedules(response?.data?.data);
     } catch (error) {
@@ -189,11 +206,13 @@ const ExamSchedules = () => {
       examType: 'Final Exam',
       class: '',
       term: 'First Term',
-      academicYear: new Date().getFullYear().toString(),
+      academicYear: getCurrentAcademicYear(),
       startDate: '',
       endDate: '',
       sessions: [],
     });
+
+    setSubjects([]);
     setEditingSchedule(null);
   };
 
@@ -253,7 +272,16 @@ const ExamSchedules = () => {
                   className="btn btn-sm btn-secondary"
                   onClick={() => {
                     setEditingSchedule(schedule);
-                    setFormData(schedule);
+                    setFormData({
+                      ...schedule,
+                      class: schedule.class?._id || schedule.class,
+                      sessions: (schedule.sessions || []).map((session) => ({
+                        ...session,
+                        subject: session.subject?._id || session.subject,
+                        invigilator:
+                          session.invigilator?._id || session.invigilator || '',
+                      })),
+                    });
                     setModalOpen(true);
                   }}
                 >
@@ -380,15 +408,24 @@ const ExamSchedules = () => {
 
             <div className="form-group">
               <label>Academic Year *</label>
-              <input
+
+              <select
                 className="form-control"
-                type="text"
                 value={formData.academicYear}
                 onChange={(e) =>
-                  setFormData({ ...formData, academicYear: e.target.value })
+                  setFormData({
+                    ...formData,
+                    academicYear: e.target.value,
+                  })
                 }
                 required
-              />
+              >
+                {academicYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group">
