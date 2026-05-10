@@ -1,9 +1,17 @@
 require('dotenv').config();
+require('express-async-errors');
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const hpp = require('hpp');
+const axios = require('axios');
+
 const connectDB = require('./src/config/db');
 const errorHandler = require('./src/middleware/errorHandler');
 
@@ -32,19 +40,56 @@ const certificateRoutes = require('./src/routes/certificate.routes');
 
 const app = express();
 
+app.set('trust proxy', 1);
+
+app.disable('x-powered-by');
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
+
 // Connect to MongoDB
 connectDB();
 
 // Security Middleware
-app.use(helmet());
+
+const allowedOrigins = process.env.CLIENT_URL || 'http://localhost:5173';
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow mobile apps / Postman / server requests
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('CORS policy violation'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
+
+app.use(compression());
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use(mongoSanitize());
+app.use(xss());
+app.use(hpp());
+
+// Logging
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
 
 // Rate Limiting
 const limiter = rateLimit({
@@ -55,7 +100,6 @@ const limiter = rateLimit({
     message: 'Too many requests, please try again later.',
   },
 });
-app.use('/api/', limiter);
 
 // Auth-specific strict limiter
 const authLimiter = rateLimit({
@@ -67,23 +111,25 @@ const authLimiter = rateLimit({
   },
 });
 
-// Body Parsers
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Logging
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-}
+app.use('/api/', limiter);
 
 // Health Check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    version: '1.0.0',
-  });
+app.get('/health', async (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      status: 'OK',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV,
+      memoryUsage: process.memoryUsage(),
+    });
+  } catch (error) {
+    res.status(503).json({
+      success: false,
+      status: 'FAILED',
+    });
+  }
 });
 
 // API Routes
@@ -109,29 +155,93 @@ app.use('/api/v1/ca-tracking', caTrackingRoutes);
 app.use('/api/v1/promotions', promotionRoutes);
 app.use('/api/v1/certificates', certificateRoutes);
 
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'School Management API is running...',
+  });
+});
+
+// Keep-alive
+app.get('/keep-alive', (_, res) => res.status(204).end());
+
+const KEEP_ALIVE =
+  process.env.KEEP_ALIVE === 'true' || process.env.NODE_ENV === 'production';
+
+const PING_URL =
+  process.env.PING_URL || 'https://schoolflo-xyo9.onrender.com/keep-alive';
+
+if (KEEP_ALIVE) {
+  setInterval(
+    async () => {
+      try {
+        await axios.get(PING_URL);
+        console.log('💓 Keep-alive ping sent');
+      } catch (err) {
+        console.error('❌ Ping failed:', err.message);
+      }
+    },
+    1000 * 60 * 14,
+  );
+}
+
 // 404 Handler
-app.use('*', (req, res) => {
-  res
-    .status(404)
-    .json({ success: false, message: `Route ${req.originalUrl} not found` });
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.originalUrl} not found`,
+  });
 });
 
 // Global Error Handler
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5001;
-const server = app.listen(PORT, () => {
-  console.log(
-    `\n🚀 SMP Server running in ${process.env.NODE_ENV} mode on port ${PORT}`,
-  );
-  console.log(`📡 API Base: http://localhost:${PORT}/api/v1`);
-  console.log(`❤️  Health: http://localhost:${PORT}/health\n`);
-});
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error(`❌ Unhandled Rejection: ${err.message}`);
-  server.close(() => process.exit(1));
-});
+const startServer = async () => {
+  try {
+    await connectDB();
 
-module.exports = server;
+    const server = app.listen(PORT, () => {
+      console.log(`
+🚀 Server running in ${process.env.NODE_ENV} mode
+📡 Port: ${PORT}
+🌐 API: http://localhost:${PORT}/api/v1
+❤️  Health: http://localhost:${PORT}/health
+      `);
+    });
+
+    const shutdown = (signal) => {
+      console.log(`\n⚠️  ${signal} received. Shutting down gracefully...`);
+
+      server.close(() => {
+        console.log('✅ HTTP server closed');
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+    process.on('unhandledRejection', (err) => {
+      console.error(`❌ Unhandled Rejection: ${err.message}`);
+
+      server.close(() => {
+        process.exit(1);
+      });
+    });
+
+    process.on('uncaughtException', (err) => {
+      console.error(`❌ Uncaught Exception: ${err.message}`);
+
+      process.exit(1);
+    });
+  } catch (error) {
+    console.error('❌ Database connection failed:', error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
+
+module.exports = app;

@@ -9,15 +9,20 @@
     "seed": "node src/utils/seed.js"
   },
   "dependencies": {
+    "axios": "^1.16.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.0.0",
     "cloudinary-core": "^2.14.1",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-async-errors": "^3.1.1",
+    "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
+    "hpp": "^0.2.3",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.0.3",
     "morgan": "^1.10.0",
@@ -27,7 +32,8 @@
     "pdfkit": "^0.18.0",
     "streamifier": "^0.1.1",
     "twilio": "^4.19.3",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "xss-clean": "^0.1.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
