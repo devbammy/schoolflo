@@ -189,34 +189,73 @@ export const paymentService = {
 
 export const assignmentService = {
   getAll: (params) => api.get('/assignments', { params }),
+  getById: (id) => api.get(`/assignments/${id}`),
   create: (data) => {
     const form = new FormData();
-    Object.entries(data).forEach(([k, v]) => {
-      if (k === 'attachments' && Array.isArray(v))
-        v.forEach((f) => form.append('attachments', f));
-      else form.append(k, v);
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (key === 'attachments' && Array.isArray(value)) {
+        value.forEach((file) => {
+          form.append('attachments', file);
+        });
+      } else if (value !== undefined && value !== null) {
+        form.append(key, value);
+      }
     });
+
     return api.post('/assignments', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
   },
-  update: (id, data) => api.put(`/assignments/${id}`, data),
+  update: (id, data) => {
+    const form = new FormData();
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (key === 'attachments' && Array.isArray(value)) {
+        value.forEach((file) => {
+          form.append('attachments', file);
+        });
+      } else if (value !== undefined && value !== null) {
+        form.append(key, value);
+      }
+    });
+
+    return api.put(`/assignments/${id}`, form, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  publish: (id) => api.patch(`/assignments/${id}/publish`),
   delete: (id) => api.delete(`/assignments/${id}`),
 };
 
 export const submissionService = {
   submit: (data) => {
     const form = new FormData();
+
     form.append('assignmentId', data.assignmentId);
-    if (data.comment) form.append('comment', data.comment);
-    (data.files || []).forEach((f) => form.append('files', f));
+
+    if (data.comment) {
+      form.append('comment', data.comment);
+    }
+
+    (data.files || []).forEach((file) => {
+      form.append('files', file);
+    });
+
     return api.post('/submissions', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
   },
   grade: (id, data) => api.patch(`/submissions/${id}/grade`, data),
   getForAssignment: (assignmentId) =>
     api.get(`/submissions/assignment/${assignmentId}`),
+  getById: (id) => api.get(`/submissions/${id}`),
   getMine: () => api.get('/submissions/mine'),
 };
 

@@ -549,7 +549,7 @@ export default function AcademicCalendarPage() {
               </div>
             </div>
 
-            <div className="card__body" style={{ padding: '12px 16px' }}>
+            <div style={{ padding: '12px 16px' }}>
               {/* Day headers */}
               <div
                 style={{

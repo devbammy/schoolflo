@@ -17,6 +17,7 @@ import {
   getCurrentAcademicYear,
   generateAcademicYearOptions,
 } from '../../utils/academicYear';
+import './styles/caTracking.scss';
 
 const CATracking = () => {
   const { user } = useAuthStore();

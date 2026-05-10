@@ -1,213 +1,319 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { resultService } from '../../services/api';
-import useAuthStore from '../../store/authStore';
-import PrintableReportCard from '../../components/results/PrintableReportCard';
-import { toast } from 'react-hot-toast';
+import React, { useState, useMemo } from 'react';
 import {
-  Printer,
-  Layout,
-  FileText,
-  Calendar,
-  Award,
-  ChevronDown,
+  Clock,
+  BookOpen,
+  MapPin,
   User,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
 } from 'lucide-react';
-import {
-  getCurrentAcademicYear,
-  generateAcademicYearOptions,
-} from '../../utils/academicYear';
+import './TimetableView.css'; // Import the new styles
 
-const ViewResults = () => {
-  const { user } = useAuthStore();
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedTerm, setSelectedTerm] = useState('First Term');
-  const [selectedYear, setSelectedYear] = useState(getCurrentAcademicYear());
-  const [showPrintView, setShowPrintView] = useState(false);
+const DAYS = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
 
-  // Determine the student ID (handles Parent vs Student roles)
-  const studentId = useMemo(() => {
-    return user.role === 'Parent'
-      ? user.parentProfile?.children[0]?._id || user.parentProfile?.children[0]
-      : user._id;
-  }, [user]);
+const SUBJECT_COLORS = [
+  { bg: '#dbeafe', text: '#1e40af', border: '#93c5fd' },
+  { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' },
+  { bg: '#ede9fe', text: '#5b21b6', border: '#c4b5fd' },
+  { bg: '#fce7f3', text: '#9d174d', border: '#f9a8d4' },
+  { bg: '#fef3c7', text: '#92400e', border: '#fcd34d' },
+  { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' },
+];
 
-  useEffect(() => {
-    fetchResults();
-    // Close print view when filters change for a fresh look
-    setShowPrintView(false);
-  }, [selectedTerm, selectedYear, studentId]);
+function subjectColor(subjectIdOrName) {
+  if (!subjectIdOrName) return SUBJECT_COLORS[0];
+  const str = String(subjectIdOrName);
+  const hash = str.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return SUBJECT_COLORS[hash % SUBJECT_COLORS.length];
+}
 
-  const fetchResults = async () => {
-    try {
-      setLoading(true);
-      const response = await resultService.getReportCard(studentId, {
-        term: selectedTerm,
-        academicYear: selectedYear,
-      });
+function shortDay(day) {
+  return day.slice(0, 3);
+}
 
-      // Safely access nested data based on your specific response structure
-      setResults(response?.data?.data?.results || []);
-    } catch (error) {
-      console.error('Fetch results error:', error);
-      toast.error('Failed to fetch results');
-    } finally {
-      setLoading(false);
-    }
-  };
+function todayDayName() {
+  const map = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ];
+  return map[new Date().getDay()] || 'Monday';
+}
 
-  // Calculate quick stats for the summary bar
-  const gpa = useMemo(() => {
-    if (!results.length) return 0;
-    const total = results.reduce((sum, r) => sum + (r.totalScore || 0), 0);
-    return (total / results.length).toFixed(2);
-  }, [results]);
+function PeriodCell({ period, compact = false }) {
+  const minHeight = compact ? 48 : 72;
+
+  if (!period)
+    return <div className="tt-cell tt-cell--empty" style={{ minHeight }} />;
+
+  if (period.isBreak) {
+    return (
+      <div className="tt-cell tt-cell--break" style={{ minHeight }}>
+        <span className="tt-label-p" style={{ letterSpacing: '0.05em' }}>
+          {period.breakLabel || 'Break'}
+        </span>
+        {!compact && (
+          <span className="tt-label-time">
+            {period.startTime}–{period.endTime}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  const clr = subjectColor(period.subject?._id || period.subject?.name);
+  const teacherName = period.teacher
+    ? `${period.teacher.firstName} ${period.teacher.lastName}`
+    : null;
 
   return (
-    <div className="view-results-container">
-      <header className="results-header">
-        <div className="header-text">
-          <h1>Academic Report</h1>
-          <p className="subtitle">
-            Official term records and performance breakdown
-          </p>
-        </div>
-
-        <div className="filter-bar">
-          <div className="select-wrapper">
-            <Calendar size={16} />
-            <select
-              value={selectedTerm}
-              onChange={(e) => setSelectedTerm(e.target.value)}
-            >
-              <option value="First Term">First Term</option>
-              <option value="Second Term">Second Term</option>
-              <option value="Third Term">Third Term</option>
-            </select>
-          </div>
-
-          <div className="select-wrapper">
-            <User size={16} />
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-            >
-              {generateAcademicYearOptions(5).map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            className={`btn-action ${showPrintView ? 'view-mode' : 'print-mode'}`}
-            onClick={() => setShowPrintView(!showPrintView)}
-            disabled={results.length === 0 || loading}
+    <div
+      className="tt-cell"
+      style={{
+        minHeight,
+        backgroundColor: clr.bg,
+        borderColor: clr.border,
+        padding: compact ? '4px 6px' : '6px 8px',
+      }}
+    >
+      <div
+        className="tt-subject-name"
+        style={{ color: clr.text, fontSize: compact ? '0.7rem' : '0.8125rem' }}
+      >
+        {period.subject?.name || '—'}
+      </div>
+      {!compact && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            marginTop: 4,
+          }}
+        >
+          {teacherName && (
+            <div className="tt-meta-item" style={{ color: clr.text }}>
+              <User size={9} /> <span className="ellipsis">{teacherName}</span>
+            </div>
+          )}
+          {period.room && (
+            <div className="tt-meta-item" style={{ color: clr.text }}>
+              <MapPin size={9} /> <span>{period.room}</span>
+            </div>
+          )}
+          <div
+            className="tt-meta-item"
+            style={{ color: clr.text, opacity: 0.7 }}
           >
-            {showPrintView ? (
-              <>
-                <Layout size={18} /> Table View
-              </>
-            ) : (
-              <>
-                <Printer size={18} /> Print View
-              </>
-            )}
-          </button>
-        </div>
-      </header>
-
-      {results.length > 0 && !showPrintView && (
-        <div className="results-stats-strip">
-          <div className="stat-pill">
-            <Award size={18} className="text-primary" />
+            <Clock size={9} />{' '}
             <span>
-              Average Score: <strong>{gpa}%</strong>
-            </span>
-          </div>
-          <div className="stat-pill">
-            <FileText size={18} className="text-secondary" />
-            <span>
-              Subjects: <strong>{results.length}</strong>
+              {period.startTime}–{period.endTime}
             </span>
           </div>
         </div>
       )}
-
-      <main className="results-main">
-        {loading ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            <p>Loading records...</p>
-          </div>
-        ) : !showPrintView ? (
-          <div className="table-card">
-            {results.length === 0 ? (
-              <div className="empty-results">
-                <div className="empty-icon">📂</div>
-                <h3>No Results Published</h3>
-                <p>
-                  Records for {selectedTerm}, {selectedYear} haven't been
-                  released yet.
-                </p>
-              </div>
-            ) : (
-              <div className="table-responsive">
-                <table className="results-table">
-                  <thead>
-                    <tr>
-                      <th>Subject</th>
-                      <th className="text-center">CA1</th>
-                      <th className="text-center">CA2</th>
-                      <th className="text-center">Mid-Term</th>
-                      <th className="text-center">Exam</th>
-                      <th className="text-center">Total</th>
-                      <th className="text-center">Grade</th>
-                      <th className="text-center">Remark</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((result) => (
-                      <tr key={result._id}>
-                        <td className="subject-col">{result.subject?.name}</td>
-                        <td className="text-center">{result.scores.ca1}</td>
-                        <td className="text-center">{result.scores.ca2}</td>
-                        <td className="text-center">{result.scores.midTerm}</td>
-                        <td className="text-center">{result.scores.exam}</td>
-                        <td className="text-center font-bold text-primary">
-                          {result.totalScore}
-                        </td>
-                        <td className="text-center">
-                          <span
-                            className={`grade-tag grade-${result.grade?.toLowerCase()}`}
-                          >
-                            {result.grade}
-                          </span>
-                        </td>
-                        <td className="text-center italic text-sm text-gray">
-                          {result.remark}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="print-section-wrapper anim-fade-in">
-            <PrintableReportCard
-              student={user}
-              results={results}
-              term={selectedTerm}
-              academicYear={selectedYear}
-            />
-          </div>
-        )}
-      </main>
     </div>
   );
-};
+}
 
-export default ViewResults;
+export default function TimetableView({
+  timetables = [],
+  title = 'Timetable',
+  compact = false,
+  showDayNav = true,
+  defaultView = 'day',
+  highlightTeacherId = null,
+}) {
+  const today = todayDayName();
+  const [activeDay, setActiveDay] = useState(today);
+  const [viewMode, setViewMode] = useState(defaultView);
+  const [activeTT, setActiveTT] = useState(0);
+
+  const timetable = timetables[activeTT] || null;
+
+  const schedule = useMemo(() => {
+    const map = {};
+    DAYS.forEach((d) => (map[d] = []));
+    if (!timetable) return map;
+    (timetable.periods || []).forEach((p) => {
+      if (map[p.day]) map[p.day].push(p);
+    });
+    DAYS.forEach((d) => map[d].sort((a, b) => a.periodNumber - b.periodNumber));
+    return map;
+  }, [timetable]);
+
+  const allPeriodNumbers = useMemo(() => {
+    const nums = new Set();
+    (timetable?.periods || []).forEach((p) => {
+      if (!p.isBreak) nums.add(p.periodNumber);
+    });
+    return Array.from(nums).sort((a, b) => a - b);
+  }, [timetable]);
+
+  const activeDayIdx = DAYS.indexOf(activeDay);
+  const hasPrev = activeDayIdx > 0;
+  const hasNext = activeDayIdx < DAYS.length - 1;
+
+  if (!timetables.length) {
+    return (
+      <div className="tt-card">
+        <div className="tt-header">
+          <span className="card__title">{title}</span>
+        </div>
+        <div className="empty-state" style={{ padding: '40px 24px' }}>
+          <Calendar size={36} className="empty-state__icon" />
+          <p className="empty-state__title">No timetable published</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tt-card">
+      <div className="tt-header">
+        <div className="tt-title-group">
+          <span className="card__title">{title}</span>
+          {timetables.length > 1 && (
+            <div className="tt-controls">
+              {timetables.map((tt, i) => (
+                <button
+                  key={tt._id}
+                  onClick={() => setActiveTT(i)}
+                  className={`tt-btn tt-btn-pill ${i === activeTT ? 'tt-btn--active' : ''}`}
+                >
+                  {tt.class?.name || `Class ${i + 1}`}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="tt-controls">
+          {['day', 'week'].map((v) => (
+            <button
+              key={v}
+              onClick={() => setViewMode(v)}
+              className={`tt-btn ${viewMode === v ? 'tt-btn--active' : ''}`}
+            >
+              {v.charAt(0).toUpperCase() + v.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div
+        className="card__body"
+        style={{ padding: compact ? '12px' : '16px' }}
+      >
+        {viewMode === 'day' && (
+          <>
+            {showDayNav && (
+              <div className="tt-day-nav">
+                <button
+                  className="tt-nav-arrow"
+                  onClick={() => setActiveDay(DAYS[activeDayIdx - 1])}
+                  disabled={!hasPrev}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <div className="tt-day-tabs">
+                  {DAYS.map((day) => (
+                    <button
+                      key={day}
+                      onClick={() => setActiveDay(day)}
+                      className={`tt-day-tab ${day === activeDay ? 'tt-day-tab--active' : ''} ${day === today ? 'tt-day-tab--today' : ''}`}
+                    >
+                      {shortDay(day)}
+                      {(schedule[day] || []).length > 0 &&
+                        day !== activeDay && <span className="tt-dot" />}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="tt-nav-arrow"
+                  onClick={() => setActiveDay(DAYS[activeDayIdx + 1])}
+                  disabled={!hasNext}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+            <div className="day-view-container">
+              {(schedule[activeDay] || []).map((p) => (
+                <div
+                  key={p._id || `${p.day}-${p.periodNumber}`}
+                  className="tt-period-row"
+                >
+                  <div className="tt-time-col">
+                    <span className="tt-label-p">
+                      {p.isBreak ? '' : `P${p.periodNumber}`}
+                    </span>
+                    {!compact && (
+                      <span className="tt-label-time">{p.startTime}</span>
+                    )}
+                  </div>
+                  <PeriodCell period={p} compact={compact} />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {viewMode === 'week' && (
+          <div className="tt-table-container">
+            <table className="tt-table">
+              <thead>
+                <tr>
+                  <th className="tt-th" style={{ width: 36 }}>
+                    P#
+                  </th>
+                  {DAYS.map((day) => (
+                    <th
+                      key={day}
+                      className="tt-th"
+                      style={{
+                        color: day === today ? 'var(--clr-primary)' : '',
+                      }}
+                    >
+                      {shortDay(day)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {allPeriodNumbers.map((pNum) => (
+                  <tr key={pNum}>
+                    <td style={{ textAlign: 'center', paddingRight: 4 }}>
+                      <span className="tt-label-p">P{pNum}</span>
+                    </td>
+                    {DAYS.map((day) => {
+                      const p = (schedule[day] || []).find(
+                        (period) => period.periodNumber === pNum,
+                      );
+                      return (
+                        <td key={day} style={{ verticalAlign: 'top' }}>
+                          <PeriodCell period={p} compact />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

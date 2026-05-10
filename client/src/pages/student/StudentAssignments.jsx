@@ -1,56 +1,82 @@
-import React, { useEffect, useState } from 'react';
-import { Upload, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Upload, Clock, CheckCircle, FileText } from 'lucide-react';
 import { assignmentService, submissionService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
+import './styles/assignment.scss';
 
 export default function StudentAssignments() {
   const { user } = useAuthStore();
+
   const [assignments, setAssignments] = useState([]);
-  const [submissions, setSubmissions] = useState({});
+  const [submissionsMap, setSubmissionsMap] = useState({});
   const [loading, setLoading] = useState(true);
-  const [submitModal, setSubmitModal] = useState(null);
+
+  const [activeAssignment, setActiveAssignment] = useState(null);
   const [files, setFiles] = useState([]);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
-      assignmentService.getAll({ classId: user?.studentProfile?.class?._id }),
-      submissionService.getMine(),
-    ])
-      .then(([aRes, sRes]) => {
-        setAssignments(aRes.data.data.assignments || []);
-        const sMap = {};
-        (sRes.data.data?.submissions || []).forEach((s) => {
-          sMap[s.assignment?._id] = s;
-        });
-        setSubmissions(sMap);
-      })
-      .catch(() => toast.error('Failed to load assignments'))
-      .finally(() => setLoading(false));
-  }, []);
+  // ---------------- FETCH DATA ----------------
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const classId = user?.studentProfile?.class?._id;
 
+      const [assignmentsRes, submissionsRes] = await Promise.all([
+        assignmentService.getAll({ classId }),
+        submissionService.getMine(),
+      ]);
+
+      setAssignments(assignmentsRes.data?.data?.assignments || []);
+
+      const map = {};
+      (submissionsRes.data?.data?.submissions || []).forEach((s) => {
+        const id = s.assignment?._id || s.assignment;
+        map[id] = s;
+      });
+
+      setSubmissionsMap(map);
+    } catch (err) {
+      toast.error('Failed to load assignments');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // ---------------- SUBMIT ----------------
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!activeAssignment) return;
     setSubmitting(true);
+
     try {
       await submissionService.submit({
-        assignmentId: submitModal._id,
-        comment,
+        assignmentId: activeAssignment._id,
         files,
+        comment,
       });
-      toast.success('Assignment submitted!');
-      setSubmitModal(null);
+
+      toast.success('Assignment submitted successfully');
+
+      setActiveAssignment(null);
       setFiles([]);
       setComment('');
-      const sRes = await submissionService.getMine();
-      const sMap = {};
-      (sRes.data.data?.submissions || []).forEach((s) => {
-        sMap[s.assignment?._id] = s;
+
+      // refresh submissions only
+      const res = await submissionService.getMine();
+      const map = {};
+      (res.data?.data?.submissions || []).forEach((s) => {
+        const id = s.assignment?._id || s.assignment;
+        map[id] = s;
       });
-      setSubmissions(sMap);
+      setSubmissionsMap(map);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Submission failed');
     } finally {
@@ -58,138 +84,108 @@ export default function StudentAssignments() {
     }
   };
 
+  // ---------------- LOADING ----------------
   if (loading)
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
+      <div className="flex justify-center p-20">
         <div className="spinner" />
       </div>
     );
 
+  // ---------------- UI ----------------
   return (
     <>
       <div className="page-header">
         <div>
-          <h1 className="page-header__title">Assignments</h1>
+          <h1 className="page-header__title">Course Assignments</h1>
           <p className="page-header__subtitle">
-            {assignments.length} assignments
+            {assignments.length} Total Tasks
           </p>
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      <div className="assignment-grid">
         {assignments.length === 0 ? (
           <div className="card">
             <div className="empty-state">
-              <p className="empty-state__title">No assignments yet</p>
+              <FileText size={40} color="var(--clr-text-3)" />
+              <p className="empty-state__title">
+                All caught up! No assignments assigned.
+              </p>
             </div>
           </div>
         ) : (
           assignments.map((a) => {
-            const sub = submissions[a._id];
-            const overdue = new Date() > new Date(a.dueDate);
+            const submission = submissionsMap[a._id];
+            const overdue = isPast(new Date(a.dueDate));
+
+            const badgeClass =
+              submission?.status === 'Graded'
+                ? 'success'
+                : submission
+                  ? 'info'
+                  : overdue
+                    ? 'danger'
+                    : 'warning';
+
             return (
               <div key={a._id} className="card">
-                <div
-                  className="card__body"
-                  style={{
-                    display: 'flex',
-                    gap: 20,
-                    alignItems: 'flex-start',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 240 }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        marginBottom: 8,
-                      }}
-                    >
-                      <h4 style={{ margin: 0 }}>{a.title}</h4>
-                      {sub ? (
-                        <span
-                          className={`badge badge--${sub.status === 'Graded' ? 'success' : 'info'}`}
-                        >
-                          {sub.status}
-                        </span>
-                      ) : overdue ? (
-                        <span className="badge badge--danger">Overdue</span>
-                      ) : (
-                        <span className="badge badge--warning">Pending</span>
-                      )}
+                <div className="card__body">
+                  <div style={{ flex: 1 }}>
+                    <div className="flex items-center gap-3 mb-2">
+                      <h4 className="card__title">{a.title}</h4>
+                      <span className={`badge badge--${badgeClass}`}>
+                        {submission?.status ||
+                          (overdue ? 'Overdue' : 'Pending')}
+                      </span>
                     </div>
-                    <p
-                      style={{
-                        fontSize: '0.9rem',
-                        color: 'var(--clr-text-3)',
-                        marginBottom: 10,
-                      }}
-                    >
-                      {a.description}
-                    </p>
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: 16,
-                        fontSize: '0.8125rem',
-                        color: 'var(--clr-text-3)',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <span>
+
+                    <p className="card__desc">{a.description}</p>
+
+                    <div className="meta-group">
+                      <div className="meta-group__item">
                         <strong>Subject:</strong> {a.subject?.name}
-                      </span>
-                      <span>
-                        <strong>Max:</strong> {a.totalMarks} marks
-                      </span>
-                      <span
-                        style={{
-                          color: overdue ? 'var(--clr-danger)' : 'inherit',
-                        }}
-                      >
-                        <Clock
-                          size={12}
-                          style={{ marginRight: 4, verticalAlign: 'middle' }}
-                        />
-                        Due:{' '}
-                        {format(new Date(a.dueDate), 'dd MMM yyyy, h:mm a')}
-                      </span>
-                    </div>
-                    {sub?.status === 'Graded' && (
+                      </div>
+                      <div className="meta-group__item">
+                        <strong>Marks:</strong> {a.totalMarks}
+                      </div>
                       <div
-                        style={{
-                          marginTop: 12,
-                          padding: '10px 14px',
-                          background: '#d1fae5',
-                          borderRadius: 8,
-                        }}
+                        className={`meta-group__item ${overdue && !submission ? 'overdue-text' : ''}`}
                       >
-                        <strong style={{ color: '#065f46' }}>
-                          Score: {sub.score}/{a.totalMarks}
-                        </strong>
-                        {sub.feedback && (
-                          <p
-                            style={{
-                              margin: '4px 0 0',
-                              color: '#047857',
-                              fontSize: '0.875rem',
-                            }}
-                          >
-                            {sub.feedback}
+                        <Clock size={14} />
+                        Due: {format(new Date(a.dueDate), 'dd MMM, p')}
+                      </div>
+                    </div>
+
+                    {submission?.status === 'Graded' && (
+                      <div className="graded-box">
+                        <span className="graded-box__score">
+                          Result: {submission.score} / {a.totalMarks}
+                        </span>
+                        {submission.feedback && (
+                          <p className="graded-box__feedback">
+                            "{submission.feedback}"
                           </p>
                         )}
                       </div>
                     )}
                   </div>
-                  {!sub && !overdue && (
-                    <button
-                      className="btn btn--primary"
-                      onClick={() => setSubmitModal(a)}
-                    >
-                      <Upload size={15} /> Submit
-                    </button>
-                  )}
+
+                  <div className="flex items-center">
+                    {!submission && !overdue && (
+                      <button
+                        className="btn btn--primary"
+                        onClick={() => setActiveAssignment(a)}
+                      >
+                        <Upload size={16} /> Submit Task
+                      </button>
+                    )}
+                    {submission && (
+                      <div className="flex items-center gap-2 text-success font-semibold">
+                        <CheckCircle size={18} /> Submitted
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -197,25 +193,29 @@ export default function StudentAssignments() {
         )}
       </div>
 
-      {submitModal && (
+      {/* ---------------- SUBMISSION MODAL ---------------- */}
+      {activeAssignment && (
         <div
           className="modal-overlay"
-          onClick={(e) => e.target === e.currentTarget && setSubmitModal(null)}
+          onClick={(e) =>
+            e.target === e.currentTarget && setActiveAssignment(null)
+          }
         >
           <div className="modal">
             <div className="modal__header">
-              <h3 className="modal__title">Submit: {submitModal.title}</h3>
+              <h3 className="modal__title">Submit Work</h3>
               <button
-                className="btn btn--ghost btn--icon"
-                onClick={() => setSubmitModal(null)}
+                className="btn btn--ghost"
+                onClick={() => setActiveAssignment(null)}
               >
                 ✕
               </button>
             </div>
+
             <form onSubmit={handleSubmit}>
               <div className="modal__body">
                 <div className="form-group">
-                  <label>Upload Files</label>
+                  <label className="form-label">Upload Files</label>
                   <input
                     type="file"
                     multiple
@@ -223,30 +223,33 @@ export default function StudentAssignments() {
                     onChange={(e) => setFiles(Array.from(e.target.files))}
                   />
                 </div>
+
                 <div className="form-group">
-                  <label>Comment (optional)</label>
+                  <label className="form-label">Notes for Teacher</label>
                   <textarea
                     className="form-control"
-                    rows={3}
+                    rows={4}
+                    placeholder="Any comments regarding your submission..."
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                   />
                 </div>
               </div>
+
               <div className="modal__footer">
                 <button
                   type="button"
                   className="btn btn--secondary"
-                  onClick={() => setSubmitModal(null)}
+                  onClick={() => setActiveAssignment(null)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   className="btn btn--primary"
-                  disabled={submitting}
+                  disabled={submitting || files.length === 0}
                 >
-                  {submitting ? 'Submitting...' : 'Submit Assignment'}
+                  {submitting ? 'Uploading...' : 'Confirm Submission'}
                 </button>
               </div>
             </form>

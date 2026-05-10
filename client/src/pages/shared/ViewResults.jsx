@@ -16,6 +16,7 @@ import {
   getCurrentAcademicYear,
   generateAcademicYearOptions,
 } from '../../utils/academicYear';
+import './styles/viewresult.scss';
 
 const ViewResults = () => {
   const { user } = useAuthStore();
@@ -40,7 +41,7 @@ const ViewResults = () => {
     if (user.role === 'Parent') {
       // Find the selected child from parent's children array
       const selectedChild = user.parentProfile?.children?.find(
-        (child) => (child._id || child) === selectedChildId
+        (child) => (child._id || child) === selectedChildId,
       );
       return selectedChild || user.parentProfile?.children?.[0];
     }

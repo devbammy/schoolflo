@@ -422,10 +422,7 @@ export default function TimetableView({
       </div>
 
       {/* ── Body ──────────────────────────────────────────────────────── */}
-      <div
-        className="card__body"
-        style={{ padding: compact ? '12px' : '16px' }}
-      >
+      <div style={{ padding: compact ? '12px' : '16px' }}>
         {/* ── DAY VIEW ──────────────────────────────────────────────── */}
         {viewMode === 'day' && (
           <>

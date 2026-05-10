@@ -1,0 +1,215 @@
+/* Container & Header */
+.tt-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid var(--clr-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.tt-header {
+  padding: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-bottom: 1px solid var(--clr-border);
+  align-items: center;
+}
+
+.tt-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+/* Controls & Buttons */
+.tt-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.tt-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-body);
+  border: 1.5px solid var(--clr-border);
+  background: transparent;
+  color: var(--clr-text-2);
+  transition: all 0.2s ease;
+}
+
+.tt-btn--active {
+  background: var(--clr-primary);
+  border-color: var(--clr-primary);
+  color: #fff;
+}
+
+.tt-btn-pill {
+  border-radius: 50px;
+  padding: 2px 10px;
+}
+
+/* Day Navigation */
+.tt-day-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.tt-nav-arrow {
+  padding: 4px 8px;
+  background: none;
+  border: 1px solid var(--clr-border);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.2s;
+}
+
+.tt-day-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tt-day-tab {
+  position: relative;
+  padding: 4px 10px;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  border: 1.5px solid var(--clr-border);
+  color: var(--clr-text-3);
+}
+
+.tt-day-tab--active {
+  background: var(--clr-primary);
+  border-color: var(--clr-primary);
+  color: #fff;
+}
+
+.tt-day-tab--today {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+}
+
+.tt-dot {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--clr-primary);
+}
+
+/* Grid & Cells */
+.tt-period-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tt-time-col {
+  width: 44px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.tt-cell {
+  flex: 1;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  border: 1px solid transparent;
+}
+
+.tt-cell--empty {
+  border: 1px dashed var(--clr-border);
+  background: transparent;
+}
+
+.tt-cell--break {
+  background: #f8fafc;
+  border: 1px solid var(--clr-border);
+  align-items: center;
+  justify-content: center;
+}
+
+/* Typography */
+.tt-label-p {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--clr-text-3);
+  text-transform: uppercase;
+}
+
+.tt-label-time {
+  font-size: 0.6rem;
+  color: var(--clr-text-3);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.tt-subject-name {
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tt-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+/* Week View Table */
+.tt-table-container {
+  overflow-x: auto;
+}
+
+.tt-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 4px;
+  min-width: 560px;
+}
+
+.tt-th {
+  font-size: 0.75rem;
+  text-align: center;
+  padding-bottom: 8px;
+  min-width: 90px;
+}
+
+/* Footer */
+.tt-footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--clr-border);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+  color: var(--clr-text-3);
+}
