@@ -149,7 +149,6 @@ const ExamSchedules = () => {
       resetForm();
       fetchSchedules();
     } catch (error) {
-      console.log(error);
       toast.error(
         error.response?.data?.message || 'Failed to save exam schedule',
       );
