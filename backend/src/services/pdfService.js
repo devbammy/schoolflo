@@ -11,25 +11,12 @@ class PDFService {
   async generateReportCard(studentId, term, academicYear) {
     return new Promise(async (resolve, reject) => {
       try {
-        console.log('Generating report card with params:', {
-          studentId,
-          term,
-          academicYear,
-        });
-
         // Fetch student data
         const student = await this._resolveStudent(studentId, true);
 
         if (!student || student.role !== 'Student') {
           throw new Error('Student not found');
         }
-
-        console.log(
-          'Student found:',
-          student._id,
-          student.firstName,
-          student.lastName,
-        );
 
         // Fetch all results for the term
         const query = {
@@ -39,37 +26,13 @@ class PDFService {
           isPublished: true,
         };
 
-        console.log('Querying results with:', query);
-
         const results = await Result.find(query)
           .populate('subject', 'name code')
           .sort({ 'subject.name': 1 });
 
-        console.log(
-          `Found ${results.length} results for student ${student._id}`,
-        );
-        console.log(
-          'Results:',
-          results.map((r) => ({
-            subject: r.subject?.name,
-            term: r.term,
-            academicYear: r.academicYear,
-            isPublished: r.isPublished,
-            totalScore: r.totalScore,
-          })),
-        );
-
         if (results.length === 0) {
           // Try to find any results for this student to debug
           const allStudentResults = await Result.find({ student: student._id });
-          console.log(
-            `Student has ${allStudentResults.length} total results:`,
-            allStudentResults.map((r) => ({
-              term: r.term,
-              academicYear: r.academicYear,
-              isPublished: r.isPublished,
-            })),
-          );
 
           // Check if there are unpublished results for this term
           const unpublishedResults = await Result.find({
@@ -78,9 +41,6 @@ class PDFService {
             academicYear,
             isPublished: false,
           });
-          console.log(
-            `Found ${unpublishedResults.length} unpublished results for this term`,
-          );
 
           if (unpublishedResults.length > 0) {
             throw new Error(
