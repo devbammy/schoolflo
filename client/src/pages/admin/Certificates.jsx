@@ -77,7 +77,6 @@ const Certificates = () => {
             data: { ...admissionLetterData },
           });
 
-          console.log(response);
           break;
         default:
           throw new Error('Invalid certificate type');
@@ -91,7 +90,6 @@ const Certificates = () => {
       // Open PDF in new tab
       // window.open(response.data.data.pdfUrl, '_blank');
     } catch (error) {
-      console.log(error);
       toast.error(
         error.response?.data?.message || 'Failed to generate certificate',
       );
@@ -275,7 +273,7 @@ const Certificates = () => {
             {certificateType === 'Report Card' && (
               <>
                 <div className="form-group">
-                  <label>Student ID *</label>
+                  <label>Student Admission Number or ObjectId *</label>
                   <input
                     className="form-control"
                     type="text"
@@ -286,7 +284,7 @@ const Certificates = () => {
                         studentId: e.target.value,
                       })
                     }
-                    placeholder="Enter student ObjectId"
+                    placeholder="Enter student admission number or ObjectId"
                     required
                   />
                 </div>
@@ -329,7 +327,7 @@ const Certificates = () => {
             {certificateType === 'School Leaving Certificate' && (
               <>
                 <div className="form-group">
-                  <label>Student ID *</label>
+                  <label>Student Admission Number or ObjectId *</label>
                   <input
                     className="form-control"
                     type="text"
@@ -340,6 +338,7 @@ const Certificates = () => {
                         studentId: e.target.value,
                       })
                     }
+                    placeholder="Enter student admission number or ObjectId"
                     required
                   />
                 </div>
@@ -432,7 +431,7 @@ const Certificates = () => {
             {certificateType === 'Admission Letter' && (
               <>
                 <div className="form-group">
-                  <label>Student ID *</label>
+                  <label>Student Admission Number or ObjectId *</label>
                   <input
                     className="form-control"
                     type="text"
@@ -443,6 +442,7 @@ const Certificates = () => {
                         studentId: e.target.value,
                       })
                     }
+                    placeholder="Enter student admission number or ObjectId"
                     required
                   />
                 </div>

@@ -1,7 +1,8 @@
+const mongoose = require('mongoose');
 const PDFDocument = require('pdfkit');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
-const Result = require('../models/Exam');
+const { Result } = require('../models/Exam');
 const User = require('../models/User');
 const Class = require('../models/Class');
 
@@ -10,28 +11,86 @@ class PDFService {
   async generateReportCard(studentId, term, academicYear) {
     return new Promise(async (resolve, reject) => {
       try {
-        // Fetch student data
-        const student = await User.findById(studentId).populate({
-          path: 'studentProfile.class',
-          populate: { path: 'subjects' },
+        console.log('Generating report card with params:', {
+          studentId,
+          term,
+          academicYear,
         });
+
+        // Fetch student data
+        const student = await this._resolveStudent(studentId, true);
 
         if (!student || student.role !== 'Student') {
           throw new Error('Student not found');
         }
 
+        console.log(
+          'Student found:',
+          student._id,
+          student.firstName,
+          student.lastName,
+        );
+
         // Fetch all results for the term
-        const results = await Result.find({
-          student: studentId,
+        const query = {
+          student: student._id,
           term,
           academicYear,
           isPublished: true,
-        })
+        };
+
+        console.log('Querying results with:', query);
+
+        const results = await Result.find(query)
           .populate('subject', 'name code')
           .sort({ 'subject.name': 1 });
 
+        console.log(
+          `Found ${results.length} results for student ${student._id}`,
+        );
+        console.log(
+          'Results:',
+          results.map((r) => ({
+            subject: r.subject?.name,
+            term: r.term,
+            academicYear: r.academicYear,
+            isPublished: r.isPublished,
+            totalScore: r.totalScore,
+          })),
+        );
+
         if (results.length === 0) {
-          throw new Error('No results found for this term');
+          // Try to find any results for this student to debug
+          const allStudentResults = await Result.find({ student: student._id });
+          console.log(
+            `Student has ${allStudentResults.length} total results:`,
+            allStudentResults.map((r) => ({
+              term: r.term,
+              academicYear: r.academicYear,
+              isPublished: r.isPublished,
+            })),
+          );
+
+          // Check if there are unpublished results for this term
+          const unpublishedResults = await Result.find({
+            student: student._id,
+            term,
+            academicYear,
+            isPublished: false,
+          });
+          console.log(
+            `Found ${unpublishedResults.length} unpublished results for this term`,
+          );
+
+          if (unpublishedResults.length > 0) {
+            throw new Error(
+              `No published results found for this term. Found ${unpublishedResults.length} unpublished results. Please publish the results first.`,
+            );
+          } else {
+            throw new Error(
+              `No results found for term "${term}" and academic year "${academicYear}". Please check if results exist for this student.`,
+            );
+          }
         }
 
         // Calculate overall statistics
@@ -61,7 +120,7 @@ class PDFService {
               folder: 'smp/certificates',
               resource_type: 'raw',
               format: 'pdf',
-              public_id: `report_card_${studentId}_${term}_${academicYear}_${Date.now()}`,
+              public_id: `report_card_${student._id}_${term}_${academicYear}_${Date.now()}`,
             },
             (error, result) => {
               if (error) {
@@ -279,9 +338,7 @@ class PDFService {
   async generateLeavingCertificate(studentId, data) {
     return new Promise(async (resolve, reject) => {
       try {
-        const student = await User.findById(studentId).populate(
-          'studentProfile.class',
-        );
+        const student = await this._resolveStudent(studentId, true);
 
         if (!student || student.role !== 'Student') {
           throw new Error('Student not found');
@@ -302,7 +359,7 @@ class PDFService {
               folder: 'smp/certificates',
               resource_type: 'raw',
               format: 'pdf',
-              public_id: `leaving_cert_${studentId}_${Date.now()}`,
+              public_id: `leaving_cert_${student._id}_${Date.now()}`,
             },
             (error, result) => {
               if (error) {
@@ -459,7 +516,7 @@ class PDFService {
   async generateAdmissionLetter(studentId, data) {
     return new Promise(async (resolve, reject) => {
       try {
-        const student = await User.findById(studentId);
+        const student = await this._resolveStudent(studentId);
 
         if (!student) {
           throw new Error('Student not found');
@@ -480,7 +537,7 @@ class PDFService {
               folder: 'smp/certificates',
               resource_type: 'raw',
               format: 'pdf',
-              public_id: `admission_letter_${studentId}_${Date.now()}`,
+              public_id: `admission_letter_${student._id}_${Date.now()}`,
             },
             (error, result) => {
               if (error) {
@@ -619,6 +676,21 @@ class PDFService {
         reject(error);
       }
     });
+  }
+
+  async _resolveStudent(identifier, populateClass = false) {
+    const query = mongoose.Types.ObjectId.isValid(identifier)
+      ? { _id: identifier }
+      : { 'studentProfile.admissionNumber': identifier };
+
+    let student = User.findOne(query);
+    if (populateClass) {
+      student = student.populate('studentProfile.class', {
+        name: 1,
+      });
+    }
+
+    return await student;
   }
 
   // Helper: Get principal's comment based on average

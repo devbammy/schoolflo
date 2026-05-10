@@ -174,6 +174,11 @@ const NAV_CONFIG = {
           icon: Printer,
           to: '/student/print-results',
         },
+        {
+          label: 'My Certificates',
+          icon: ShieldCheck,
+          to: '/student/certificates',
+        },
       ],
     },
     {
@@ -215,6 +220,11 @@ const NAV_CONFIG = {
           to: '/parent/calendar',
           icon: CalendarDays,
           label: 'School Calendar',
+        },
+        {
+          label: 'Certificates',
+          icon: ShieldCheck,
+          to: '/parent/certificates',
         },
       ],
     },

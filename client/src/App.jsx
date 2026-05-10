@@ -46,6 +46,7 @@ import StudentAssignments from './pages/student/StudentAssignments';
 import StudentPayments from './pages/student/StudentPayments';
 import StudentTimetable from './pages/student/StudentTimetable';
 import StudentExamSchedule from './pages/student/StudentExamSchedule';
+import StudentCertificates from './pages/student/StudentCertificates';
 import CATracking from './pages/student/CATracking';
 
 // Parent Pages
@@ -55,6 +56,7 @@ import ParentPayments from './pages/parent/ParentPayments';
 import ParentTimetable from './pages/parent/ParentTimetable';
 import ParentExamSchedule from './pages/parent/ParentExamSchedule';
 import ParentAssignments from './pages/parent/ParentAssignments';
+import ParentCertificates from './pages/parent/ParentCertificates';
 
 // Shared Pages
 import MyLibraryPage from './pages/shared/MyLibraryPage';
@@ -190,6 +192,7 @@ export default function App() {
           <Route path="print-results" element={<ViewResults />} />
           <Route path="ca-tracking" element={<CATracking />} />
           <Route path="exam-schedules" element={<StudentExamSchedule />} />
+          <Route path="certificates" element={<StudentCertificates />} />
         </Route>
 
         {/* Parent */}
@@ -210,6 +213,7 @@ export default function App() {
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="print-results" element={<ViewResults />} />
           <Route path="exam-schedules" element={<ParentExamSchedule />} />
+          <Route path="certificates" element={<ParentCertificates />} />
         </Route>
 
         <Route

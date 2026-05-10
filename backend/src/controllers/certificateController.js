@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const Certificate = require('../models/Certificate');
+const User = require('../models/User');
 const pdfService = require('../services/pdfService');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
 const {
@@ -35,6 +37,15 @@ const getCertificateNotificationRecipients = async (certificate) => {
   }
 
   return recipients;
+};
+
+const resolveStudentIdentifier = async (identifier) => {
+  if (!identifier) return null;
+  if (mongoose.Types.ObjectId.isValid(identifier)) {
+    const student = await User.findById(identifier);
+    if (student) return student;
+  }
+  return await User.findOne({ 'studentProfile.admissionNumber': identifier });
 };
 
 const notifyCertificateIssued = async (certificate) => {
@@ -107,9 +118,14 @@ exports.generateReportCard = async (req, res) => {
   try {
     const { studentId, term, academicYear } = req.body;
 
+    const student = await resolveStudentIdentifier(studentId);
+    if (!student || student.role !== 'Student') {
+      return sendError(res, 404, 'Student not found');
+    }
+
     // Generate PDF
     const pdfData = await pdfService.generateReportCard(
-      studentId,
+      student._id,
       term,
       academicYear,
     );
@@ -117,7 +133,7 @@ exports.generateReportCard = async (req, res) => {
     // Save certificate record
     const certificate = await Certificate.create({
       certificateType: 'Report Card',
-      student: studentId,
+      student: student._id,
       term,
       academicYear,
       data: { term, academicYear },
@@ -135,6 +151,7 @@ exports.generateReportCard = async (req, res) => {
 
     sendSuccess(res, 201, 'Report card generated successfully', certificate);
   } catch (error) {
+    console.log(error);
     sendError(res, error.message, 400);
   }
 };
@@ -144,16 +161,21 @@ exports.generateLeavingCertificate = async (req, res) => {
   try {
     const { studentId, data } = req.body;
 
+    const student = await resolveStudentIdentifier(studentId);
+    if (!student || student.role !== 'Student') {
+      return sendError(res, 404, 'Student not found');
+    }
+
     // Generate PDF
     const pdfData = await pdfService.generateLeavingCertificate(
-      studentId,
+      student._id,
       data,
     );
 
     // Save certificate record
     const certificate = await Certificate.create({
       certificateType: 'School Leaving Certificate',
-      student: studentId,
+      student: student._id,
       data,
       pdfUrl: pdfData.url,
       publicId: pdfData.publicId,
@@ -183,13 +205,18 @@ exports.generateAdmissionLetter = async (req, res) => {
   try {
     const { studentId, data } = req.body;
 
+    const student = await resolveStudentIdentifier(studentId);
+    if (!student || student.role !== 'Student') {
+      return sendError(res, 404, 'Student not found');
+    }
+
     // Generate PDF
-    const pdfData = await pdfService.generateAdmissionLetter(studentId, data);
+    const pdfData = await pdfService.generateAdmissionLetter(student._id, data);
 
     // Save certificate record
     const certificate = await Certificate.create({
       certificateType: 'Admission Letter',
-      student: studentId,
+      student: student._id,
       data,
       pdfUrl: pdfData.url,
       publicId: pdfData.publicId,
@@ -203,8 +230,6 @@ exports.generateAdmissionLetter = async (req, res) => {
     notifyCertificateIssued(certificate).catch((err) =>
       console.error('Certificate issuance notification failed:', err.message),
     );
-
-    console.log(certificate);
 
     sendSuccess(
       res,

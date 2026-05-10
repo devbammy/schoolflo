@@ -347,5 +347,8 @@ export const certificateService = {
     api.post('/certificates/admission-letter', data),
   getAll: (params) => api.get('/certificates', { params }),
   getById: (id) => api.get(`/certificates/${id}`),
+  getMyCertificates: () => api.get('/certificates/student/my-certificates'),
+  getChildrenCertificates: () =>
+    api.get('/certificates/parent/children-certificates'),
   revoke: (id, data) => api.put(`/certificates/${id}/revoke`, data),
 };

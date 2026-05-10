@@ -2,6 +2,20 @@
 // Fonts: Sora (display) + DM Sans (body)
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
 
+$primary: #4f46e5;
+$success: #10b981;
+$danger: #ef4444;
+$warning: #f59e0b;
+$info: #3b82f6;
+$bg: #f8fafc;
+$surface: #ffffff;
+$text-main: #1e293b;
+$text-muted: #64748b;
+$radius: 12px;
+$shadow:
+  0 4px 6px -1px rgba(0, 0, 0, 0.1),
+  0 2px 4px -1px rgba(0, 0, 0, 0.06);
+
 // ─── CSS Custom Properties ────────────────────────────────────────────────────
 :root {
   // Brand Colors
@@ -1392,6 +1406,777 @@ select.form-control {
   }
 }
 
+// ---- Promotions
+
+.promotions-container {
+  padding: 2rem;
+  background: $bg;
+  min-height: 100vh;
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2.5rem;
+
+    .title {
+      font-size: 1.875rem;
+      font-weight: 800;
+      color: $text-main;
+      margin: 0;
+    }
+    .subtitle {
+      color: $text-muted;
+      margin-top: 0.25rem;
+    }
+  }
+}
+
+.promotions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.promo-card {
+  background: $surface;
+  border-radius: $radius;
+  padding: 1.5rem;
+  box-shadow: $shadow;
+  border: 1px solid #e2e8f0;
+  transition: transform 0.2s;
+
+  &:hover {
+    transform: translateY(-4px);
+  }
+
+  .promo-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+
+    .pathway {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      .class-pill {
+        background: #f1f5f9;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.875rem;
+
+        &.highlight {
+          background: rgba($primary, 0.1);
+          color: $primary;
+        }
+      }
+      .arrow {
+        color: $text-muted;
+      }
+    }
+  }
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+
+  &.status-draft {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  &.status-completed {
+    background: #dcfce7;
+    color: #166534;
+  }
+  &.status-applied {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+}
+
+.promo-details {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem 0;
+  border-top: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+
+  .detail-item {
+    label {
+      display: block;
+      font-size: 0.75rem;
+      color: $text-muted;
+      text-transform: uppercase;
+    }
+    span {
+      font-weight: 600;
+      color: $text-main;
+    }
+  }
+}
+
+.promo-actions {
+  display: flex;
+  gap: 0.5rem;
+
+  .action-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.6rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: 0.2s;
+
+    &.info {
+      background: #f1f5f9;
+      color: $text-main;
+      &:hover {
+        background: #e2e8f0;
+      }
+    }
+    &.primary {
+      background: $primary;
+      color: white;
+      &:hover {
+        opacity: 0.9;
+      }
+    }
+    &.danger {
+      width: 40px;
+      flex: none;
+      background: #fee2e2;
+      color: $danger;
+      &:hover {
+        background: $danger;
+        color: white;
+      }
+    }
+    &.success {
+      background: $success;
+      color: white;
+    }
+  }
+}
+
+// Stats inside Details Modal
+.stats-header {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+
+  .stat-box {
+    background: #f8fafc;
+    padding: 1.25rem;
+    border-radius: $radius;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    .icon {
+      color: $text-muted;
+    }
+    label {
+      display: block;
+      font-size: 0.875rem;
+      color: $text-muted;
+    }
+    strong {
+      font-size: 1.5rem;
+    }
+
+    &.success {
+      .icon,
+      strong {
+        color: $success;
+      }
+      background: rgba($success, 0.05);
+    }
+    &.danger {
+      .icon,
+      strong {
+        color: $danger;
+      }
+      background: rgba($danger, 0.05);
+    }
+  }
+}
+
+.modern-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    text-align: left;
+    padding: 1rem;
+    color: $text-muted;
+    font-weight: 600;
+    border-bottom: 2px solid #f1f5f9;
+  }
+  td {
+    padding: 1rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .status-pill {
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    &.promoted {
+      background: #dcfce7;
+      color: $success;
+    }
+    &.repeated {
+      background: #fee2e2;
+      color: $danger;
+    }
+  }
+
+  .avg-badge {
+    background: #eff6ff;
+    color: $primary;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 700;
+  }
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+
+  &-primary {
+    background: $primary;
+    color: white;
+  }
+  &-ghost {
+    background: transparent;
+    color: $text-muted;
+    &:hover {
+      background: #f1f5f9;
+    }
+  }
+}
+
+// Certificates Admin
+// _certificates.scss
+
+.certificates-page {
+  padding: var(--space-6);
+  background-color: var(--clr-bg);
+  min-height: 100vh;
+  font-family: var(--font-body);
+
+  // Header Section
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-8);
+
+    &__title {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      color: var(--clr-text-1);
+      margin-bottom: var(--space-1);
+    }
+
+    &__subtitle {
+      color: var(--clr-text-3);
+      font-weight: 500;
+    }
+  }
+
+  // Grid Layout
+  .certificates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-6);
+  }
+
+  // Card Design
+  .certificate-card {
+    background: var(--clr-surface);
+    padding: var(--space-6);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--clr-border);
+    box-shadow: var(--shadow-sm);
+    transition:
+      transform var(--transition-base),
+      box-shadow var(--transition-base);
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--clr-primary-lt);
+    }
+
+    .cert-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-4);
+
+      h3 {
+        font-family: var(--font-display);
+        color: var(--clr-text-1);
+        font-size: 1.1rem;
+        margin: 0;
+      }
+    }
+
+    .cert-details {
+      margin-bottom: var(--space-6);
+
+      p {
+        font-size: 0.9rem;
+        color: var(--clr-text-2);
+        margin-bottom: var(--space-2);
+        display: flex;
+        justify-content: space-between;
+
+        strong {
+          color: var(--clr-text-3);
+          font-weight: 500;
+        }
+      }
+    }
+
+    .cert-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-3);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--clr-border);
+    }
+  }
+}
+
+// Global UI Components
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: none;
+  font-family: var(--font-body);
+  text-decoration: none;
+
+  &-primary {
+    background-color: var(--clr-primary);
+    color: var(--clr-text-inv);
+    &:hover {
+      background-color: var(--clr-primary-lt);
+    }
+  }
+
+  &-secondary {
+    background-color: var(--clr-bg-alt);
+    color: var(--clr-primary);
+    &:hover {
+      background-color: var(--clr-border);
+    }
+  }
+
+  &-danger {
+    background-color: #fee2e2; // Subtle red bg
+    color: var(--clr-danger);
+    &:hover {
+      background-color: var(--clr-danger);
+      color: white;
+    }
+  }
+
+  &-sm {
+    padding: var(--space-2) var(--space-4);
+    font-size: 0.85rem;
+  }
+}
+
+// Status Badges
+.status-badge {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+
+  &.status-issued {
+    background-color: #ecfdf5;
+    color: var(--clr-success);
+  }
+  &.status-revoked {
+    background-color: #fef2f2;
+    color: var(--clr-danger);
+  }
+}
+
+// Form Elements (Inside Modal)
+.form-group {
+  margin-bottom: var(--space-4);
+
+  label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--clr-text-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .form-control {
+    width: 100%;
+    padding: var(--space-3);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    transition: border-color var(--transition-fast);
+
+    &:focus {
+      outline: none;
+      border-color: var(--clr-primary);
+      box-shadow: 0 0 0 3px rgba(26, 79, 171, 0.1);
+    }
+  }
+}
+
+// Certificate students
+// _student-certificates.scss
+
+.student-certificates-page {
+  padding: var(--space-6);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  font-family: var(--font-body);
+
+  .page-header {
+    margin-bottom: var(--space-8);
+
+    &__title {
+      font-family: var(--font-display);
+      font-size: 2.25rem;
+      color: var(--clr-text-1);
+      letter-spacing: -0.02em;
+    }
+
+    &__subtitle {
+      color: var(--clr-text-3);
+      font-size: 1.1rem;
+    }
+  }
+
+  // Loading & Empty States
+  .loading-screen {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-16);
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--clr-border);
+      border-top-color: var(--clr-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-16) var(--space-6);
+
+    &__icon {
+      color: var(--clr-border-dk);
+      margin-bottom: var(--space-4);
+    }
+
+    &__title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--clr-text-1);
+    }
+
+    &__text {
+      color: var(--clr-text-3);
+      max-width: 400px;
+      margin: var(--space-2) auto 0;
+    }
+  }
+
+  // The Grid
+  .certificates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: var(--space-6);
+  }
+
+  // Enhanced Student Card
+  .certificate-card {
+    background: var(--clr-surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--clr-border);
+    overflow: hidden;
+    transition: all var(--transition-base);
+    display: flex;
+    flex-direction: column;
+
+    &:hover {
+      box-shadow: var(--shadow-lg);
+      border-color: var(--clr-primary-lt);
+    }
+
+    .certificate-header {
+      padding: var(--space-5);
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      border-bottom: 1px solid var(--clr-bg);
+
+      .certificate-icon {
+        width: 48px;
+        height: 48px;
+        background: var(--clr-bg);
+        color: var(--clr-primary);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .certificate-info {
+        flex: 1;
+        h3 {
+          font-family: var(--font-display);
+          font-size: 1.1rem;
+          margin: 0;
+          color: var(--clr-text-1);
+        }
+        .certificate-number {
+          font-size: 0.8rem;
+          color: var(--clr-text-3);
+          font-family: monospace;
+        }
+      }
+    }
+
+    .certificate-details {
+      padding: var(--space-5);
+      flex: 1;
+
+      .detail-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: var(--space-3);
+        font-size: 0.9rem;
+
+        .label {
+          color: var(--clr-text-3);
+          font-weight: 500;
+        }
+        .value {
+          color: var(--clr-text-2);
+          font-weight: 600;
+        }
+      }
+    }
+
+    .certificate-actions {
+      padding: var(--space-4) var(--space-5);
+      background: var(--clr-bg-alt);
+
+      .btn {
+        width: 100%;
+        gap: var(--space-2);
+        box-shadow: var(--shadow-xs);
+      }
+    }
+  }
+}
+
+// Utility for Status (to match your getStatusColor logic)
+.status-badge {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Certificate parent
+// _parent-certificates.scss
+
+.parent-certificates-page {
+  padding: var(--space-6);
+  max-width: var(--content-max);
+  margin: 0 auto;
+
+  .page-header {
+    margin-bottom: var(--space-10);
+    border-left: 4px solid var(--clr-parent); // Theme accent
+    padding-left: var(--space-4);
+
+    &__title {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      color: var(--clr-text-1);
+    }
+
+    &__subtitle {
+      color: var(--clr-text-3);
+    }
+  }
+
+  // Child Grouping Section
+  .child-section {
+    background: var(--clr-surface);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    margin-bottom: var(--space-12);
+    border: 1px solid var(--clr-border);
+    box-shadow: var(--shadow-sm);
+
+    .child-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: var(--space-6);
+      padding-bottom: var(--space-4);
+      border-bottom: 2px solid var(--clr-bg);
+
+      .child-info {
+        h2 {
+          font-family: var(--font-display);
+          color: var(--clr-text-1);
+          font-size: 1.5rem;
+          margin: 0;
+        }
+        .child-class {
+          color: var(--clr-parent);
+          font-weight: 600;
+          font-size: 0.9rem;
+          margin-top: var(--space-1);
+        }
+      }
+
+      .certificates-count {
+        background: var(--clr-bg-alt);
+        color: var(--clr-text-2);
+        padding: var(--space-1) var(--space-4);
+        border-radius: var(--radius-full);
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+    }
+  }
+
+  // Reuse and tweak the grid from the student page
+  .certificates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--space-6);
+  }
+
+  // Parent-specific card tweaks
+  .certificate-card {
+    background: var(
+      --clr-bg
+    ); // Slightly different to contrast with child-section white
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-lg);
+    transition: all var(--transition-base);
+
+    &:hover {
+      background: var(--clr-surface);
+      transform: scale(1.02);
+      box-shadow: var(--shadow-md);
+      border-color: var(--clr-parent);
+    }
+
+    .certificate-header {
+      padding: var(--space-4);
+      display: flex;
+      gap: var(--space-3);
+
+      .certificate-icon {
+        color: var(--clr-parent); // Parent green icon
+      }
+
+      h3 {
+        font-size: 1rem;
+        font-family: var(--font-display);
+      }
+    }
+
+    .certificate-details {
+      padding: 0 var(--space-4) var(--space-4);
+
+      .detail-item {
+        font-size: 0.85rem;
+        margin-bottom: var(--space-1);
+        display: flex;
+        justify-content: space-between;
+
+        .label {
+          color: var(--clr-text-3);
+        }
+        .value {
+          color: var(--clr-text-1);
+          font-weight: 500;
+        }
+      }
+    }
+
+    .certificate-actions {
+      padding: var(--space-4);
+
+      .btn-primary {
+        background: var(--clr-parent);
+        &:hover {
+          background: #047857;
+        } // Darker green
+      }
+    }
+  }
+}
+
+// Global Badge Overrides for Parent Context
+.status-badge {
+  &.text-green-600 {
+    color: var(--clr-parent) !important;
+    background: #ecfdf5 !important;
+  }
+}
 // ─── Responsive Utilities ─────────────────────────────────────────────────────
 .hidden-mobile {
   @media (max-width: 768px) {

@@ -1,4 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Plus,
+  ArrowRight,
+  GraduationCap,
+  Trash2,
+  Play,
+  CheckCircle,
+  Info,
+  Users,
+  Award,
+  AlertCircle,
+} from 'lucide-react';
 import { promotionService, classService } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import Modal from '../../components/common/Modal';
@@ -10,9 +22,9 @@ const Promotions = () => {
   const [modal, setModal] = useState(null);
   const [selectedPromotion, setSelectedPromotion] = useState(null);
   const [stats, setStats] = useState(null);
-  const [saving, setSaving] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const initialForm = {
     academicYear: new Date().getFullYear().toString(),
     fromClass: '',
     toClass: '',
@@ -22,7 +34,8 @@ const Promotions = () => {
       coreSubjectsMustPass: true,
       coreSubjects: [],
     },
-  });
+  };
+  const [formData, setFormData] = useState(initialForm);
 
   useEffect(() => {
     fetchPromotions();
@@ -33,7 +46,7 @@ const Promotions = () => {
     try {
       setLoading(true);
       const response = await promotionService.getAll();
-      setPromotions(response?.data?.data);
+      setPromotions(response?.data?.data || []);
     } catch (error) {
       toast.error('Failed to fetch promotions');
     } finally {
@@ -44,77 +57,51 @@ const Promotions = () => {
   const fetchClasses = async () => {
     try {
       const response = await classService.getAll();
-      setClasses(response?.data?.data?.classes);
+      setClasses(response?.data?.data?.classes || []);
     } catch (error) {
       console.error('Failed to fetch classes');
     }
   };
 
-  const handleSubmit = async (e) => {
-    if (e) e.preventDefault();
-    try {
-      if (!formData.fromClass || !formData.toClass) {
-        toast.warn('All fields are required');
-        return;
-      }
-      setSaving(true);
-      setLoading(true);
+  const handleInputChange = (path, value) => {
+    const keys = path.split('.');
+    if (keys.length > 1) {
+      setFormData((prev) => ({
+        ...prev,
+        [keys[0]]: { ...prev[keys[0]], [keys[1]]: value },
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [path]: value }));
+    }
+  };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.fromClass) return toast.error('Source class is required');
+
+    try {
+      setSaving(true);
       await promotionService.create(formData);
-      toast.success('Promotion batch created successfully');
+      toast.success('Promotion batch created');
       setModal(null);
-      resetForm();
+      setFormData(initialForm);
       fetchPromotions();
     } catch (error) {
-      toast.error(
-        error.response?.data?.message || 'Failed to create promotion batch',
-      );
+      toast.error(error.response?.data?.message || 'Failed to create batch');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleAutoProcess = async (id) => {
-    if (
-      !window.confirm(
-        'Are you sure you want to auto-process this promotion? This will evaluate all students based on the criteria.',
-      )
-    ) {
-      return;
-    }
-
+  const handleAction = async (action, id, message) => {
+    if (!window.confirm(message)) return;
     try {
       setLoading(true);
-      await promotionService.autoProcess(id);
-      toast.success('Promotion processed successfully');
+      await promotionService[action](id);
+      toast.success(`Action successful`);
       fetchPromotions();
     } catch (error) {
-      toast.error(
-        error.response?.data?.message || 'Failed to process promotion',
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleApply = async (id) => {
-    if (
-      !window.confirm(
-        'Are you sure you want to apply these promotions? This will update student classes and cannot be undone.',
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await promotionService.apply(id);
-      toast.success('Promotions applied successfully');
-      fetchPromotions();
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message || 'Failed to apply promotions',
-      );
+      toast.error(error.response?.data?.message || 'Action failed');
     } finally {
       setLoading(false);
     }
@@ -127,374 +114,297 @@ const Promotions = () => {
         promotionService.getById(promotion._id),
         promotionService.getStats(promotion._id),
       ]);
-
       setSelectedPromotion(detailsRes.data.data);
       setStats(statsRes.data.data);
       setModal('details');
     } catch (error) {
-      toast.error('Failed to load promotion details');
+      toast.error('Failed to load details');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDelete = async (id) => {
-    if (
-      !window.confirm('Are you sure you want to delete this promotion batch?')
-    ) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await promotionService.delete(id);
-      toast.success('Promotion batch deleted successfully');
-      fetchPromotions();
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message || 'Failed to delete promotion',
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      academicYear: new Date().getFullYear().toString(),
-      fromClass: '',
-      toClass: '',
-      criteria: {
-        minimumAverage: 40,
-        maximumFailures: 3,
-        coreSubjectsMustPass: true,
-        coreSubjects: [],
-      },
-    });
   };
 
   return (
-    <div className="promotions-page">
-      <div className="page-header">
-        <div>
-          <h1 className="page-header__title">Class Promotion & Advancement</h1>
-          <p className="page-header__subtitle">
-            {promotions.length} batches configured
+    <div className="promotions-container">
+      <header className="page-header">
+        <div className="header-text">
+          <h1 className="title">Academic Promotions</h1>
+          <p className="subtitle">
+            Manage student advancement and graduation cycles
           </p>
         </div>
-        <button className="btn btn--primary" onClick={() => setModal('form')}>
-          Create Promotion Batch
+        <button className="btn btn-primary" onClick={() => setModal('form')}>
+          <Plus size={18} /> <span>Create Promotion Batch</span>
         </button>
-      </div>
+      </header>
 
       {loading && !modal && (
-        <div className="loading-spinner" style={{ margin: '40px auto' }} />
+        <div className="loader-container">
+          <div className="loader" />
+        </div>
       )}
 
-      <div className="promotions-list">
-        {promotions.length > 0 &&
-          promotions.map((promotion) => (
-            <div key={promotion._id} className="promotion-card">
-              <div className="promotion-header">
-                <div>
-                  <h3>
-                    {promotion.fromClass?.name} →{' '}
-                    {promotion.toClass?.name || 'Graduation'}
-                  </h3>
-                  <p className="promotion-meta">
-                    Academic Year: {promotion.academicYear}
-                  </p>
-                </div>
-                <span
-                  className={`status-badge status-${promotion.status.toLowerCase()}`}
-                >
-                  {promotion.status}
+      <div className="promotions-grid">
+        {promotions.map((promotion) => (
+          <div key={promotion._id} className="promo-card">
+            <div className="promo-card-header">
+              <div className="pathway">
+                <span className="class-pill">{promotion.fromClass?.name}</span>
+                <ArrowRight size={16} className="arrow" />
+                <span className="class-pill highlight">
+                  {promotion.toClass?.name || (
+                    <>
+                      <GraduationCap size={14} /> Graduation
+                    </>
+                  )}
                 </span>
               </div>
+              <span
+                className={`status-badge status-${promotion.status.toLowerCase()}`}
+              >
+                {promotion.status}
+              </span>
+            </div>
 
-              <div className="promotion-info">
-                <p>
-                  <strong>Criteria:</strong>
-                </p>
-                <ul>
-                  <li>Minimum Average: {promotion.criteria.minimumAverage}%</li>
-                  <li>
-                    Maximum Failures: {promotion.criteria.maximumFailures}{' '}
-                    subjects
-                  </li>
-                  <li>
-                    Core Subjects:{' '}
-                    {promotion.criteria.coreSubjectsMustPass
-                      ? 'Must Pass'
-                      : 'Optional'}
-                  </li>
-                </ul>
+            <div className="promo-details">
+              <div className="detail-item">
+                <label>Academic Year</label>
+                <span>{promotion.academicYear}</span>
               </div>
-
-              <div className="promotion-actions">
-                <button
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => viewDetails(promotion)}
-                >
-                  View Details
-                </button>
-
-                {promotion.status === 'Draft' && (
-                  <>
-                    <button
-                      className="btn btn-sm btn-primary"
-                      onClick={() => handleAutoProcess(promotion._id)}
-                    >
-                      Auto Process
-                    </button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => handleDelete(promotion._id)}
-                    >
-                      Delete
-                    </button>
-                  </>
-                )}
-
-                {promotion.status === 'Completed' && (
-                  <button
-                    className="btn btn-sm btn-success"
-                    onClick={() => handleApply(promotion._id)}
-                  >
-                    Apply Promotions
-                  </button>
-                )}
+              <div className="detail-item">
+                <label>Threshold</label>
+                <span>{promotion.criteria.minimumAverage}% Avg</span>
               </div>
             </div>
-          ))}
+
+            <div className="promo-actions">
+              <button
+                className="action-btn info"
+                onClick={() => viewDetails(promotion)}
+              >
+                <Info size={16} /> Details
+              </button>
+
+              {promotion.status === 'Draft' && (
+                <>
+                  <button
+                    className="action-btn primary"
+                    onClick={() =>
+                      handleAction(
+                        'autoProcess',
+                        promotion._id,
+                        'Analyze student performance?',
+                      )
+                    }
+                  >
+                    <Play size={16} /> Process
+                  </button>
+                  <button
+                    className="action-btn danger"
+                    onClick={() =>
+                      handleAction(
+                        'delete',
+                        promotion._id,
+                        'Delete this batch?',
+                      )
+                    }
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </>
+              )}
+
+              {promotion.status === 'Completed' && (
+                <button
+                  className="action-btn success"
+                  onClick={() =>
+                    handleAction(
+                      'apply',
+                      promotion._id,
+                      'Apply changes permanently?',
+                    )
+                  }
+                >
+                  <CheckCircle size={16} /> Apply Changes
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
 
+      {/* CREATE MODAL */}
       <Modal
         open={modal === 'form'}
-        onClose={() => {
-          setModal(null);
-          resetForm();
-        }}
-        title="Create Promotion Batch"
-        maxWidth={600}
-        footer={
-          <>
+        onClose={() => setModal(null)}
+        title="Configure New Promotion"
+      >
+        <form className="modern-form" onSubmit={handleSubmit}>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Academic Year</label>
+              <input
+                type="text"
+                value={formData.academicYear}
+                onChange={(e) =>
+                  handleInputChange('academicYear', e.target.value)
+                }
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>From Class</label>
+              <select
+                value={formData.fromClass}
+                onChange={(e) => handleInputChange('fromClass', e.target.value)}
+              >
+                <option value="">Select...</option>
+                {classes.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>To Class (Target)</label>
+              <select
+                value={formData.toClass}
+                onChange={(e) => handleInputChange('toClass', e.target.value)}
+              >
+                <option value="">Graduation</option>
+                {classes.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="criteria-section">
+            <h4>Promotion Criteria</h4>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Min. Average (%)</label>
+                <input
+                  type="number"
+                  value={formData.criteria.minimumAverage}
+                  onChange={(e) =>
+                    handleInputChange('criteria.minimumAverage', e.target.value)
+                  }
+                />
+              </div>
+              <div className="form-group">
+                <label>Max. Failures</label>
+                <input
+                  type="number"
+                  value={formData.criteria.maximumFailures}
+                  onChange={(e) =>
+                    handleInputChange(
+                      'criteria.maximumFailures',
+                      e.target.value,
+                    )
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="modal-footer">
             <button
-              className="btn btn--secondary"
-              onClick={() => {
-                setModal(null);
-                resetForm();
-              }}
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setModal(null)}
             >
               Cancel
             </button>
-            <button
-              className="btn btn--primary"
-              disabled={saving}
-              onClick={handleSubmit}
-            >
-              {saving ? 'Creating...' : 'Create Batch'}
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Creating...' : 'Launch Batch'}
             </button>
-          </>
-        }
-      >
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Academic Year *</label>
-            <input
-              className="form-control"
-              type="text"
-              value={formData.academicYear}
-              onChange={(e) =>
-                setFormData({ ...formData, academicYear: e.target.value })
-              }
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>From Class *</label>
-            <select
-              className="form-control"
-              value={formData.fromClass}
-              onChange={(e) =>
-                setFormData({ ...formData, fromClass: e.target.value })
-              }
-              required
-            >
-              <option value="">Select Class</option>
-              {classes.map((cls) => (
-                <option key={cls._id} value={cls._id}>
-                  {cls.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>To Class</label>
-            <select
-              className="form-control"
-              value={formData.toClass}
-              onChange={(e) =>
-                setFormData({ ...formData, toClass: e.target.value })
-              }
-              required
-            >
-              <option value="">Graduation (No next class)</option>
-              {classes.map((cls) => (
-                <option key={cls._id} value={cls._id}>
-                  {cls.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <h3>Promotion Criteria</h3>
-
-          <div className="form-group">
-            <label>Minimum Average (%) *</label>
-            <input
-              className="form-control"
-              type="number"
-              value={formData.criteria.minimumAverage}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  criteria: {
-                    ...formData.criteria,
-                    minimumAverage: parseInt(e.target.value),
-                  },
-                })
-              }
-              min="0"
-              max="100"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Maximum Failed Subjects *</label>
-            <input
-              className="form-control"
-              type="number"
-              value={formData.criteria.maximumFailures}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  criteria: {
-                    ...formData.criteria,
-                    maximumFailures: parseInt(e.target.value),
-                  },
-                })
-              }
-              min="0"
-              required
-            />
-          </div>
-
-          <div className="form-group checkbox-group">
-            <label>
-              <input
-                className="form-control"
-                type="checkbox"
-                checked={formData.criteria.coreSubjectsMustPass}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    criteria: {
-                      ...formData.criteria,
-                      coreSubjectsMustPass: e.target.checked,
-                    },
-                  })
-                }
-              />
-              Core subjects must be passed
-            </label>
           </div>
         </form>
       </Modal>
 
-      {/* Details Modal */}
-
+      {/* DETAILS MODAL */}
       <Modal
         open={modal === 'details'}
         onClose={() => setModal(null)}
-        title="Promotion Details"
-        maxWidth={800}
+        title="Evaluation Summary"
+        maxWidth={900}
       >
-        {selectedPromotion && stats && (
-          <div
-            className="modal-overlay"
-            onClick={() => setSelectedPromotion(null)}
-          >
-            <div
-              className="modal-content promotion-details-modal"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="modal-header">
-                <h2>Promotion Details</h2>
-                <button
-                  className="close-btn"
-                  onClick={() => setSelectedPromotion(null)}
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <label>Total Students</label>
-                  <p className="big-number">{stats.total}</p>
+        {stats && selectedPromotion && (
+          <div className="summary-layout">
+            <div className="stats-header">
+              <div className="stat-box">
+                <Users className="icon" />
+                <div>
+                  <label>Total</label>
+                  <strong>{stats.total}</strong>
                 </div>
-                <div className="stat-card success">
+              </div>
+              <div className="stat-box success">
+                <Award className="icon" />
+                <div>
                   <label>Promoted</label>
-                  <p className="big-number">{stats.promoted}</p>
+                  <strong>{stats.promoted}</strong>
                 </div>
-                <div className="stat-card warning">
+              </div>
+              <div className="stat-box danger">
+                <AlertCircle className="icon" />
+                <div>
                   <label>Repeated</label>
-                  <p className="big-number">{stats.repeated}</p>
-                </div>
-                <div className="stat-card info">
-                  <label>Pass Rate</label>
-                  <p className="big-number">{stats.passRate}%</p>
+                  <strong>{stats.repeated}</strong>
                 </div>
               </div>
+              <div className="stat-box info">
+                <div className="progress-circle">{stats.passRate}%</div>
+                <div>
+                  <label>Success Rate</label>
+                </div>
+              </div>
+            </div>
 
-              <div className="students-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Student</th>
-                      <th>Average</th>
-                      <th>Position</th>
-                      <th>Status</th>
-                      <th>Promoted To</th>
+            <div className="table-responsive">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th>Student Name</th>
+                    <th>Average</th>
+                    <th>Rank</th>
+                    <th>Result</th>
+                    <th>Destination</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedPromotion.students.map((entry) => (
+                    <tr key={entry.student._id}>
+                      <td className="font-medium">
+                        {entry.student.firstName} {entry.student.lastName}
+                      </td>
+                      <td>
+                        <span className="avg-badge">
+                          {entry.yearlyAverage}%
+                        </span>
+                      </td>
+                      <td className="text-muted">
+                        {entry.yearlyPosition} / {entry.totalStudents}
+                      </td>
+                      <td>
+                        <span
+                          className={`status-pill ${entry.status.toLowerCase()}`}
+                        >
+                          {entry.status}
+                        </span>
+                      </td>
+                      <td className="text-sm">
+                        {entry.promotedTo?.name || 'Graduated'}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {selectedPromotion.students.map((entry) => (
-                      <tr key={entry.student._id}>
-                        <td>
-                          {entry.student.firstName} {entry.student.lastName}
-                        </td>
-                        <td>{entry.yearlyAverage}%</td>
-                        <td>
-                          {entry.yearlyPosition}/{entry.totalStudents}
-                        </td>
-                        <td>
-                          <span
-                            className={`status-badge status-${entry.status.toLowerCase()}`}
-                          >
-                            {entry.status}
-                          </span>
-                        </td>
-                        <td>{entry.promotedTo?.name || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

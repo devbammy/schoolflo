@@ -11,8 +11,26 @@ const sendSuccess = (
   return res.status(statusCode).json(response);
 };
 
-const sendError = (res, statusCode = 500, message = 'Error', errors = null) => {
-  if (typeof statusCode !== 'number') statusCode = 200;
+const sendError = (
+  res,
+  messageOrStatusCode = 'Error',
+  statusCodeOrMessage = 500,
+  errors = null,
+) => {
+  let statusCode = 500;
+  let message = 'Error';
+
+  if (typeof messageOrStatusCode === 'number') {
+    statusCode = messageOrStatusCode;
+    message =
+      typeof statusCodeOrMessage === 'string' ? statusCodeOrMessage : 'Error';
+  } else {
+    message = messageOrStatusCode;
+    statusCode =
+      typeof statusCodeOrMessage === 'number' ? statusCodeOrMessage : 500;
+  }
+
+  if (typeof statusCode !== 'number') statusCode = 500;
   const response = { success: false, message };
   if (errors) response.errors = errors;
   return res.status(statusCode).json(response);

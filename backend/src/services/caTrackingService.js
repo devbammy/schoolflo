@@ -1,5 +1,5 @@
 const CATracker = require('../models/CATracker');
-const Result = require('../models/Exam'); // Using existing Result model
+const { Result } = require('../models/Exam'); // Using existing Result model
 const User = require('../models/User');
 const Subject = require('../models/Subject');
 
