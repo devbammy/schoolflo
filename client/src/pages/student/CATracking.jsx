@@ -1,32 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { caTrackingService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
-import { Line } from 'react-chartjs-2';
 import { toast } from 'react-hot-toast';
+import { Line } from 'react-chartjs-2';
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Activity,
+  Award,
+  AlertCircle,
+  Calendar,
+  ChevronRight,
+} from 'lucide-react';
+import {
+  getCurrentAcademicYear,
+  generateAcademicYearOptions,
+} from '../../utils/academicYear';
 
 const CATracking = () => {
   const { user } = useAuthStore();
+
   const [tracking, setTracking] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [academicYear, setAcademicYear] = useState(
-    new Date().getFullYear().toString(),
-  );
+  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
 
   useEffect(() => {
+    if (!user?._id) return;
     fetchTracking();
     fetchAnalytics();
-  }, [academicYear]);
+  }, [academicYear, user?._id]);
 
   const fetchTracking = async () => {
     try {
       setLoading(true);
-      const response = await caTrackingService.getStudentTracking(user._id, {
+
+      const res = await caTrackingService.getStudentTracking(user._id, {
         academicYear,
       });
-      setTracking(response.data.data);
+
+      setTracking(res?.data?.data || []);
     } catch (error) {
       toast.error('Failed to fetch tracking data');
     } finally {
@@ -36,248 +52,278 @@ const CATracking = () => {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await caTrackingService.getAnalytics(user._id, {
+      const res = await caTrackingService.getAnalytics(user._id, {
         academicYear,
       });
-      setAnalytics(response.data.data);
+      setAnalytics(res?.data?.data || null);
     } catch (error) {
-      console.error('Failed to fetch analytics');
+      console.error('Analytics error:', error);
     }
   };
 
   const viewSubjectChart = async (subjectId) => {
     try {
-      const response = await caTrackingService.getChartData(
-        user._id,
-        subjectId,
-        {
-          academicYear,
-        },
-      );
-      setChartData(response.data.data);
-      setSelectedSubject(tracking.find((t) => t.subject._id === subjectId));
+      const res = await caTrackingService.getChartData(user._id, subjectId, {
+        academicYear,
+      });
+
+      console.log(res.data.data);
+
+      const subject = tracking.find((t) => t.subject?._id === subjectId);
+
+      setSelectedSubject(subject || null);
+      setChartData(res?.data?.data || null);
     } catch (error) {
       toast.error('Failed to load chart data');
     }
   };
 
-  const getTrendIcon = (trend) => {
+  const getTrendUI = (trend) => {
     switch (trend) {
       case 'Improving':
-        return '📈';
+        return {
+          icon: <TrendingUp size={18} />,
+          class: 'trend-up',
+          label: 'Improving',
+        };
       case 'Declining':
-        return '📉';
+        return {
+          icon: <TrendingDown size={18} />,
+          class: 'trend-down',
+          label: 'Declining',
+        };
       case 'Stable':
-        return '➡️';
-      case 'Inconsistent':
-        return '↕️';
+        return {
+          icon: <Minus size={18} />,
+          class: 'trend-stable',
+          label: 'Stable',
+        };
       default:
-        return '';
+        return {
+          icon: <Activity size={18} />,
+          class: 'trend-mixed',
+          label: 'Inconsistent',
+        };
     }
   };
 
-  const getTrendClass = (trend) => {
-    switch (trend) {
-      case 'Improving':
-        return 'trend-improving';
-      case 'Declining':
-        return 'trend-declining';
-      case 'Stable':
-        return 'trend-stable';
-      default:
-        return 'trend-inconsistent';
-    }
+  const getChartConfig = () => {
+    if (!chartData) return null;
+
+    return {
+      labels: chartData.labels || [],
+      datasets: [
+        {
+          label: selectedSubject?.subject?.name || 'Performance',
+          data: chartData.values || chartData.datasets[0]?.data || [],
+          borderColor: '#4f46e5',
+          tension: 0.3,
+        },
+      ],
+    };
   };
+
+  const improvingCount =
+    analytics?.trends?.improving ??
+    analytics?.trendSummary?.improving ??
+    analytics?.trends?.improvingSubjects?.length ??
+    0;
 
   return (
-    <div className="ca-tracking-page">
-      <div className="page-header">
-        <h1>Continuous Assessment Tracking</h1>
-        <select
-          value={academicYear}
-          onChange={(e) => setAcademicYear(e.target.value)}
-          className="year-selector"
-        >
-          <option value={(new Date().getFullYear() - 1).toString()}>
-            {new Date().getFullYear() - 1}
-          </option>
-          <option value={new Date().getFullYear().toString()}>
-            {new Date().getFullYear()}
-          </option>
-          <option value={(new Date().getFullYear() + 1).toString()}>
-            {new Date().getFullYear() + 1}
-          </option>
-        </select>
+    <div className="ca-container">
+      {/* HEADER */}
+      <header className="dashboard-header">
+        <div>
+          <h2>Academic Progress</h2>
+          <p>Tracking Continuous Assessment for {user?.name}</p>
+        </div>
+
+        <div className="year-filter">
+          <Calendar size={18} />
+          <select
+            value={academicYear}
+            onChange={(e) => setAcademicYear(e.target.value)}
+          >
+            {generateAcademicYearOptions().map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+        </div>
+      </header>
+
+      {/* ANALYTICS */}
+      {analytics && (
+        <section className="stats-grid">
+          <div className="stat-card main">
+            <label>Overall Average</label>
+            <div className="value-group">
+              <span className="big-number">
+                {analytics?.overallAverage || 0}%
+              </span>
+              <Award className="icon-bg" />
+            </div>
+          </div>
+
+          <div className="stat-card border-green">
+            <label>Improving Subjects</label>
+            <span className="count-val text-green">{improvingCount}</span>
+            <TrendingUp size={24} />
+          </div>
+
+          <div className="stat-card border-red">
+            <label>Needs Attention</label>
+            <span className="count-val text-red">
+              {analytics?.trends?.declining || 0}
+            </span>
+            <AlertCircle size={24} />
+          </div>
+        </section>
+      )}
+
+      {/* Empty State Logic before the main content layout */}
+      {tracking.length === 0 && !loading && (
+        <div className="empty-state">
+          <Activity size={48} />
+          <p>No assessment data found for the {academicYear} academic year.</p>
+        </div>
+      )}
+
+      {/* MAIN CONTENT */}
+      <div className="content-layout">
+        <main className="tracking-section">
+          <h4 style={{ marginBottom: 20 }}>Subject Breakdown</h4>
+
+          <div className="subject-cards">
+            {tracking.map((tracker) => {
+              const trend = getTrendUI(tracker.trend);
+
+              return (
+                <div key={tracker._id} className="subject-card">
+                  <div className="card-top">
+                    <h4>{tracker?.subject?.name}</h4>
+                    <span className={`trend-pill ${trend.class}`}>
+                      {trend.icon} {trend.label}
+                    </span>
+                  </div>
+
+                  <div className="score-row">
+                    <div className="score-circle">
+                      <span className="score">
+                        {tracker?.yearlyAverage || 0}%
+                      </span>
+                      <span className="label">Yearly Avg</span>
+                    </div>
+                    <div className="grade-box">
+                      <span className="grade">
+                        {tracker?.yearlyGrade || 'N/A'}
+                      </span>
+                      <span className="label">Final Grade</span>
+                    </div>
+                  </div>
+
+                  <table className="mini-table">
+                    <thead>
+                      <tr>
+                        <th>Term</th>
+                        <th>Score</th>
+                        <th>Pos.</th>
+                        <th>+/-</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {(tracker.termRecords || []).map((record, idx) => (
+                        <tr key={idx}>
+                          <td>{record.term}</td>
+                          <td>
+                            <strong>{record.total}%</strong>
+                          </td>
+                          <td>#{record.position}</td>
+                          <td
+                            className={
+                              record.improvement >= 0
+                                ? 'text-green'
+                                : 'text-red'
+                            }
+                          >
+                            {record.improvement > 0
+                              ? `+${record.improvement}`
+                              : record.improvement}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <button
+                    className="btn-view-chart"
+                    onClick={() => viewSubjectChart(tracker?.subject?._id)}
+                  >
+                    Insights & Trends <ChevronRight size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </main>
+
+        {/* SIDEBAR */}
+        {analytics && (
+          <aside className="insights-sidebar">
+            <div className="insight-box">
+              <h4>
+                <Award size={18} /> Top Performers
+              </h4>
+
+              {(analytics.bestPerformance || []).map((item, i) => (
+                <div key={i} className="insight-item">
+                  <span>{item.subject}</span>
+                  <span className="badge-green">{item.average}%</span>
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
       </div>
 
-      {loading && <div className="loading-spinner">Loading...</div>}
-
-      {/* Analytics Summary */}
-      {analytics && (
-        <div className="analytics-summary">
-          <div className="summary-card">
-            <h3>Overall Average</h3>
-            <p className="big-number">{analytics.overallAverage}%</p>
-          </div>
-          <div className="summary-card">
-            <h3>Total Subjects</h3>
-            <p className="big-number">{analytics.totalSubjects}</p>
-          </div>
-          <div className="summary-card">
-            <h3>Improving</h3>
-            <p className="big-number trend-improving">
-              {analytics.trends.improving}
-            </p>
-          </div>
-          <div className="summary-card">
-            <h3>Needs Attention</h3>
-            <p className="big-number trend-declining">
-              {analytics.trends.declining}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Best & Worst Performance */}
-      {analytics && (
-        <div className="performance-insights">
-          <div className="insight-card">
-            <h3>Top Performance</h3>
-            {analytics.bestPerformance.map((item, index) => (
-              <div key={index} className="performance-item">
-                <span>{item.subject}</span>
-                <span className="performance-score">{item.average}%</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="insight-card">
-            <h3>Needs Attention</h3>
-            {analytics.needsAttention.map((item, index) => (
-              <div key={index} className="performance-item">
-                <span>{item.subject}</span>
-                <span className="performance-score warning">
-                  {item.average}%
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Subject-wise Tracking */}
-      <div className="tracking-grid">
-        {tracking.map((tracker) => (
-          <div key={tracker._id} className="tracking-card">
-            <div className="card-header">
-              <h3>{tracker.subject.name}</h3>
-              <span className={`trend-badge ${getTrendClass(tracker.trend)}`}>
-                {getTrendIcon(tracker.trend)} {tracker.trend}
-              </span>
-            </div>
-
-            <div className="card-stats">
-              <div className="stat">
-                <label>Yearly Average</label>
-                <p className="stat-value">{tracker.yearlyAverage}%</p>
-              </div>
-              <div className="stat">
-                <label>Grade</label>
-                <p className="stat-value">{tracker.yearlyGrade}</p>
-              </div>
-            </div>
-
-            {/* Term-by-term breakdown */}
-            <div className="term-records">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Term</th>
-                    <th>Score</th>
-                    <th>Grade</th>
-                    <th>Position</th>
-                    <th>Change</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tracker.termRecords.map((record, index) => (
-                    <tr key={index}>
-                      <td>{record.term}</td>
-                      <td>{record.total}%</td>
-                      <td>{record.grade}</td>
-                      <td>{record.position}</td>
-                      <td
-                        className={
-                          record.improvement > 0
-                            ? 'positive'
-                            : record.improvement < 0
-                              ? 'negative'
-                              : ''
-                        }
-                      >
-                        {record.improvement > 0 ? '+' : ''}
-                        {record.improvement}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      {/* CHART SECTION */}
+      {chartData && selectedSubject && (
+        <section className="chart-section">
+          <div className="chart-header">
+            <h3>{selectedSubject?.subject?.name} Performance Trend</h3>
 
             <button
-              className="btn btn-sm btn-secondary"
-              onClick={() => viewSubjectChart(tracker.subject._id)}
+              className="close-btn"
+              onClick={() => {
+                setChartData(null);
+                setSelectedSubject(null);
+              }}
             >
-              View Chart
+              Close
             </button>
           </div>
-        ))}
-      </div>
 
-      {/* Chart Modal */}
-      {chartData && selectedSubject && (
-        <div className="modal-overlay" onClick={() => setChartData(null)}>
-          <div
-            className="modal-content chart-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h2>{selectedSubject.subject.name} - Performance Trend</h2>
-              <button className="close-btn" onClick={() => setChartData(null)}>
-                ×
-              </button>
-            </div>
-
-            <div className="chart-container">
-              <Line
-                data={{
-                  labels: chartData.labels,
-                  datasets: chartData.datasets,
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      max: 100,
-                    },
+          <div className="chart-box">
+            <Line
+              data={getChartConfig()}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: true },
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    max: 100,
                   },
-                }}
-              />
-            </div>
-
-            <div className="trend-summary">
-              <p>
-                <strong>Trend:</strong> {selectedSubject.trend}
-              </p>
-              <p>
-                <strong>Yearly Average:</strong> {selectedSubject.yearlyAverage}
-                %
-              </p>
-            </div>
+                },
+              }}
+            />
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

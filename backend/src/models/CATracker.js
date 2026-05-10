@@ -75,26 +75,47 @@ caTrackerSchema.index(
 
 // Method to calculate trend
 caTrackerSchema.methods.calculateTrend = function () {
-  if (this.termRecords.length < 2) {
+  if (!this.termRecords || this.termRecords.length < 2) {
     this.trend = 'Stable';
     return;
   }
 
-  const totals = this.termRecords
+  // 1. Always sort terms properly
+  const sorted = [...this.termRecords].sort((a, b) => {
+    const order = {
+      'First Term': 1,
+      'Second Term': 2,
+      'Third Term': 3,
+    };
+    return order[a.term] - order[b.term];
+  });
+
+  const totals = sorted
     .map((r) => r.total)
-    .filter((t) => t !== undefined);
+    .filter((t) => typeof t === 'number');
+
+  if (totals.length < 2) {
+    this.trend = 'Stable';
+    return;
+  }
+
   let improvements = 0;
   let declines = 0;
 
   for (let i = 1; i < totals.length; i++) {
     const diff = totals[i] - totals[i - 1];
-    if (diff > 5) improvements++;
-    else if (diff < -5) declines++;
+
+    if (diff >= 5) improvements++;
+    else if (diff <= -5) declines++;
   }
 
-  if (improvements > declines && improvements >= 2) {
+  // 2. Smarter classification (works with 3 terms)
+
+  const totalChange = totals[totals.length - 1] - totals[0];
+
+  if (totalChange >= 5) {
     this.trend = 'Improving';
-  } else if (declines > improvements && declines >= 2) {
+  } else if (totalChange <= -5) {
     this.trend = 'Declining';
   } else if (improvements > 0 && declines > 0) {
     this.trend = 'Inconsistent';
