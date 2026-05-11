@@ -55,7 +55,10 @@ connectDB();
 
 // Security Middleware
 
-const allowedOrigins = process.env.CLIENT_URL || 'http://localhost:5173';
+const allowedOrigins =
+  process.env.CLIENT_URL ||
+  'http://localhost:5173' ||
+  'https://schoolflo.vercel.app';
 
 app.use(
   cors({
