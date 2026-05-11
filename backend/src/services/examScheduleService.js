@@ -113,42 +113,58 @@ class ExamScheduleService {
 
     // Send email notifications
     const emailPromises = [
-      ...students.map((student) =>
-        notificationService.sendEmail({
-          to: student.email,
-          subject: `${schedule.examType} Schedule Published - ${schedule.title}`,
-          template: 'examSchedulePublished',
-          data: {
-            studentName: `${student.firstName} ${student.lastName}`,
-            examTitle: schedule.title,
-            examType: schedule.examType,
-            className: schedule.class.name,
-            startDate: schedule.startDate.toLocaleDateString('en-NG'),
-            endDate: schedule.endDate.toLocaleDateString('en-NG'),
-            loginUrl: process.env.CLIENT_URL,
-          },
-        }),
-      ),
-      ...invigilators.map((teacher) =>
-        notificationService.sendEmail({
-          to: teacher.email,
-          subject: `Invigilation Assignment - ${schedule.title}`,
-          template: 'invigilationAssignment',
-          data: {
-            teacherName: `${teacher.firstName} ${teacher.lastName}`,
-            examTitle: schedule.title,
-            className: schedule.class.name,
-            sessionsCount: schedule.sessions.filter(
-              (s) =>
-                s.invigilator &&
-                s.invigilator._id.toString() === teacher._id.toString(),
-            ).length,
-            loginUrl: process.env.CLIENT_URL,
-          },
-        }),
-      ),
+      ...students.map(async (student) => {
+        try {
+          await notificationService.sendEmail({
+            to: student.email,
+            subject: `${schedule.examType} Schedule Published - ${schedule.title}`,
+            template: 'examSchedulePublished',
+            data: {
+              studentName: `${student.firstName} ${student.lastName}`,
+              examTitle: schedule.title,
+              examType: schedule.examType,
+              className: schedule.class.name,
+              startDate: schedule.startDate.toLocaleDateString('en-NG'),
+              endDate: schedule.endDate.toLocaleDateString('en-NG'),
+              loginUrl: process.env.CLIENT_URL,
+            },
+          });
+        } catch (error) {
+          console.error(
+            `Failed to send exam schedule email to ${student.email}:`,
+            error.message,
+          );
+        }
+      }),
+
+      ...invigilators.map(async (teacher) => {
+        try {
+          await notificationService.sendEmail({
+            to: teacher.email,
+            subject: `Invigilation Assignment - ${schedule.title}`,
+            template: 'invigilationAssignment',
+            data: {
+              teacherName: `${teacher.firstName} ${teacher.lastName}`,
+              examTitle: schedule.title,
+              className: schedule.class.name,
+              sessionsCount: schedule.sessions.filter(
+                (s) =>
+                  s.invigilator &&
+                  s.invigilator._id.toString() === teacher._id.toString(),
+              ).length,
+              loginUrl: process.env.CLIENT_URL,
+            },
+          });
+        } catch (error) {
+          console.error(
+            `Failed to send invigilation email to ${teacher.email}:`,
+            error.message,
+          );
+        }
+      }),
     ];
 
+    await Promise.all(emailPromises);
     await Promise.allSettled(emailPromises);
 
     return schedule;

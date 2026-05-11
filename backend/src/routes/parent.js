@@ -89,17 +89,21 @@ router.post('/', protect, authorize('Admin'), async (req, res) => {
     }
 
     // Send welcome email
-    await sendEmail({
-      to: email,
-      subject: 'Welcome to School Management Portal',
-      html: emailTemplates.welcome({
-        firstName,
-        email,
-        password,
-        role: 'Parent',
-        loginUrl: `${process.env.CLIENT_URL}/login`,
-      }),
-    });
+    try {
+      await sendEmail({
+        to: email,
+        subject: 'Welcome to School Management Portal',
+        html: emailTemplates.welcome({
+          firstName,
+          email,
+          password,
+          role: 'Parent',
+          loginUrl: `${process.env.CLIENT_URL}/login`,
+        }),
+      });
+    } catch (error) {
+      console.log('email error:', error);
+    }
 
     await parent.populate({
       path: 'parentProfile.children',

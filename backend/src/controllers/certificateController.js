@@ -68,16 +68,23 @@ const notifyCertificateIssued = async (certificate) => {
   };
 
   await Promise.all(
-    recipients.map((recipient) =>
-      sendEmail({
-        to: recipient.email,
-        subject: `${payload.certificateType} Issued — ${payload.certificateNumber}`,
-        html: emailTemplates.certificateIssued({
-          recipientName: recipient.name,
-          ...payload,
-        }),
-      }),
-    ),
+    recipients.map(async (recipient) => {
+      try {
+        await sendEmail({
+          to: recipient.email,
+          subject: `${payload.certificateType} Issued — ${payload.certificateNumber}`,
+          html: emailTemplates.certificateIssued({
+            recipientName: recipient.name,
+            ...payload,
+          }),
+        });
+      } catch (error) {
+        console.error(
+          `Failed to send email to ${recipient.email}:`,
+          error.message,
+        );
+      }
+    }),
   );
 };
 
@@ -100,16 +107,23 @@ const notifyCertificateRevoked = async (certificate) => {
   };
 
   await Promise.all(
-    recipients.map((recipient) =>
-      sendEmail({
-        to: recipient.email,
-        subject: `${payload.certificateType} Revoked — ${payload.certificateNumber}`,
-        html: emailTemplates.certificateRevoked({
-          recipientName: recipient.name,
-          ...payload,
-        }),
-      }),
-    ),
+    recipients.map(async (recipient) => {
+      try {
+        await sendEmail({
+          to: recipient.email,
+          subject: `${payload.certificateType} Revoked — ${payload.certificateNumber}`,
+          html: emailTemplates.certificateRevoked({
+            recipientName: recipient.name,
+            ...payload,
+          }),
+        });
+      } catch (error) {
+        console.error(
+          `Failed to send email to ${recipient.email}:`,
+          error.message,
+        );
+      }
+    }),
   );
 };
 
