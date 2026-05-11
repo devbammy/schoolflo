@@ -137,22 +137,6 @@ const verifyPaystackPayment = async (req, res) => {
     if (!payment) return sendError(res, 404, 'Payment record not found');
 
     // Send receipt email
-    try {
-      await sendEmail({
-        to: payment.student.email,
-        subject: `Payment Receipt — ${payment.receiptNumber}`,
-        html: emailTemplates.paymentReceipt({
-          studentName: `${payment.student.firstName} ${payment.student.lastName}`,
-          receiptNumber: payment.receiptNumber,
-          amount: payment.amountPaid,
-          term: payment.term,
-          academicYear: payment.academicYear,
-          date: payment.paymentDate,
-        }),
-      });
-    } catch (error) {
-      console.log('Email error:', error);
-    }
 
     return sendSuccess(res, 200, 'Payment verified and confirmed', { payment });
   } catch (error) {

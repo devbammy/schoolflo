@@ -226,23 +226,6 @@ const notifyParentsOfResults = async (studentIds, term, academicYear) => {
     );
     const parent = student?.studentProfile?.parentId;
     if (!parent?.email) continue;
-
-    try {
-      await sendEmail({
-        to: parent.email,
-        subject: `${term} ${academicYear} Results Available — ${student.firstName} ${student.lastName}`,
-        html: emailTemplates.resultPublished({
-          studentName: `${student.firstName} ${student.lastName}`,
-          term,
-          academicYear,
-          average: reportCard.summary.average,
-          position: `${reportCard.summary.overallPosition} of ${reportCard.summary.totalStudentsInClass}`,
-          loginUrl: `${process.env.CLIENT_URL}/login`,
-        }),
-      });
-    } catch (error) {
-      console.log('Email error:', error);
-    }
   }
 };
 

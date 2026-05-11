@@ -62,22 +62,6 @@ const register = async (req, res) => {
       parentProfile: role === 'Parent' ? parentProfile : undefined,
     });
 
-    try {
-      await sendEmail({
-        to: email,
-        subject: 'Welcome to School Management Portal',
-        html: emailTemplates.welcome({
-          firstName,
-          email,
-          password,
-          role,
-          loginUrl: `${process.env.CLIENT_URL}/login`,
-        }),
-      });
-    } catch (emailError) {
-      console.error('EMAIL ERROR:', emailError);
-    }
-
     const accessToken = user.generateAccessToken();
     const refreshToken = user.generateRefreshToken();
 
@@ -212,16 +196,6 @@ const forgotPassword = async (req, res) => {
     await user.save({ validateBeforeSave: false });
 
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
-
-    try {
-      await sendEmail({
-        to: user.email,
-        subject: 'Password Reset Request',
-        html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link expires in 10 minutes.</p>`,
-      });
-    } catch (error) {
-      console.log('Email Error:', error);
-    }
 
     return sendSuccess(res, 200, 'Password reset email sent');
   } catch (error) {
