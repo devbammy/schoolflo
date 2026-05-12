@@ -13,7 +13,10 @@ const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   const ALLOWED_TYPES = [
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -35,7 +38,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: { fileSize: 500 * 1024 }, // 500kb max
 });
 
 /**
@@ -52,7 +55,7 @@ const uploadToCloudinary = (buffer, folder, options = {}) => {
       (error, result) => {
         if (error) reject(error);
         else resolve(result);
-      }
+      },
     );
     uploadStream.end(buffer);
   });
@@ -63,7 +66,9 @@ const uploadToCloudinary = (buffer, folder, options = {}) => {
  */
 const deleteFromCloudinary = async (publicId, resourceType = 'auto') => {
   try {
-    const result = await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType,
+    });
     return result;
   } catch (error) {
     console.error(`Cloudinary delete error: ${error.message}`);
@@ -89,7 +94,7 @@ const processUploadedFiles = async (files, folder) => {
         mimeType: file.mimetype,
         size: file.size,
       };
-    })
+    }),
   );
 
   return uploads;
