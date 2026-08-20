@@ -1,10 +1,17 @@
+/* eslint-disable no-async-promise-executor --
+ * Each executor below wraps its whole body in try/catch and calls reject(),
+ * so the usual hazard (an async throw leaving the promise forever pending)
+ * cannot occur here. Removing the disable means restructuring all three
+ * generators to fetch their data before constructing the Promise, leaving
+ * the Promise to wrap only the Cloudinary upload stream. Worth doing, but
+ * not worth doing blind — these paths are not covered by tests yet.
+ */
 const mongoose = require('mongoose');
 const PDFDocument = require('pdfkit');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const { Result } = require('../models/Exam');
 const User = require('../models/User');
-const Class = require('../models/Class');
 const { GRADE_SCALE } = require('../config/constants');
 
 // Rendered from GRADE_SCALE so the legend printed on a report card can never

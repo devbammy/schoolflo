@@ -14,7 +14,7 @@ const authorize = (...roles) => {
       return sendError(
         res,
         403,
-        `Access denied. Role '${req.user.role}' is not authorized for this resource.`
+        `Access denied. Role '${req.user.role}' is not authorized for this resource.`,
       );
     }
     next();

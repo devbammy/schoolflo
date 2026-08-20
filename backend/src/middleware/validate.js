@@ -23,10 +23,7 @@ const validate = (rules = []) => [
     }));
 
     return next(
-      AppError.badRequest(
-        errors.map((e) => e.message).join(' '),
-        errors,
-      ),
+      AppError.badRequest(errors.map((e) => e.message).join(' '), errors),
     );
   },
 ];

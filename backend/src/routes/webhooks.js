@@ -32,7 +32,9 @@ router.post(
   async (req, res) => {
     const secret = process.env.PAYSTACK_SECRET_KEY;
     if (!secret) {
-      console.error('Paystack webhook received but PAYSTACK_SECRET_KEY is unset');
+      console.error(
+        'Paystack webhook received but PAYSTACK_SECRET_KEY is unset',
+      );
       return res.sendStatus(500);
     }
 
@@ -87,7 +89,9 @@ router.post(
     } catch (error) {
       // Transient failure (DB down, gateway unreachable) — a non-2xx asks
       // Paystack to retry.
-      console.error(`Paystack webhook error for ${reference}: ${error.message}`);
+      console.error(
+        `Paystack webhook error for ${reference}: ${error.message}`,
+      );
       return res.sendStatus(500);
     }
   },

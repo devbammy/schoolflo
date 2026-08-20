@@ -74,10 +74,11 @@ const validateScoreBatch = (results = [], labelFor = () => '') => {
 
   results.forEach((row, index) => {
     const context = labelFor(row, index) || `Row ${index + 1}`;
-    const { valid, errors: rowErrors, scores } = validateScores(
-      row?.scores,
-      context,
-    );
+    const {
+      valid,
+      errors: rowErrors,
+      scores,
+    } = validateScores(row?.scores, context);
 
     if (!valid) errors.push(...rowErrors);
     else rows.push({ ...row, scores });

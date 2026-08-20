@@ -4,9 +4,12 @@ const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const validate = require('../middleware/validate');
 const {
-  initPaystack, verifyPaystackPayment,
+  initPaystack,
+  verifyPaystackPayment,
   initFlutterwave,
-  recordManualPayment, getStudentPayments, getFinancialReport,
+  recordManualPayment,
+  getStudentPayments,
+  getFinancialReport,
 } = require('../controllers/paymentController');
 const {
   initPaymentRules,

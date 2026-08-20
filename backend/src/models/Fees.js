@@ -56,10 +56,19 @@ const FeesSchema = new mongoose.Schema(
   },
 );
 
-// Auto-calculate total from items
-FeesSchema.pre('save', function (next) {
-  if (this.isModified('items')) {
-    this.totalAmount = this.items.reduce((sum, item) => sum + item.amount, 0);
+// Auto-calculate total from items.
+//
+// This has to run on 'validate', not 'save'. Mongoose validates before the
+// save hooks fire, so computing a `required` field in pre('save') meant
+// validation always failed first — creating a fee structure only worked
+// because the client happened to send its own totalAmount, which the server
+// then silently recomputed. The server is the authority; the field is derived.
+FeesSchema.pre('validate', function (next) {
+  if (Array.isArray(this.items) && (this.isModified('items') || this.isNew)) {
+    this.totalAmount = this.items.reduce(
+      (sum, item) => sum + (Number(item.amount) || 0),
+      0,
+    );
   }
   next();
 });

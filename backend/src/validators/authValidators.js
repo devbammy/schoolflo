@@ -28,7 +28,9 @@ const passwordRule = (field = 'password', label = 'Password') =>
 
 const loginRules = [
   emailRule(),
-  body('password').exists({ checkFalsy: true }).withMessage('Password is required.'),
+  body('password')
+    .exists({ checkFalsy: true })
+    .withMessage('Password is required.'),
 ];
 
 const registerRules = [

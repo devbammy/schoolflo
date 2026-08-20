@@ -184,10 +184,12 @@ const generateReportCard = async (studentId, term, academicYear) => {
 };
 
 const getPrincipalComment = (average) => {
-  if (average >= 70) return 'Excellent performance. Keep up the outstanding work!';
+  if (average >= 70)
+    return 'Excellent performance. Keep up the outstanding work!';
   if (average >= 60) return 'Very good performance. You are doing well.';
   if (average >= 50) return 'Good performance. Work harder for better results.';
-  if (average >= 40) return 'Fair performance. Significant improvement is needed.';
+  if (average >= 40)
+    return 'Fair performance. Significant improvement is needed.';
   return 'Poor performance. Urgent attention and extra effort required.';
 };
 

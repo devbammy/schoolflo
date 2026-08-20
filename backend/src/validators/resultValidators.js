@@ -34,7 +34,9 @@ const scoreRules = (prefix) => [
   body(`${prefix}.midTerm`)
     .optional({ values: 'null' })
     .isFloat({ min: 0, max: SCORE_BREAKDOWN.MID_TERM_MAX })
-    .withMessage(`Mid-Term must be between 0 and ${SCORE_BREAKDOWN.MID_TERM_MAX}.`)
+    .withMessage(
+      `Mid-Term must be between 0 and ${SCORE_BREAKDOWN.MID_TERM_MAX}.`,
+    )
     .toFloat(),
   body(`${prefix}.exam`)
     .optional({ values: 'null' })
@@ -62,7 +64,9 @@ const bulkResultRules = [
   body('results')
     .isArray({ min: 1, max: 200 })
     .withMessage('Provide between 1 and 200 results.'),
-  body('results.*.student').isMongoId().withMessage('Each row needs a valid student id.'),
+  body('results.*.student')
+    .isMongoId()
+    .withMessage('Each row needs a valid student id.'),
   ...scoreRules('results.*.scores'),
   body('results.*.teacherComment')
     .optional({ values: 'falsy' })

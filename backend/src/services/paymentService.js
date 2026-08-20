@@ -14,33 +14,44 @@ const MIN_PAYMENT_NGN = 100;
  * Initialize a Paystack payment
  */
 const initializePaystack = async ({ email, amount, metadata, callbackUrl }) => {
-  const response = await fetch('https://api.paystack.co/transaction/initialize', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-      'Content-Type': 'application/json',
+  const response = await fetch(
+    'https://api.paystack.co/transaction/initialize',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        amount: Math.round(amount * 100), // Convert to kobo
+        reference: `SMP-${uuidv4().split('-')[0].toUpperCase()}`,
+        callback_url:
+          callbackUrl || `${process.env.CLIENT_URL}/payments/verify`,
+        metadata,
+      }),
     },
-    body: JSON.stringify({
-      email,
-      amount: Math.round(amount * 100), // Convert to kobo
-      reference: `SMP-${uuidv4().split('-')[0].toUpperCase()}`,
-      callback_url: callbackUrl || `${process.env.CLIENT_URL}/payments/verify`,
-      metadata,
-    }),
-  });
+  );
 
   const data = await response.json();
-  if (!data.status) throw new Error(data.message || 'Paystack initialization failed');
-  return { authorizationUrl: data.data.authorization_url, reference: data.data.reference };
+  if (!data.status)
+    throw new Error(data.message || 'Paystack initialization failed');
+  return {
+    authorizationUrl: data.data.authorization_url,
+    reference: data.data.reference,
+  };
 };
 
 /**
  * Verify a Paystack transaction
  */
 const verifyPaystack = async (reference) => {
-  const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-    headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
-  });
+  const response = await fetch(
+    `https://api.paystack.co/transaction/verify/${reference}`,
+    {
+      headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
+    },
+  );
 
   const data = await response.json();
   if (!data.status) throw new Error('Paystack verification failed');
@@ -60,7 +71,14 @@ const verifyPaystack = async (reference) => {
 /**
  * Initialize a Flutterwave payment
  */
-const initializeFlutterwave = async ({ email, amount, name, phone, metadata, redirectUrl }) => {
+const initializeFlutterwave = async ({
+  email,
+  amount,
+  name,
+  phone,
+  metadata,
+  redirectUrl,
+}) => {
   const txRef = `SMP-FLW-${uuidv4().split('-')[0].toUpperCase()}`;
 
   const response = await fetch('https://api.flutterwave.com/v3/payments', {
@@ -85,7 +103,8 @@ const initializeFlutterwave = async ({ email, amount, name, phone, metadata, red
   });
 
   const data = await response.json();
-  if (data.status !== 'success') throw new Error(data.message || 'Flutterwave initialization failed');
+  if (data.status !== 'success')
+    throw new Error(data.message || 'Flutterwave initialization failed');
   return { authorizationUrl: data.data.link, reference: txRef };
 };
 
@@ -97,11 +116,16 @@ const initializeFlutterwave = async ({ email, amount, name, phone, metadata, red
 const verifyFlutterwave = async (reference) => {
   const response = await fetch(
     `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`,
-    { headers: { Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}` } },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
+      },
+    },
   );
 
   const data = await response.json();
-  if (data.status !== 'success') throw new Error('Flutterwave verification failed');
+  if (data.status !== 'success')
+    throw new Error('Flutterwave verification failed');
 
   const tx = data.data;
   return {
@@ -218,7 +242,11 @@ const settlePayment = async ({ reference }) => {
 
   // Idempotency: the redirect and the webhook routinely both fire.
   if (payment.status === PAYMENT_STATUS.PAID) {
-    return { settled: true, alreadySettled: true, payment: publicPayment(payment) };
+    return {
+      settled: true,
+      alreadySettled: true,
+      payment: publicPayment(payment),
+    };
   }
 
   const verification =
@@ -253,7 +281,11 @@ const settlePayment = async ({ reference }) => {
 
   await sendReceiptEmail(payment);
 
-  return { settled: true, alreadySettled: false, payment: publicPayment(payment) };
+  return {
+    settled: true,
+    alreadySettled: false,
+    payment: publicPayment(payment),
+  };
 };
 
 /**
@@ -298,7 +330,11 @@ const sendReceiptEmail = async (payment) => {
  */
 const getFinancialSummary = async (classId, term, academicYear) => {
   const payments = await Payment.find({ term, academicYear })
-    .populate({ path: 'student', match: { 'studentProfile.class': classId }, select: 'firstName lastName' })
+    .populate({
+      path: 'student',
+      match: { 'studentProfile.class': classId },
+      select: 'firstName lastName',
+    })
     .populate('feeStructure', 'totalAmount title');
 
   const filtered = payments.filter((p) => p.student !== null);
@@ -321,9 +357,12 @@ const getFinancialSummary = async (classId, term, academicYear) => {
     else if (p.status === 'Partial') summary.partialCount++;
   });
 
-  summary.collectionRate = summary.totalExpected > 0
-    ? parseFloat(((summary.totalCollected / summary.totalExpected) * 100).toFixed(1))
-    : 0;
+  summary.collectionRate =
+    summary.totalExpected > 0
+      ? parseFloat(
+          ((summary.totalCollected / summary.totalExpected) * 100).toFixed(1),
+        )
+      : 0;
 
   return summary;
 };

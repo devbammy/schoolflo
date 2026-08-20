@@ -359,12 +359,14 @@ const getFinancialReport = async (req, res) => {
   });
 };
 
-
 // @desc    Get one fee structure
 // @route   GET /api/v1/fees/:id
 // @access  Any authenticated user
 const getFeeStructureById = async (req, res) => {
-  const fee = await Fees.findById(req.params.id).populate('class', 'name level');
+  const fee = await Fees.findById(req.params.id).populate(
+    'class',
+    'name level',
+  );
   if (!fee) throw AppError.notFound('Fee structure not found');
 
   return sendSuccess(res, 200, 'Fee structure fetched', { fee });

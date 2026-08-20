@@ -239,11 +239,7 @@ const publishResults = async (req, res) => {
   const { class: classId, term, academicYear } = req.body;
 
   // Step 1: Compute stats & positions
-  const statsResult = await computeClassStatistics(
-    classId,
-    term,
-    academicYear,
-  );
+  const statsResult = await computeClassStatistics(classId, term, academicYear);
   if (!statsResult.success) return sendError(res, 400, statsResult.message);
 
   // Step 2: Publish all results

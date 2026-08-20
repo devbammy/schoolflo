@@ -147,35 +147,31 @@ const getTeacherDashboard = async (req, res) => {
   }).distinct('_id');
 
   // Run remaining queries in parallel — no nested awaits
-  const [
-    upcomingAssignments,
-    totalAssignments,
-    pendingGrades,
-    announcements,
-  ] = await Promise.all([
-    // Upcoming / recent assignments for the dashboard list (capped at 10)
-    Assignment.find({ teacher: teacherId, isActive: true })
-      .populate('class', 'name')
-      .populate('subject', 'name code')
-      .sort({ dueDate: 1 })
-      .limit(10),
+  const [upcomingAssignments, totalAssignments, pendingGrades, announcements] =
+    await Promise.all([
+      // Upcoming / recent assignments for the dashboard list (capped at 10)
+      Assignment.find({ teacher: teacherId, isActive: true })
+        .populate('class', 'name')
+        .populate('subject', 'name code')
+        .sort({ dueDate: 1 })
+        .limit(10),
 
-    // Accurate total count — not limited
-    Assignment.countDocuments({ teacher: teacherId, isActive: true }),
+      // Accurate total count — not limited
+      Assignment.countDocuments({ teacher: teacherId, isActive: true }),
 
-    // Submissions awaiting grading
-    Submission.countDocuments({
-      status: 'Submitted',
-      assignment: { $in: teacherAssignmentIds },
-    }),
+      // Submissions awaiting grading
+      Submission.countDocuments({
+        status: 'Submitted',
+        assignment: { $in: teacherAssignmentIds },
+      }),
 
-    Announcement.find({
-      isPublished: true,
-      targetAudience: { $in: ['All', 'Teacher'] },
-    })
-      .sort({ publishedAt: -1 })
-      .limit(5),
-  ]);
+      Announcement.find({
+        isPublished: true,
+        targetAudience: { $in: ['All', 'Teacher'] },
+      })
+        .sort({ publishedAt: -1 })
+        .limit(5),
+    ]);
 
   // Today's attendance — only run if the teacher has a class assigned
   let todayAttendance = { Present: 0, Absent: 0, Late: 0, Excused: 0 };
@@ -277,9 +273,9 @@ const getStudentDashboard = async (req, res) => {
   ]);
 
   const avgScore = results.length
-    ? (
-        results.reduce((s, r) => s + r.totalScore, 0) / results.length
-      ).toFixed(1)
+    ? (results.reduce((s, r) => s + r.totalScore, 0) / results.length).toFixed(
+        1,
+      )
     : null;
 
   return sendSuccess(res, 200, 'Student dashboard data', {

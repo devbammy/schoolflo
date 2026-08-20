@@ -222,12 +222,7 @@ exports.generateAdmissionLetter = async (req, res) => {
     console.error('Certificate issuance notification failed:', err.message),
   );
 
-  sendSuccess(
-    res,
-    201,
-    'Admission letter generated successfully',
-    certificate,
-  );
+  sendSuccess(res, 201, 'Admission letter generated successfully', certificate);
 };
 
 // Get all certificates (with filters)

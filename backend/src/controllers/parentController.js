@@ -10,7 +10,8 @@ const AppError = require('../utils/AppError');
 const { emailTemplates } = require('../services/notificationService');
 const { enqueueEmail } = require('../services/jobQueue');
 
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const CHILD_POPULATE = {
   path: 'parentProfile.children',
@@ -102,7 +103,9 @@ const createParent = async (req, res) => {
       loginUrl: `${process.env.CLIENT_URL}/login`,
     }),
   }).catch((err) =>
-    console.error(`Parent welcome email failed for ${parent.email}: ${err.message}`),
+    console.error(
+      `Parent welcome email failed for ${parent.email}: ${err.message}`,
+    ),
   );
 
   await parent.populate({

@@ -231,7 +231,10 @@ const createParentRules = [
     .optional({ values: 'falsy' })
     .isIn(['Father', 'Mother', 'Guardian', 'Other'])
     .withMessage('Relationship must be Father, Mother, Guardian or Other.'),
-  body('childrenIds').optional().isArray().withMessage('Children must be a list.'),
+  body('childrenIds')
+    .optional()
+    .isArray()
+    .withMessage('Children must be a list.'),
   body('childrenIds.*').optional().isMongoId().withMessage('Invalid child id.'),
 ];
 

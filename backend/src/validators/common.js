@@ -30,7 +30,10 @@ const objectIdParam = (field = 'id', label = 'id') =>
 const termBody = (field = 'term', { optional = false } = {}) => {
   const chain = optional
     ? body(field).optional({ values: 'falsy' })
-    : body(field).exists({ checkFalsy: true }).withMessage('Term is required.').bail();
+    : body(field)
+        .exists({ checkFalsy: true })
+        .withMessage('Term is required.')
+        .bail();
   return chain
     .isIn(TERM_VALUES)
     .withMessage(`Term must be one of: ${TERM_VALUES.join(', ')}.`);
@@ -42,7 +45,10 @@ const termQuery = (field = 'term') =>
     .isIn(TERM_VALUES)
     .withMessage(`Term must be one of: ${TERM_VALUES.join(', ')}.`);
 
-const academicYearBody = (field = 'academicYear', { optional = false } = {}) => {
+const academicYearBody = (
+  field = 'academicYear',
+  { optional = false } = {},
+) => {
   const chain = optional
     ? body(field).optional({ values: 'falsy' })
     : body(field)
@@ -68,7 +74,10 @@ const stringBody = (
 ) => {
   const chain = optional
     ? body(field).optional({ values: 'falsy' })
-    : body(field).exists({ checkFalsy: true }).withMessage(`${label} is required.`).bail();
+    : body(field)
+        .exists({ checkFalsy: true })
+        .withMessage(`${label} is required.`)
+        .bail();
   return chain
     .isString()
     .withMessage(`${label} must be text.`)
@@ -79,10 +88,17 @@ const stringBody = (
 };
 
 /** A non-negative amount of money, in whole naira. */
-const amountBody = (field = 'amount', label = 'Amount', { optional = false } = {}) => {
+const amountBody = (
+  field = 'amount',
+  label = 'Amount',
+  { optional = false } = {},
+) => {
   const chain = optional
     ? body(field).optional({ values: 'null' })
-    : body(field).exists({ checkFalsy: true }).withMessage(`${label} is required.`).bail();
+    : body(field)
+        .exists({ checkFalsy: true })
+        .withMessage(`${label} is required.`)
+        .bail();
   return chain
     .isFloat({ min: 0 })
     .withMessage(`${label} must be a positive number.`)
@@ -99,12 +115,22 @@ const booleanBody = (field, label = field) =>
 const dateBody = (field, label = field, { optional = true } = {}) => {
   const chain = optional
     ? body(field).optional({ values: 'falsy' })
-    : body(field).exists({ checkFalsy: true }).withMessage(`${label} is required.`).bail();
-  return chain.isISO8601().withMessage(`${label} must be a valid date.`).toDate();
+    : body(field)
+        .exists({ checkFalsy: true })
+        .withMessage(`${label} is required.`)
+        .bail();
+  return chain
+    .isISO8601()
+    .withMessage(`${label} must be a valid date.`)
+    .toDate();
 };
 
 const paginationQuery = () => [
-  query('page').optional().isInt({ min: 1 }).withMessage('Page must be 1 or more.').toInt(),
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be 1 or more.')
+    .toInt(),
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })

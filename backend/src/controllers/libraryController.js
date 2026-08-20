@@ -24,7 +24,8 @@ const BORROW_POPULATE = [
   { path: 'returnedTo', select: 'firstName lastName' },
 ];
 
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * Loans past their due date are flagged lazily, whenever records are read.
@@ -50,7 +51,9 @@ const getBooks = async (req, res) => {
   if (category) filter.category = new RegExp(escapeRegex(category), 'i');
   if (available === 'true') filter.availableCopies = { $gt: 0 };
 
-  const fullFilter = search ? { ...filter, $text: { $search: search } } : filter;
+  const fullFilter = search
+    ? { ...filter, $text: { $search: search } }
+    : filter;
 
   const [books, total] = await Promise.all([
     Book.find(fullFilter)
@@ -148,7 +151,8 @@ const borrowBook = async (req, res) => {
 
   if (!book) throw AppError.notFound('Book not found');
   if (!borrower) throw AppError.notFound('Borrower not found');
-  if (book.availableCopies < 1) throw AppError.badRequest('No copies available');
+  if (book.availableCopies < 1)
+    throw AppError.badRequest('No copies available');
 
   const existing = await BorrowRecord.findOne({
     book: bookId,
@@ -248,9 +252,14 @@ const renewBook = async (req, res) => {
 
   await record.populate(BORROW_POPULATE);
 
-  return sendSuccess(res, 200, `Renewed — new due date ${base.toDateString()}`, {
-    record,
-  });
+  return sendSuccess(
+    res,
+    200,
+    `Renewed — new due date ${base.toDateString()}`,
+    {
+      record,
+    },
+  );
 };
 
 // @desc    Mark a fine as paid

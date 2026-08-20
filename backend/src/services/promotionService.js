@@ -1,6 +1,5 @@
 const Promotion = require('../models/Promotion');
 const User = require('../models/User');
-const Class = require('../models/Class');
 const CATracker = require('../models/CATracker');
 const { Result } = require('../models/Exam');
 const AppError = require('../utils/AppError');

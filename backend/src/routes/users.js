@@ -3,10 +3,7 @@ const router = express.Router();
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const validate = require('../middleware/validate');
-const {
-  uploadAvatar,
-  handleUploadErrors,
-} = require('../services/fileService');
+const { uploadAvatar, handleUploadErrors } = require('../services/fileService');
 const {
   getUsers,
   getUserById,

@@ -37,12 +37,7 @@ exports.publishSchedule = async (req, res) => {
     req.params.id,
     req.user._id,
   );
-  sendSuccess(
-    res,
-    201,
-    'Schedule published and notifications sent',
-    schedule,
-  );
+  sendSuccess(res, 201, 'Schedule published and notifications sent', schedule);
 };
 
 // Get teacher invigilations

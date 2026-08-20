@@ -6,7 +6,10 @@ const protect = async (req, res, next) => {
   try {
     let token;
 
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith('Bearer ')
+    ) {
       token = req.headers.authorization.split(' ')[1];
     }
 
@@ -22,11 +25,19 @@ const protect = async (req, res, next) => {
     }
 
     if (!user.isActive) {
-      return sendError(res, 401, 'Your account has been deactivated. Contact admin.');
+      return sendError(
+        res,
+        401,
+        'Your account has been deactivated. Contact admin.',
+      );
     }
 
     if (user.changedPasswordAfter(decoded.iat)) {
-      return sendError(res, 401, 'Password was recently changed. Please log in again.');
+      return sendError(
+        res,
+        401,
+        'Password was recently changed. Please log in again.',
+      );
     }
 
     req.user = user;

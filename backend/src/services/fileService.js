@@ -130,9 +130,10 @@ const uploadToCloudinary = (buffer, folder, options = {}) => {
 const deleteFromCloudinary = async (publicId, resourceType) => {
   if (!publicId) return null;
 
-  const candidates = resourceType && resourceType !== 'auto'
-    ? [resourceType]
-    : ['image', 'raw', 'video'];
+  const candidates =
+    resourceType && resourceType !== 'auto'
+      ? [resourceType]
+      : ['image', 'raw', 'video'];
 
   for (const type of candidates) {
     try {

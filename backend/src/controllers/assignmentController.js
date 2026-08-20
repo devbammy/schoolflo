@@ -4,7 +4,8 @@ const { sendSuccess, getPaginationParams } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
 const { processUploadedFiles } = require('../services/fileService');
 
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * Multipart form fields arrive as strings, so booleans need converting.

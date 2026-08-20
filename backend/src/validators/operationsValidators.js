@@ -12,8 +12,21 @@ const {
 } = require('./common');
 
 const AUDIENCES = ['All', 'Admin', 'Teacher', 'Student', 'Parent'];
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const EXAM_SCHEDULE_TYPES = ['Mid-Term', 'Final Exam', 'Mock Exam', 'External Exam'];
+const DAYS = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+const EXAM_SCHEDULE_TYPES = [
+  'Mid-Term',
+  'Final Exam',
+  'Mock Exam',
+  'External Exam',
+];
 const BORROWER_TYPES = ['Student', 'Teacher', 'Staff'];
 
 // "09:00 AM" — the format the timetable and exam schedule models expect.
@@ -22,7 +35,10 @@ const TIME_PATTERN = /^(0?[1-9]|1[0-2]):[0-5]\d\s?(AM|PM|am|pm)$/;
 const idParam = [objectIdParam('id', 'id')];
 
 const audienceRules = (field = 'targetAudience') => [
-  body(field).optional().isArray().withMessage('Target audience must be a list.'),
+  body(field)
+    .optional()
+    .isArray()
+    .withMessage('Target audience must be a list.'),
   body(`${field}.*`)
     .optional()
     .isIn(AUDIENCES)
@@ -44,7 +60,11 @@ const calendarEventRules = [
   dateBody('startDate', 'Start date', { optional: false }),
   dateBody('endDate', 'End date'),
   body('endDate').custom((value, { req }) => {
-    if (value && req.body.startDate && new Date(value) < new Date(req.body.startDate)) {
+    if (
+      value &&
+      req.body.startDate &&
+      new Date(value) < new Date(req.body.startDate)
+    ) {
       throw new Error('End date cannot be before the start date.');
     }
     return true;
@@ -63,7 +83,11 @@ const termDatesRules = [
   dateBody('startDate', 'Start date', { optional: false }),
   dateBody('endDate', 'End date', { optional: false }),
   body('endDate').custom((value, { req }) => {
-    if (value && req.body.startDate && new Date(value) < new Date(req.body.startDate)) {
+    if (
+      value &&
+      req.body.startDate &&
+      new Date(value) < new Date(req.body.startDate)
+    ) {
       throw new Error('Term end date cannot be before the start date.');
     }
     return true;
@@ -89,8 +113,14 @@ const timetableRules = [
     .optional()
     .matches(TIME_PATTERN)
     .withMessage('End time must look like 11:00 AM.'),
-  body('periods.*.subject').optional().isMongoId().withMessage('Invalid subject id.'),
-  body('periods.*.teacher').optional().isMongoId().withMessage('Invalid teacher id.'),
+  body('periods.*.subject')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid subject id.'),
+  body('periods.*.teacher')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid teacher id.'),
 ];
 
 // ─── Library ─────────────────────────────────────────────────────────────────
@@ -127,13 +157,21 @@ const examScheduleRules = [
   body('examType')
     .optional({ values: 'falsy' })
     .isIn(EXAM_SCHEDULE_TYPES)
-    .withMessage(`Exam type must be one of: ${EXAM_SCHEDULE_TYPES.join(', ')}.`),
+    .withMessage(
+      `Exam type must be one of: ${EXAM_SCHEDULE_TYPES.join(', ')}.`,
+    ),
   objectIdBody('class', 'Class'),
   termBody(),
   academicYearBody(),
   body('sessions').optional().isArray().withMessage('Sessions must be a list.'),
-  body('sessions.*.subject').optional().isMongoId().withMessage('Invalid subject id.'),
-  body('sessions.*.invigilator').optional().isMongoId().withMessage('Invalid invigilator id.'),
+  body('sessions.*.subject')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid subject id.'),
+  body('sessions.*.invigilator')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid invigilator id.'),
   body('sessions.*.startTime')
     .optional()
     .matches(TIME_PATTERN)
@@ -191,10 +229,7 @@ const revokeCertificateRules = [
 ];
 
 // ─── CA tracking ─────────────────────────────────────────────────────────────
-const caSyncRules = [
-  objectIdBody('studentId', 'Student'),
-  academicYearBody(),
-];
+const caSyncRules = [objectIdBody('studentId', 'Student'), academicYearBody()];
 
 module.exports = {
   idParam,

@@ -13,7 +13,8 @@ const {
 
 // Regex metacharacters in a search box would otherwise be interpreted, letting
 // a user craft a pattern that scans the whole collection.
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // @desc    List users, filtered and paginated
 // @route   GET /api/v1/users
@@ -147,7 +148,9 @@ const uploadUserAvatar = async (req, res) => {
   }
 
   const result = await uploadToCloudinary(req.file.buffer, 'avatars', {
-    transformation: [{ width: 300, height: 300, crop: 'fill', gravity: 'face' }],
+    transformation: [
+      { width: 300, height: 300, crop: 'fill', gravity: 'face' },
+    ],
   });
 
   user.avatar = { url: result.secure_url, publicId: result.public_id };

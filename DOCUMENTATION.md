@@ -1,646 +1,706 @@
-# School Management Portal (SMP) — Technical Documentation
-**Version:** 1.0.0 | **Stack:** Node.js + Express + MongoDB + React (Vite) + Zustand
+# SchoolFlo — Technical Documentation
+
+**Stack:** Node.js · Express · MongoDB (Mongoose) · React 18 (Vite) · Zustand
+**Package manager:** pnpm (see [Working on this repo](#working-on-this-repo) — using npm here will break your `node_modules`)
 
 ---
 
 ## Table of Contents
-1. [Architecture Overview](#1-architecture-overview)
-2. [Project Structure](#2-project-structure)
-3. [Getting Started](#3-getting-started)
-4. [Grading Logic](#4-grading-logic)
-5. [API Reference — /auth](#5-api-auth)
-6. [API Reference — /results](#6-api-results)
-7. [API Reference — /payments](#7-api-payments)
-8. [Role-Based Access Control](#8-rbac)
-9. [Database Schema Summary](#9-database-schema)
-10. [Payment Gateway Integration](#10-payment-gateways)
-11. [File Storage (Cloudinary)](#11-file-storage)
-12. [Notification Channels](#12-notifications)
-13. [Environment Variables](#13-environment-variables)
-14. [Deployment Guide](#14-deployment)
+
+1. [Architecture](#1-architecture)
+2. [Project structure](#2-project-structure)
+3. [Getting started](#3-getting-started)
+4. [Working on this repo](#working-on-this-repo)
+5. [Request lifecycle](#5-request-lifecycle)
+6. [Grading](#6-grading)
+7. [Payments](#7-payments)
+8. [Authentication & sessions](#8-authentication--sessions)
+9. [Role-based access control](#9-role-based-access-control)
+10. [API reference](#10-api-reference)
+11. [Database schema](#11-database-schema)
+12. [File storage](#12-file-storage)
+13. [Notifications & the job queue](#13-notifications--the-job-queue)
+14. [Environment variables](#14-environment-variables)
+15. [Testing](#15-testing)
+16. [Deployment](#16-deployment)
+17. [Known gaps](#17-known-gaps)
 
 ---
 
-## 1. Architecture Overview
+## 1. Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  React Frontend (Vite)               │
-│  Zustand State │ React Router │ TanStack Query       │
-│  Role Dashboards: Admin │ Teacher │ Student │ Parent │
-└─────────────────────┬───────────────────────────────┘
-                      │ HTTPS / REST (JWT Bearer)
-┌─────────────────────▼───────────────────────────────┐
-│              Node.js + Express API (v1)              │
-│  Helmet │ CORS │ Rate Limiter │ Morgan               │
-│  MVC: Controllers ▸ Services ▸ Models                │
-└────────┬──────────────────────────────┬─────────────┘
-         │ Mongoose ODM                 │ External APIs
-┌────────▼────────┐         ┌───────────▼──────────────┐
-│   MongoDB Atlas  │         │  Cloudinary (files)       │
-│   (Primary DB)   │         │  Paystack / Flutterwave   │
-└─────────────────┘         │  Nodemailer (SMTP email)  │
-                             │  Twilio (SMS)             │
-                             └──────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                React Frontend (Vite)                     │
+│  Zustand (persisted auth) │ React Router │ SCSS          │
+│  Route-level code splitting via React.lazy               │
+│  Role dashboards: Admin │ Teacher │ Student │ Parent     │
+└───────────────────────┬──────────────────────────────────┘
+                        │ HTTPS / REST (JWT Bearer)
+┌───────────────────────▼──────────────────────────────────┐
+│               Node.js + Express API (v1)                 │
+│  helmet │ cors │ rate limit │ hpp │ mongo-sanitize       │
+│  routes ▸ validators ▸ controllers ▸ services ▸ models   │
+└────────┬─────────────────────────────┬───────────────────┘
+         │ Mongoose                    │ External
+┌────────▼─────────┐        ┌──────────▼───────────────────┐
+│  MongoDB Atlas   │        │  Cloudinary (files)          │
+│  + Agenda jobs   │        │  Paystack / Flutterwave      │
+└──────────────────┘        │  Nodemailer (SMTP)           │
+                            │  Twilio (SMS, optional)      │
+                            └──────────────────────────────┘
 ```
 
-### Design Principles
-- **Modularity First**: Each domain (Academic, Finance, LMS, Comms) is encapsulated in its own controller + service layer — ready for microservices extraction.
-- **RBAC on every route**: Admin → Teacher → Student → Parent with ownership checks.
-- **Optimistic DB writes**: Bulk operations use `bulkWrite` for performance.
-- **<2s responses**: MongoDB indexes on all frequent query patterns; aggregation pipelines replace N+1 queries.
+### Layering
+
+Every request follows the same path. Each layer has one job:
+
+| Layer          | Responsibility                                                        |
+| -------------- | --------------------------------------------------------------------- |
+| **Route**      | Path, HTTP verb, and the middleware chain. No business logic.          |
+| **Validator**  | Shape and range of the request. Rejects bad input before it reaches a controller. |
+| **Controller** | Authorization, orchestration, response shape.                          |
+| **Service**    | Reusable domain logic and all external I/O (gateways, SMTP, Cloudinary). |
+| **Model**      | Schema, indexes, and invariants enforced in hooks.                     |
+
+Controllers do not use try/catch. `express-async-errors` forwards any thrown
+error to the global handler, which decides the status code and what the client
+is allowed to see. Throw `AppError` for expected failures; anything else is
+treated as an unexpected fault.
 
 ---
 
-## 2. Project Structure
+## 2. Project structure
 
 ```
-smp/
+schoolflo/
+├── .github/workflows/ci.yml       # lint · format · test · build
+├── .prettierrc.json
 ├── backend/
-│   ├── server.js                    # Express entrypoint
-│   └── src/
-│       ├── config/
-│       │   ├── db.js                # MongoDB connection
-│       │   └── constants.js         # Enums, grade scale, score caps
-│       ├── models/
-│       │   ├── User.js              # Auth + Student/Teacher/Parent profiles
-│       │   ├── Class.js             # Class + sections
-│       │   ├── Subject.js
-│       │   ├── Attendance.js        # Daily records + static aggregator
-│       │   ├── Exam.js              # Exam sessions + Result (pre-save auto-grade)
-│       │   ├── Fees.js              # Fee structures + Payment transactions
-│       │   ├── Assignment.js        # Assignments + Submissions
-│       │   └── Announcement.js      # Multi-channel messaging
-│       ├── controllers/
-│       │   ├── authController.js
-│       │   ├── resultController.js  # Grading engine + report cards
-│       │   ├── paymentController.js # Paystack + Flutterwave + manual
-│       │   └── dashboardController.js
-│       ├── services/
-│       │   ├── gradingService.js    # Class stats, positions, GPA
-│       │   ├── paymentService.js    # Gateway wrappers + receipt gen
-│       │   ├── notificationService.js # Email + SMS + templates
-│       │   └── fileService.js       # Multer + Cloudinary
-│       ├── middleware/
-│       │   ├── auth.js              # JWT protect()
-│       │   ├── rbac.js              # authorize() + ownDataOnly()
-│       │   └── errorHandler.js      # Global error formatter
-│       ├── routes/                  # One file per domain
-│       └── utils/
-│           └── apiResponse.js       # sendSuccess / sendError / sendPaginated
-└── frontend/
+│   ├── server.js                  # Express entrypoint, middleware order
+│   ├── jest.config.js
+│   ├── .eslintrc.json
+│   ├── src/
+│   │   ├── config/
+│   │   │   ├── db.js
+│   │   │   └── constants.js       # roles, terms, GRADE_SCALE, score caps
+│   │   ├── models/                # 18 Mongoose models
+│   │   ├── controllers/           # 20 controllers, one per domain
+│   │   ├── services/
+│   │   │   ├── gradingService.js      # class stats, ranking, report cards
+│   │   │   ├── paymentService.js      # gateways + settlement
+│   │   │   ├── notificationService.js # SMTP transport + email templates
+│   │   │   ├── jobQueue.js            # Agenda-backed background email
+│   │   │   ├── fileService.js         # multer + Cloudinary
+│   │   │   ├── pdfService.js          # report cards, certificates
+│   │   │   ├── caTrackingService.js
+│   │   │   ├── examScheduleService.js
+│   │   │   └── promotionService.js
+│   │   ├── middleware/
+│   │   │   ├── auth.js            # protect()
+│   │   │   ├── rbac.js            # authorize(), ownDataOnly()
+│   │   │   ├── validate.js        # express-validator runner
+│   │   │   └── errorHandler.js
+│   │   ├── validators/            # request schemas, grouped by domain
+│   │   ├── routes/                # thin routers, one file per domain
+│   │   └── utils/
+│   │       ├── AppError.js
+│   │       ├── apiResponse.js
+│   │       ├── scoreValidation.js
+│   │       └── ms.js
+│   └── tests/
+│       ├── unit/                  # grading, validation, error handling
+│       ├── integration/           # payments, auth (real in-memory MongoDB)
+│       └── setup/db.js
+└── client/                        # NOTE: "client", not "frontend"
     ├── src/
-    │   ├── store/authStore.js       # Zustand persisted auth state
-    │   ├── services/api.js          # Axios + all service modules
-    │   ├── styles/main.scss         # Complete design system (CSS vars)
+    │   ├── App.jsx                # routes, lazy loading, ErrorBoundary
+    │   ├── store/authStore.js     # Zustand, persisted
+    │   ├── services/api.js        # axios + auth bridge + service modules
     │   ├── components/
-    │   │   └── layout/DashboardLayout.jsx  # Sidebar + topbar
-    │   └── pages/
-    │       ├── auth/                # Login, ForgotPassword, ResetPassword
-    │       ├── admin/               # Dashboard, Students, Teachers, ...
-    │       ├── teacher/             # Dashboard, Attendance, Grades, ...
-    │       ├── student/             # Dashboard, Results, Assignments, Payments
-    │       └── parent/              # Dashboard, Results
-    ├── vite.config.js
-    └── index.html
+    │   ├── pages/{auth,admin,teacher,student,parent,shared}/
+    │   └── styles/main.scss
+    └── vite.config.js
 ```
 
 ---
 
-## 3. Getting Started
+## 3. Getting started
 
 ### Prerequisites
-- Node.js v18+
-- MongoDB Atlas cluster (or local MongoDB 6+)
+
+- Node.js 18+
+- pnpm 10+ (`npm install -g pnpm`)
+- MongoDB Atlas cluster, or local MongoDB 6+
 - Cloudinary account
-- Paystack/Flutterwave account (Nigerian payment gateways)
+- Paystack account (Nigerian payment gateway)
 
-### Backend Setup
+### Backend
+
 ```bash
-cd smp/backend
-cp .env.example .env          # Fill in all env vars
-npm install
-npm run dev                    # Starts on :5000
+cd backend
+cp .env.example .env    # fill in every variable — see section 14
+pnpm install
+pnpm dev                # starts on :5000
 ```
 
-### Frontend Setup
+### Client
+
 ```bash
-cd smp/frontend
-cp .env.example .env.local     # VITE_API_URL=http://localhost:5000/api/v1
-npm install
-npm run dev                    # Starts on :5173
+cd client
+pnpm install
+pnpm dev                # starts on :5173
 ```
 
-### First Admin Account
-Since registration requires an existing Admin, seed the first admin directly:
+### First admin account
+
+Registration requires an existing Admin, so the first one is seeded:
+
 ```bash
-# Connect to MongoDB shell or Compass and insert:
-db.users.insertOne({
-  firstName: "Super",
-  lastName: "Admin",
-  email: "admin@school.edu.ng",
-  password: "$2a$12$...",  # bcrypt hash of your password
-  role: "Admin",
-  isActive: true
-})
-```
-Or use the included seeder:
-```bash
-npm run seed
+cd backend && pnpm seed
 ```
 
 ---
 
-## 4. Grading Logic
+## Working on this repo
 
-### Score Breakdown (100-point system)
-| Component     | Max Marks | Weight |
-|---------------|-----------|--------|
-| CA1           | 10        | 10%    |
-| CA2           | 10        | 10%    |
-| Mid-Term Test | 10        | 10%    |
-| Final Exam    | 70        | 70%    |
-| **Total**     | **100**   | 100%   |
+**Use pnpm, not npm.** `node_modules` is pnpm-managed. Running `npm install`
+or `npm uninstall` against it fails with an opaque internal error
+(`Cannot read properties of null (reading 'matches')`) and can leave the tree
+inconsistent.
 
-### Nigerian Grading Scale
-| Score Range | Grade | Remark       | Grade Point |
-|-------------|-------|--------------|-------------|
-| 70 – 100    | A     | Distinction  | 5.0         |
-| 60 – 69     | B     | Credit       | 4.0         |
-| 50 – 59     | C     | Merit        | 3.0         |
-| 45 – 49     | D     | Pass         | 2.0         |
-| 40 – 44     | E     | Weak Pass    | 1.0         |
-| 0  – 39     | F     | Fail         | 0.0         |
+| Task              | Command                    |
+| ----------------- | -------------------------- |
+| Install           | `pnpm install`             |
+| Add a dependency  | `pnpm add <pkg>`           |
+| Run tests         | `pnpm test`                |
+| Coverage          | `pnpm test:coverage`       |
+| Lint              | `pnpm lint`                |
+| Format            | `pnpm format`              |
 
-### Auto-Calculation (Mongoose Pre-Save Hook)
-When a `Result` document is saved, the `pre('save')` hook fires:
+CI runs lint, format check, tests and the client build on every push and pull
+request to `main`.
+
+---
+
+## 5. Request lifecycle
+
+Middleware order in `server.js` is deliberate:
+
 ```
-totalScore = ca1 + ca2 + midTerm + exam
-grade + remark + gradePoint = calculateGrade(totalScore)
-```
-
-### Publishing Flow
-```
-1. Teacher enters scores → POST /api/v1/results/bulk
-2. Admin triggers publish → POST /api/v1/results/publish
-   ├── computeClassStatistics() runs per-subject aggregate
-   │   ├── Groups all results by subject
-   │   ├── Computes: classAverage, classHighest, classLowest
-   │   └── Assigns per-subject position (rank desc by score)
-   ├── isPublished = true on all results
-   └── Email notifications → parents of all students
-3. Students & Parents can view report cards
+helmet
+  → cors            (exact-match allowlist; substring matching is a vulnerability)
+  → compression
+  → /webhooks       (BEFORE express.json — HMAC needs the raw body)
+  → express.json
+  → mongo-sanitize, hpp
+  → morgan
+  → rate limit      (/api only, so webhooks are never throttled)
+  → routes
+  → 404
+  → errorHandler
 ```
 
-### GPA Calculation
+### Error handling
+
+| Thrown                     | Client sees                                  |
+| -------------------------- | -------------------------------------------- |
+| `AppError.badRequest(msg)` | 400 with `msg`                               |
+| `AppError.unauthorized()`  | 401                                          |
+| `AppError.forbidden(msg)`  | 403 with `msg`                               |
+| `AppError.notFound(msg)`   | 404 with `msg`                               |
+| `AppError.conflict(msg)`   | 409 with `msg`                               |
+| Mongoose `ValidationError` | 400, field messages                          |
+| Mongoose `CastError`       | 400 ("'x' is not a valid id")                |
+| Duplicate key (11000)      | 409, naming the field                        |
+| Anything else              | **500, generic message.** Full detail logged server-side only. |
+
+Unexpected faults never expose `err.message` to the caller.
+
+---
+
+## 6. Grading
+
+### Score breakdown
+
+| Component     | Max    |
+| ------------- | ------ |
+| CA1           | 10     |
+| CA2           | 10     |
+| Mid-Term Test | 10     |
+| Final Exam    | 70     |
+| **Total**     | **100**|
+
+Caps live in `SCORE_BREAKDOWN` (`config/constants.js`) and are enforced in two
+places that both read from it: `utils/scoreValidation.js` (every write path)
+and `validators/resultValidators.js` (the request edge).
+
+### Grading scale
+
+`GRADE_SCALE` in `config/constants.js` is the **single source of truth**. The
+report-card legend in `pdfService` is generated from it, and `calculateGrade`
+derives from it — there is no second ladder to keep in sync.
+
+| Score  | Grade | Remark      | Grade point |
+| ------ | ----- | ----------- | ----------- |
+| 70–100 | A     | Distinction | 5.0         |
+| 60–69  | B     | Credit      | 4.0         |
+| 50–59  | C     | Merit       | 3.0         |
+| 45–49  | D     | Pass        | 2.0         |
+| 40–44  | E     | Weak Pass   | 1.0         |
+| 0–39   | F     | Fail        | 0.0         |
+
+### Ranking
+
+Positions use **competition ranking**: tied students share a position and the
+next position skips accordingly (82, 82, 79 → 1, 1, 3). Overall averages are
+rounded to 2dp before ranking, so two students separated only by floating-point
+noise are treated as the tie they are.
+
+### GPA
+
 ```
 GPA = Σ(gradePoint × creditUnit) / Σ(creditUnit)
 ```
-(Defaults to creditUnit = 1 for all subjects unless overridden.)
 
-### Principal's Comment Logic
-| Average Score | Comment                                              |
-|---------------|------------------------------------------------------|
-| ≥ 70          | Excellent performance. Keep up the outstanding work! |
-| ≥ 60          | Very good performance. You are doing well.           |
-| ≥ 50          | Good performance. Work harder for better results.    |
-| ≥ 40          | Fair performance. Significant improvement is needed. |
-| < 40          | Poor performance. Urgent attention required.         |
+Weighted by `Subject.creditUnit`, which defaults to 1.
 
----
+### Publishing
 
-## 5. API — /auth
-
-Base: `POST|GET /api/v1/auth`
-
-| Method | Endpoint                        | Auth    | Body / Params                          | Response                             |
-|--------|---------------------------------|---------|----------------------------------------|--------------------------------------|
-| POST   | `/login`                        | Public  | `{ email, password }`                  | `{ user, accessToken, refreshToken }` |
-| POST   | `/register`                     | Admin   | `{ firstName, lastName, email, password, role, ... }` | `{ user, accessToken }` |
-| GET    | `/me`                           | Any     | —                                      | `{ user }` (populated)               |
-| PUT    | `/update-password`              | Any     | `{ currentPassword, newPassword }`     | `{ accessToken }`                    |
-| POST   | `/forgot-password`              | Public  | `{ email }`                            | 200 OK                               |
-| PUT    | `/reset-password/:token`        | Public  | `{ password }`                         | `{ accessToken }`                    |
-| POST   | `/refresh`                      | Public  | `{ refreshToken }`                     | `{ accessToken }`                    |
-
-**JWT Token Lifecycle:**
-- Access token: 30 days (configurable via `JWT_EXPIRE`)
-- Refresh token: 90 days (configurable via `JWT_REFRESH_EXPIRE`)
-- Frontend Axios interceptor auto-refreshes on 401
-
-**Error Codes:**
-| Code | Meaning |
-|------|---------|
-| 400  | Missing fields / email already registered |
-| 401  | Wrong credentials / expired token |
-| 403  | Deactivated account |
-| 429  | Rate limit exceeded (20 login attempts / 15 min) |
-
----
-
-## 6. API — /results
-
-Base: `/api/v1/results` | Auth: All routes require Bearer token
-
-| Method | Endpoint                              | Roles               | Description                               |
-|--------|---------------------------------------|---------------------|-------------------------------------------|
-| POST   | `/`                                   | Admin, Teacher      | Upsert single result                      |
-| POST   | `/bulk`                               | Admin, Teacher      | Bulk upsert results array                 |
-| POST   | `/publish`                            | Admin               | Compute stats → publish → email parents   |
-| GET    | `/report-card/:studentId`             | All (own/child)     | Full term report card                     |
-| GET    | `/class/:classId`                     | Admin, Teacher      | All results for a class/term/subject      |
-| GET    | `/student/:studentId/history`         | All (own/child)     | All-term result history                   |
-
-### POST /results (single upsert)
-```json
-{
-  "student": "objectId",
-  "class": "objectId",
-  "subject": "objectId",
-  "term": "First Term",
-  "academicYear": "2024/2025",
-  "scores": { "ca1": 8, "ca2": 7, "midTerm": 9, "exam": 58 },
-  "teacherComment": "Good improvement this term"
-}
 ```
-Response: `{ result: { totalScore: 82, grade: "A", remark: "Distinction", gradePoint: 5.0 } }`
-
-### POST /results/bulk
-```json
-{
-  "class": "objectId",
-  "subject": "objectId",
-  "term": "First Term",
-  "academicYear": "2024/2025",
-  "results": [
-    { "student": "id1", "scores": { "ca1": 9, "ca2": 8, "midTerm": 8, "exam": 55 } },
-    { "student": "id2", "scores": { "ca1": 6, "ca2": 5, "midTerm": 7, "exam": 40 } }
-  ]
-}
-```
-
-### GET /results/report-card/:studentId
-Query params: `?term=First Term&academicYear=2024/2025`
-
-Response:
-```json
-{
-  "student": { "firstName": "...", "studentProfile": { "class": {...} } },
-  "results": [
-    {
-      "subject": { "name": "Mathematics", "code": "MTH" },
-      "scores": { "ca1": 9, "ca2": 8, "midTerm": 8, "exam": 58 },
-      "totalScore": 83, "grade": "A", "remark": "Distinction",
-      "position": 2, "classAverage": 67.4, "classHighest": 89, "classLowest": 28
-    }
-  ],
-  "summary": {
-    "totalSubjects": 8, "average": 74.6, "gpa": 4.5,
-    "overallPosition": 2, "totalStudentsInClass": 45,
-    "grade": "A", "principalComment": "Excellent performance..."
-  }
-}
+POST /results/publish { class, term, academicYear }
+  1. computeClassStatistics over the FULL cohort for that term
+     (not just unpublished rows — otherwise re-publishing one correction
+      recomputes the class average from that single row)
+  2. per-subject average / highest / lowest + competition ranks
+  3. one bulkWrite for all stat updates
+  4. isPublished = true
+  5. background: CA tracker sync + parent emails (queued, not inline)
 ```
 
 ---
 
-## 7. API — /payments
+## 7. Payments
 
-Base: `/api/v1/payments`
+### Settlement
 
-| Method | Endpoint                              | Roles           | Description                            |
-|--------|---------------------------------------|-----------------|----------------------------------------|
-| POST   | `/initialize/paystack`                | Any auth        | Init Paystack payment → returns URL    |
-| POST   | `/verify/paystack`                    | Any auth        | Verify + update + email receipt        |
-| POST   | `/initialize/flutterwave`             | Any auth        | Init Flutterwave → returns URL         |
-| POST   | `/manual`                             | Admin           | Record cash/bank transfer payment      |
-| GET    | `/student/:studentId`                 | Admin/own/child | Payment history                        |
-| GET    | `/report`                             | Admin           | Financial overview + analytics         |
+`settlePayment()` in `paymentService.js` is the **single settlement path**.
+Both the browser redirect and the gateway webhook call it.
 
-### POST /payments/initialize/paystack
-```json
-{ "studentId": "objectId", "feeStructureId": "objectId", "amount": 45000 }
 ```
-Response:
-```json
-{
-  "authorizationUrl": "https://checkout.paystack.com/...",
-  "reference": "SMP-A1B2C3D4"
-}
+init    → server computes outstanding = totalAmount − Σ(paid)
+        → a client-supplied `amount` is only a part-payment REQUEST and is
+          rejected if it exceeds the outstanding balance
+        → Payment{status:Pending, amountDue:outstanding, transactionRef}
+
+pay     → Paystack checkout
+        ├─ WEBHOOK  POST /webhooks/paystack   ← authoritative, retried
+        └─ REDIRECT POST /payments/verify/paystack ← fast path, best effort
+
+settle  → idempotent: if already Paid, return unchanged
+        → verify with the gateway; assert success, NGN, positive amount
+        → payment.save()  ← the pre('save') hook derives balance and status
 ```
 
-### POST /payments/verify/paystack
-```json
-{ "reference": "SMP-A1B2C3D4" }
-```
-Response:
-```json
-{
-  "payment": {
-    "status": "Paid",
-    "amountPaid": 45000,
-    "receiptNumber": "RCP-123456-789",
-    "gateway": "Paystack",
-    "paymentDate": "2024-10-15T14:22:00.000Z"
-  }
-}
-```
-**Side effect**: Receipt email automatically sent to student's email.
+Two rules that matter:
 
-### GET /payments/report
-Query: `?term=First Term&academicYear=2024/2025`
-```json
-{
-  "overview": {
-    "totalExpected": 4500000,
-    "totalCollected": 3150000,
-    "totalOutstanding": 1350000,
-    "count": 100
-  },
-  "byStatus": [
-    { "_id": "Paid", "count": 70, "amount": 3150000 },
-    { "_id": "Pending", "count": 20, "amount": 0 },
-    { "_id": "Partial", "count": 10, "amount": 225000 }
-  ],
-  "byGateway": [
-    { "_id": "Paystack", "count": 45, "amount": 2025000 },
-    { "_id": "Cash", "count": 25, "amount": 1125000 }
-  ],
-  "recentTransactions": [...]
-}
-```
+- **Never `findOneAndUpdate` a Payment.** It bypasses the `pre('save')` hook
+  that derives `balance` and `status`. Hardcoding `status: 'Paid'` is how an
+  underpayment used to clear a full debt.
+- **The client never defines what is owed.** `resolvePayableAmount()` is the
+  only authority.
 
-### Fee Structure: POST /api/v1/fees
-```json
-{
-  "title": "JSS1 First Term 2024/2025",
-  "class": "objectId",
-  "term": "First Term",
-  "academicYear": "2024/2025",
-  "items": [
-    { "label": "Tuition", "amount": 35000, "isCompulsory": true },
-    { "label": "Books", "amount": 5000, "isCompulsory": true },
-    { "label": "Uniform", "amount": 5000, "isCompulsory": false }
-  ],
-  "dueDate": "2024-10-01",
-  "lateFee": 2000
-}
-```
-`totalAmount` is auto-calculated from items sum on save.
+Receipt numbers are sequential and collision-free: `RCP-25-000042`, backed by
+the atomic `Sequence` model.
+
+**Webhook setup:** register `https://<your-api-host>/webhooks/paystack` in the
+Paystack dashboard. Without it, a payment is only confirmed if the payer
+returns to the site.
 
 ---
 
-## 8. RBAC
+## 8. Authentication & sessions
 
-Every protected route uses:
-```js
-router.use(protect)          // Validates JWT, attaches req.user
-router.use(authorize('Admin', 'Teacher'))  // Role check
-```
+- **Access token** — JWT, default **1 hour**. Not revocable, so its lifetime is
+  its blast radius. Overridden by `JWT_EXPIRE`.
+- **Refresh token** — JWT, default **30 days**, and only valid while a matching
+  `Session` row exists.
+- **Sessions** — one row per signed-in device, storing a SHA-256 hash of the
+  refresh token. A dump of the collection cannot be replayed.
 
-| Resource          | Admin | Teacher | Student | Parent |
-|-------------------|-------|---------|---------|--------|
-| Create users      | ✅    | ❌      | ❌      | ❌     |
-| Delete users      | ✅    | ❌      | ❌      | ❌     |
-| View all students | ✅    | ✅      | ❌      | ❌     |
-| Mark attendance   | ✅    | ✅      | ❌      | ❌     |
-| Enter grades      | ✅    | ✅      | ❌      | ❌     |
-| Publish results   | ✅    | ❌      | ❌      | ❌     |
-| View own results  | ❌    | ❌      | ✅      | own child ✅ |
-| Create fees       | ✅    | ❌      | ❌      | ❌     |
-| Pay fees          | ✅    | ❌      | ✅      | ✅     |
-| Record manual pay | ✅    | ❌      | ❌      | ❌     |
-| Financial report  | ✅    | ❌      | ❌      | ❌     |
-| Create announcement | ✅  | ✅      | ❌      | ❌     |
-| View announcements | ✅   | ✅      | ✅      | ✅     |
+This is what makes logout real:
+
+| Action                     | Effect                                  |
+| -------------------------- | --------------------------------------- |
+| `POST /auth/logout`        | Deletes that device's session           |
+| `POST /auth/logout-all`    | Deletes every session for the user      |
+| Deactivating a user        | Deletes all their sessions              |
+| Deleting a user            | Deletes all their sessions              |
+| Changing a password        | Invalidates tokens issued before it     |
+
+Sessions expire from MongoDB automatically via a TTL index.
 
 ---
 
-## 9. Database Schema
+## 9. Role-based access control
+
+`authorize(...roles)` gates by role. Ownership is checked inside controllers,
+because "own data" means something different per domain.
+
+| Resource               | Admin | Teacher                | Student  | Parent      |
+| ---------------------- | ----- | ---------------------- | -------- | ----------- |
+| Create / delete users  | ✅    | ❌                     | ❌       | ❌          |
+| View all students      | ✅    | ✅                     | ❌       | ❌          |
+| Mark attendance        | ✅    | ✅                     | ❌       | ❌          |
+| Enter grades           | ✅    | own subjects only      | ❌       | ❌          |
+| View class results     | ✅    | own subjects only      | ❌       | ❌          |
+| Publish results        | ✅    | ❌                     | ❌       | ❌          |
+| View results           | ✅    | ✅                     | own      | own child   |
+| View attendance        | ✅    | ✅                     | own      | own child   |
+| View submissions       | ✅    | own assignments        | own      | own child   |
+| Manage assignments     | ✅    | own only               | ❌       | ❌          |
+| Manage exams           | ✅    | own only               | ❌       | ❌          |
+| Create fees            | ✅    | ❌                     | ❌       | ❌          |
+| Pay fees               | ✅    | ❌                     | own      | own child   |
+| Record manual payment  | ✅    | ❌                     | ❌       | ❌          |
+| Financial report       | ✅    | ❌                     | ❌       | ❌          |
+| Library issue / return | ✅    | ✅                     | ❌       | ❌          |
+| Announcements          | ✅    | create + view          | view     | view        |
+
+**Teacher scoping:** a teacher may manage results for subjects in their
+`teacherProfile.subjectsTaught`, plus everything in the class they are form
+teacher of (`classTeacherOf`).
+
+---
+
+## 10. API reference
+
+Base URL: `/api/v1`. All routes require a Bearer token unless marked Public.
+
+### Auth — `/auth` (9 routes)
+
+| Method | Endpoint                 | Access | Notes                                        |
+| ------ | ------------------------ | ------ | -------------------------------------------- |
+| POST   | `/login`                 | Public | Returns `{ user, accessToken, refreshToken }`|
+| POST   | `/register`              | Admin  | Sends a welcome email with the credentials   |
+| GET    | `/me`                    | Any    | Fully populated profile                      |
+| PUT    | `/update-password`       | Any    | New password must differ from the current one|
+| POST   | `/forgot-password`       | Public | Always 200 — never reveals whether an account exists |
+| PUT    | `/reset-password/:token` | Public | Token valid 10 minutes, single use           |
+| POST   | `/refresh`               | Public | Requires a live session                      |
+| POST   | `/logout`                | Any    | Revokes this device                          |
+| POST   | `/logout-all`            | Any    | Revokes every device                         |
+
+### Results — `/results` (6 routes)
+
+| Method | Endpoint                      | Access                    |
+| ------ | ----------------------------- | ------------------------- |
+| POST   | `/`                           | Admin, Teacher (own subject) |
+| POST   | `/bulk`                       | Admin, Teacher (own subject) |
+| POST   | `/publish`                    | Admin                     |
+| GET    | `/report-card/:studentId`     | Admin, Teacher, own, own child |
+| GET    | `/class/:classId`             | Admin, Teacher (scoped)   |
+| GET    | `/student/:studentId/history` | Admin, Teacher, own, own child |
+
+`POST /results/bulk` validates every row first and rejects the **whole batch**
+if any row is invalid — a half-applied set of scores is worse than none.
+
+### Payments — `/payments` (6) and `/fees` (4)
+
+| Method | Endpoint                    | Access                    |
+| ------ | --------------------------- | ------------------------- |
+| POST   | `/initialize/paystack`      | Admin, own, own child     |
+| POST   | `/verify/paystack`          | Admin, own, own child     |
+| POST   | `/initialize/flutterwave`   | Admin, own, own child     |
+| POST   | `/manual`                   | Admin (Cash / Bank Transfer only) |
+| GET    | `/student/:studentId`       | Admin, own, own child     |
+| GET    | `/report`                   | Admin                     |
+
+`amount` is optional on initialize. Omit it to settle the outstanding balance
+in full — which is what the client does.
+
+### Other domains
+
+| Base                | Routes | Controller                  |
+| ------------------- | ------ | --------------------------- |
+| `/users`            | 7      | `userController`            |
+| `/parents`          | 7      | `parentController`          |
+| `/classes`          | 5      | `classController`           |
+| `/subjects`         | 4      | `subjectController`         |
+| `/attendance`       | 3      | `attendanceController`      |
+| `/exams`            | 4      | `examController`            |
+| `/assignments`      | 6      | `assignmentController`      |
+| `/submissions`      | 5      | `submissionController`      |
+| `/announcements`    | 4      | `announcementController`    |
+| `/dashboard`        | 4      | `dashboardController`       |
+| `/timetables`       | 10     | `timetableController`       |
+| `/library`          | 14     | `libraryController`         |
+| `/calendar`         | 11     | `calendarController`        |
+| `/exam-schedules`   | 10     | `examScheduleController`    |
+| `/ca-tracking`      | 6      | `caTrackingController`      |
+| `/promotions`       | 8      | `promotionController`       |
+| `/certificates`     | 8      | `certificateController`     |
+| `/webhooks`         | 1      | HMAC-verified, no JWT       |
+
+**142 routes total.**
+
+### Response shape
+
+```jsonc
+// success
+{ "success": true, "message": "...", "data": { } }
+
+// paginated
+{ "success": true, "data": [], "meta": { "total": 0, "page": 1, "limit": 20, "pages": 0, "hasNext": false, "hasPrev": false } }
+
+// error
+{ "success": false, "message": "...", "errors": [{ "field": "email", "message": "..." }] }
+```
+
+---
+
+## 11. Database schema
+
+18 models. The ones with non-obvious behaviour:
 
 ### User
+
 ```
-_id, firstName, lastName, email, password (hashed), role, phone, avatar, isActive
-studentProfile: { admissionNumber, dateOfBirth, gender, class→Class, section, parentId→User }
-teacherProfile: { staffId, qualification, classTeacherOf→Class, subjectsTaught→[Subject] }
+firstName, lastName, email (unique), password (bcrypt, select:false), role,
+phone, avatar{url,publicId}, isActive, lastLogin, passwordChangedAt
+studentProfile: { admissionNumber (auto), class→Class, section, parentId→User,
+                  dateOfBirth, gender, profileStatus }
+teacherProfile: { staffId (auto), classTeacherOf→Class, subjectsTaught→[Subject] }
 parentProfile:  { occupation, relationship, children→[User] }
 ```
-**Indexes**: `email`, `role`, `studentProfile.admissionNumber`, `teacherProfile.staffId`
 
-### Class
-```
-_id, name, level (JSS|SS|Primary), sections[{name, capacity, classTeacher→User}],
-subjects→[Subject], academicYear, isActive
-```
-
-### Attendance
-```
-_id, student→User, class→Class, date, status (Present|Absent|Late|Excused),
-markedBy→User, term, academicYear, note
-```
-**Unique index**: `{ student, date }` — one record per student per day
+Admission numbers and staff IDs are generated in a `pre('save')` hook from the
+`Counter` collection.
 
 ### Result
-```
-_id, student→User, class→Class, subject→Subject, term, academicYear,
-scores: { ca1, ca2, midTerm, exam }, totalScore (auto), grade (auto), remark (auto),
-gradePoint (auto), classAverage, classHighest, classLowest, position, isPublished
-```
-**Unique index**: `{ student, subject, term, academicYear }`
 
-### Fees
 ```
-_id, title, class→Class, term, academicYear,
-items: [{label, amount, isCompulsory}], totalAmount (auto-sum), dueDate, lateFee
+student→User, class→Class, subject→Subject, term, academicYear,
+scores{ca1,ca2,midTerm,exam}, totalScore, grade, remark, gradePoint,
+classAverage, classHighest, classLowest, position, isPublished, gradedBy
 ```
 
-### Payment
+**Unique:** `{ student, subject, term, academicYear }`.
+`pre('save')` computes totals and grades — but `bulkWrite` bypasses it, which
+is why `scoreValidation.js` exists and why the bulk path computes fields
+explicitly.
+
+### Fees / Payment
+
 ```
-_id, student→User, feeStructure→Fees, term, academicYear,
-amountPaid, amountDue, balance (auto), status (auto),
-gateway (Paystack|Flutterwave|Cash|Bank Transfer),
-transactionRef (unique), receiptNumber (unique), paymentDate
+Fees:    title, class→Class, term, academicYear, items[{label,amount,isCompulsory}],
+         totalAmount (derived), dueDate, lateFee
+Payment: student→User, feeStructure→Fees, amountPaid, amountDue,
+         balance (derived), status (derived), gateway, transactionRef (unique),
+         receiptNumber (unique), gatewayResponse (select:false), processedBy
 ```
 
-### Assignment
+`Fees.totalAmount` is summed from `items` in **`pre('validate')`**, not
+`pre('save')` — Mongoose validates before save hooks run, so a required field
+computed in `pre('save')` can never be satisfied.
+
+`Payment.balance` and `.status` are derived in `pre('save')` from `amountPaid`
+vs `amountDue`.
+
+### Session
+
 ```
-_id, title, description, class→Class, subject→Subject, teacher→User,
-term, academicYear, dueDate, totalMarks,
-attachments: [{name, url, publicId, mimeType, size}], allowLateSubmission
+user→User, tokenHash (sha256, unique), userAgent, ip, lastUsedAt, expiresAt
 ```
 
-### Submission
-```
-_id, assignment→Assignment, student→User, submittedAt, isLate,
-files: [{name, url, publicId}], comment, status, score, feedback, gradedBy→User
-```
-**Unique index**: `{ assignment, student }` — one submission per student
+TTL index on `expiresAt`.
 
-### Announcement
-```
-_id, title, body, author→User,
-targetAudience: ['All'|'Admin'|'Teacher'|'Student'|'Parent'],
-channels: {dashboard, email, sms}, priority, isPublished,
-readBy: [{user, readAt}]
-```
+### Sequence
+
+Named atomic counters (`Sequence.next('receipt-25')`). Deliberately separate
+from `Counter`, which numbers admissions — changing that model's query shape
+would risk reissuing duplicate admission numbers.
+
+### Others
+
+`Class`, `Subject`, `Attendance` (unique `{student, date}`), `Exam`,
+`Assignment` / `Submission` (unique `{assignment, student}`), `Announcement`,
+`AcademicCalendar`, `Timetable`, `Library` (Book + BorrowRecord), `CATracker`,
+`Certificate`, `ExamSchedule`, `Promotion`, `Counter`.
 
 ---
 
-## 10. Payment Gateways
+## 12. File storage
 
-### Paystack (Primary — NGN)
-```
-Flow:
-1. POST /payments/initialize/paystack → Paystack API → returns authorizationUrl
-2. User pays on Paystack checkout page
-3. Paystack redirects to CLIENT_URL/payments/verify
-4. Frontend calls POST /payments/verify/paystack with reference
-5. Server verifies with Paystack, updates Payment record, emails receipt
-```
+Multer memory storage → streamed to Cloudinary.
 
-**Webhook (optional production setup):**
+| Content       | Folder                | Max size |
+| ------------- | --------------------- | -------- |
+| Avatars       | `smp/avatars/`        | 5 MB     |
+| Assignments   | `smp/assignments/`    | 10 MB    |
+| Submissions   | `smp/submissions/`    | 10 MB    |
+| Announcements | `smp/announcements/`  | 10 MB    |
+
+Allowed: images (JPEG/PNG/GIF/WebP), PDF, DOC(X), XLS(X), PPT(X), TXT, ZIP.
+
+Uploads record a `resourceType` (`image` | `video` | `raw`) alongside
+`publicId`. Cloudinary's `destroy` needs it — passing `auto` silently fails and
+orphans every non-image file.
+
+`handleUploadErrors` turns multer's errors into readable 400s instead of 500s.
+
+---
+
+## 13. Notifications & the job queue
+
+Email is sent **through a queue**, not inline. Agenda is backed by the same
+MongoDB the app already uses — no extra infrastructure. Jobs live in the `jobs`
+collection; failures are retried and left there for inspection.
+
 ```js
-// Add to server.js for real-time verification
-app.post('/webhook/paystack', express.raw({type: 'application/json'}), (req, res) => {
-  const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
-    .update(req.body).digest('hex');
-  if (hash === req.headers['x-paystack-signature']) {
-    // Process event
-  }
-});
+await enqueueEmail({ to, subject, html });
+await enqueueBulkEmail(recipients, (r) => ({ to: r.email, subject, html }));
 ```
 
-### Flutterwave (Secondary — NGN)
-Same flow pattern. Reference stored as `SMP-FLW-XXXXXXXX`.
+If the queue is unavailable, `enqueueEmail` sends inline instead. Degraded, but
+a payment receipt is never silently dropped.
 
-### Currency
-All amounts stored and processed in **NGN (Nigerian Naira)**.
-Paystack requires kobo (×100 conversion applied in `paymentService.js`).
+**Emails sent:** welcome (user + parent creation), password reset, payment
+receipt (gateway and manual), results published, announcements, certificate
+issued, certificate revoked.
 
----
+**SMS** via Twilio is wired for announcements and skipped when unconfigured.
 
-## 11. File Storage (Cloudinary)
-
-All file uploads use `multer` (memory storage) → streamed to Cloudinary.
-
-**Upload folders:**
-| Content          | Cloudinary Path         | Max Size |
-|------------------|-------------------------|----------|
-| User avatars     | `smp/avatars/`          | 5MB      |
-| Assignments      | `smp/assignments/`      | 10MB     |
-| Submissions      | `smp/submissions/`      | 10MB     |
-| Announcements    | `smp/announcements/`    | 10MB     |
-
-**Allowed types**: Images (JPEG/PNG/GIF/WebP), PDF, DOCX, XLSX, PPTX, TXT, ZIP
-
-**Delete on update**: Old files are deleted from Cloudinary before new ones are uploaded (avatar endpoint).
-
-**AWS S3 (alternative):**
-To switch to AWS S3, replace `fileService.js` with the `@aws-sdk/client-s3` equivalent — no other changes needed as the interface returns the same `{name, url, publicId, mimeType, size}` shape.
+TLS certificate validation is **on**. Set `SMTP_ALLOW_SELF_SIGNED=true` only
+for a local mail server with a self-signed certificate.
 
 ---
 
-## 12. Notifications
+## 14. Environment variables
 
-### Email (Nodemailer + SMTP)
-Triggered automatically on:
-- User creation → welcome email with credentials
-- Payment verified → receipt email
-- Results published → parent notification
-- Announcement with `channels.email = true`
+### Backend `.env`
 
-Template system in `notificationService.js`:
-```js
-emailTemplates.welcome({ firstName, email, password, role, loginUrl })
-emailTemplates.paymentReceipt({ studentName, receiptNumber, amount, term, date })
-emailTemplates.announcement({ title, body, senderName })
-emailTemplates.resultPublished({ studentName, term, average, position, loginUrl })
-```
-
-### SMS (Twilio)
-Available for announcements with `channels.sms = true`.
-Requires `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`.
-Gracefully skips if Twilio is not configured.
-
----
-
-## 13. Environment Variables
-
-### Backend (.env)
 ```
 PORT=5000
 NODE_ENV=production
 MONGO_URI=mongodb+srv://...
-JWT_SECRET=min-32-char-secret
-JWT_EXPIRE=30d
-JWT_REFRESH_SECRET=another-secret
-JWT_REFRESH_EXPIRE=90d
+
+JWT_SECRET=                  # min 32 random chars
+JWT_EXPIRE=1h                # keep short — access tokens cannot be revoked
+JWT_REFRESH_SECRET=          # different from JWT_SECRET
+JWT_REFRESH_EXPIRE=30d
+
+CLIENT_URL=https://yourschool.ng   # exact origin; comma-separate for several
+
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
-PAYSTACK_SECRET_KEY=sk_live_...
-FLUTTERWAVE_SECRET_KEY=FLWSECK_...
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
+
+PAYSTACK_SECRET_KEY=sk_live_...    # also verifies webhook signatures
+FLUTTERWAVE_SECRET_KEY=
+
+SMTP_HOST=
+SMTP_PORT=587                      # 465 switches to implicit TLS
 SMTP_USER=
 SMTP_PASS=
+SMTP_ALLOW_SELF_SIGNED=false
 FROM_EMAIL=noreply@yourschool.ng
 FROM_NAME=Your School Name
-TWILIO_ACCOUNT_SID=          # Optional
-TWILIO_AUTH_TOKEN=           # Optional
-TWILIO_PHONE_NUMBER=         # Optional
-CLIENT_URL=https://yourschool.ng
+
+TWILIO_ACCOUNT_SID=                # optional
+TWILIO_AUTH_TOKEN=                 # optional
+TWILIO_PHONE_NUMBER=               # optional
+
+KEEP_ALIVE=true                    # optional: self-ping for free-tier hosts
+PING_URL=
 ```
 
-### Frontend (.env.local)
+### Client `.env.local`
+
 ```
 VITE_API_URL=https://api.yourschool.ng/api/v1
 ```
 
 ---
 
-## 14. Deployment
+## 15. Testing
 
-### Backend — Railway / Render / AWS EC2
 ```bash
-# Set all env vars in your platform dashboard
-# Build command: npm install
-# Start command: node server.js
+cd backend
+pnpm test              # 107 tests
+pnpm test:coverage
 ```
 
-### Frontend — Vercel (Recommended)
-```bash
-vercel --prod
-# Set VITE_API_URL in Vercel dashboard
-```
+| Suite                        | Covers                                                   |
+| ---------------------------- | -------------------------------------------------------- |
+| `unit/grading.test.js`       | Every grade boundary, competition ranking, weighted GPA  |
+| `unit/validation.test.js`    | Score caps, request validators, error-handler status mapping |
+| `integration/payments.test.js` | Settlement, idempotency, underpayment, receipt uniqueness |
+| `integration/auth.test.js`   | Password hashing, token lifetimes, session revocation    |
 
-### MongoDB Atlas
-- Enable IP allowlist for your backend server IP
-- Create DB user with readWrite on `smp_db`
-- Enable backup retention (7 days min)
-
-### Production Checklist
-- [ ] `NODE_ENV=production` (disables Morgan, hides stack traces)
-- [ ] HTTPS on all endpoints (TLS termination at load balancer)
-- [ ] MongoDB connection string with `?retryWrites=true&w=majority`
-- [ ] Cloudinary `resource_type: 'auto'` handles all file types
-- [ ] Paystack → switch from test keys to live keys
-- [ ] Rate limiter configured (200 req/15min general, 20/15min for /auth)
-- [ ] JWT secrets at minimum 32 characters, randomly generated
-- [ ] CORS origin set to exact production frontend URL
-
-### Microservices Migration Path
-When the school's data grows, the modular service layer maps cleanly:
-```
-smp-auth-service      → /auth routes + User model
-smp-academic-service  → classes, subjects, attendance, exams, results
-smp-finance-service   → fees, payments
-smp-lms-service       → assignments, submissions
-smp-comms-service     → announcements, notifications
-```
-Each service can be extracted with its own MongoDB connection and deployed independently behind an API Gateway (AWS API GW / Kong / Nginx).
+Integration tests run against a **real MongoDB in memory**
+(`mongodb-memory-server`). Mocking Mongoose would defeat the purpose — the
+bugs these tests exist to catch (a bypassed hook, an index not firing,
+`bulkWrite` skipping validators) only appear against a real database. The only
+mocked boundary is the payment gateway, stubbed at `fetch`.
 
 ---
 
-*Generated for Code District NG client project — SMP v1.0.0*
-*Full-Stack: Node.js + Express + MongoDB + React (Vite) + Zustand*
+## 16. Deployment
+
+### Backend — Render / Railway / EC2
+
+```
+Install: pnpm install --frozen-lockfile
+Start:   node server.js
+```
+
+### Client — Vercel
+
+```
+Build:   pnpm run build
+Output:  dist
+```
+
+Set `VITE_API_URL` in the dashboard.
+
+### Production checklist
+
+- [ ] `NODE_ENV=production`
+- [ ] `CLIENT_URL` set to the exact frontend origin
+- [ ] `JWT_EXPIRE=1h` (a leftover `30d` silently keeps long-lived tokens)
+- [ ] JWT secrets ≥ 32 random characters, and different from each other
+- [ ] Paystack webhook registered at `/webhooks/paystack`
+- [ ] Paystack switched from test to live keys
+- [ ] HTTPS everywhere; TLS terminated at the load balancer
+- [ ] MongoDB URI with `?retryWrites=true&w=majority`
+- [ ] Atlas IP allowlist includes the backend host
+- [ ] Backup retention enabled (7 days minimum)
+
+---
+
+## 17. Known gaps
+
+Recorded honestly so nobody rediscovers them the hard way.
+
+- **No test coverage** for `pdfService`, the dashboard aggregations, the
+  library and timetable domains, or any client code.
+- **`pdfService` uses async Promise executors.** Safe today (each wraps its
+  body in try/catch and calls `reject`), but the lint rule is disabled at file
+  scope until those three generators are restructured.
+- **The report-card legend in `client/src/components/results/PrintableReportCard.jsx`
+  is a hardcoded copy** of the grading scale. The backend derives its copy from
+  `GRADE_SCALE`; the client cannot import backend constants, so this one will
+  drift unless the scale is served from an endpoint.
+- **`getFinancialReport` over-counts `totalExpected`.** Every abandoned payment
+  attempt leaves a `Pending` row with an `amountDue`, and the report sums them.
+  Cleaning them up risks losing a late webhook for an abandoned-then-completed
+  attempt, so it needs a real reconciliation design.
+- **Historic payment data may be wrong.** Anything settled before the settlement
+  fix is marked `Paid` with `balance: 0` regardless of what was collected. A
+  reconciliation script should re-derive status from `amountPaid`.
+- **Refresh tokens are not rotated** on use. Sessions are revocable, which
+  covers the main risk, but rotation would be stronger.
+- **`GET /users/:id`** is open to any Teacher, returning full profiles.
+- **Rate limiting is in-process.** With more than one instance, limits apply
+  per instance rather than globally.

@@ -86,7 +86,10 @@ const updateFeeRules = [
   stringBody('title', 'Title', { optional: true, min: 2, max: 150 }),
   termBody('term', { optional: true }),
   academicYearBody('academicYear', { optional: true }),
-  body('items').optional().isArray({ min: 1 }).withMessage('At least one fee item is required.'),
+  body('items')
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage('At least one fee item is required.'),
   body('items.*.amount')
     .optional()
     .isFloat({ min: 0 })

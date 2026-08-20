@@ -4,8 +4,12 @@ const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const validate = require('../middleware/validate');
 const {
-  upsertResult, bulkUpsertResults, publishResults,
-  getReportCard, getClassResults, getStudentResultHistory,
+  upsertResult,
+  bulkUpsertResults,
+  publishResults,
+  getReportCard,
+  getClassResults,
+  getStudentResultHistory,
 } = require('../controllers/resultController');
 const {
   upsertResultRules,
@@ -37,7 +41,12 @@ router.post(
   validate(publishResultRules),
   publishResults,
 );
-router.get('/report-card/:studentId', protect, validate(reportCardRules), getReportCard);
+router.get(
+  '/report-card/:studentId',
+  protect,
+  validate(reportCardRules),
+  getReportCard,
+);
 router.get(
   '/class/:classId',
   protect,
