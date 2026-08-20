@@ -16,6 +16,8 @@ const attachmentSchema = new mongoose.Schema(
       required: true,
     },
     publicId: String,
+    // image | video | raw — Cloudinary needs this to delete the file later.
+    resourceType: String,
     mimeType: String,
     size: Number,
   },

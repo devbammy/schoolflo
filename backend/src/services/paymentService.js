@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const { Payment } = require('../models/Fees');
+const Sequence = require('../models/Sequence');
 const { PAYMENT_STATUS, PAYMENT_GATEWAY } = require('../config/constants');
 const { sendEmail, emailTemplates } = require('./notificationService');
 
@@ -114,12 +115,17 @@ const verifyFlutterwave = async (reference) => {
 };
 
 /**
- * Generate a receipt number
+ * Generate a sequential receipt number: RCP-25-000042.
+ *
+ * Backed by an atomic counter rather than a timestamp plus three random
+ * digits, which collided roughly once in a thousand receipts issued in the
+ * same millisecond window — and collided against a unique index, throwing
+ * after the money had already been taken.
  */
-const generateReceiptNumber = () => {
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `RCP-${timestamp}-${random}`;
+const generateReceiptNumber = async () => {
+  const year = new Date().getFullYear().toString().slice(-2);
+  const seq = await Sequence.next(`receipt-${year}`);
+  return `RCP-${year}-${String(seq).padStart(6, '0')}`;
 };
 
 /**
@@ -237,7 +243,8 @@ const settlePayment = async ({ reference }) => {
     ? new Date(verification.paidAt)
     : new Date();
   payment.gatewayResponse = verification.raw;
-  payment.receiptNumber = payment.receiptNumber || generateReceiptNumber();
+  payment.receiptNumber =
+    payment.receiptNumber || (await generateReceiptNumber());
 
   // save() — not findOneAndUpdate() — so the pre('save') hook derives balance
   // and status from the amount that actually landed.

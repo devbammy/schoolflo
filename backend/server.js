@@ -14,6 +14,7 @@ const axios = require('axios');
 
 const connectDB = require('./src/config/db');
 const errorHandler = require('./src/middleware/errorHandler');
+const { verifyTransport } = require('./src/services/notificationService');
 
 // Route imports
 const authRoutes = require('./src/routes/auth');
@@ -227,6 +228,10 @@ const PORT = process.env.PORT || 5001;
 const startServer = async () => {
   try {
     await connectDB();
+
+    // Checked once here rather than before every send, which previously added
+    // a round trip to each email. Non-fatal: the app runs without email.
+    verifyTransport();
 
     const server = app.listen(PORT, () => {
       console.log(`

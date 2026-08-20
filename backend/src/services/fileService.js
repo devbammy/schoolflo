@@ -35,11 +35,69 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 500 * 1024 }, // 500kb max
-});
+const MB = 1024 * 1024;
+
+// Per-purpose size caps. A single global 500KB limit rejected any real phone
+// photo or scanned PDF with an opaque multer error.
+const UPLOAD_LIMITS = {
+  avatar: 5 * MB,
+  assignment: 10 * MB,
+  submission: 10 * MB,
+  announcement: 10 * MB,
+  default: 10 * MB,
+};
+
+const makeUploader = (limitKey = 'default') =>
+  multer({
+    storage,
+    fileFilter,
+    limits: {
+      fileSize: UPLOAD_LIMITS[limitKey] ?? UPLOAD_LIMITS.default,
+    },
+  });
+
+/**
+ * Default uploader, kept for existing call sites.
+ * Prefer the purpose-specific uploaders below so each route carries the limit
+ * the documentation promises for that kind of content.
+ */
+const upload = makeUploader('default');
+
+const uploadAvatar = makeUploader('avatar');
+const uploadAssignment = makeUploader('assignment');
+const uploadSubmission = makeUploader('submission');
+
+/**
+ * Turn multer's terse errors into something a user can act on.
+ * Mount after the routes that accept uploads; it passes anything else through.
+ */
+const handleUploadErrors = (err, req, res, next) => {
+  if (!(err instanceof multer.MulterError)) return next(err);
+
+  const messages = {
+    LIMIT_FILE_SIZE: 'That file is too large.',
+    LIMIT_FILE_COUNT: 'Too many files were uploaded at once.',
+    LIMIT_UNEXPECTED_FILE: 'Unexpected file field in the upload.',
+  };
+
+  return res.status(400).json({
+    success: false,
+    message: messages[err.code] || `Upload failed: ${err.message}`,
+  });
+};
+
+/**
+ * Cloudinary stores images, videos and everything else ("raw") separately, and
+ * destroy() must be told which. Persist this alongside publicId at upload time
+ * so deletions actually delete rather than silently orphaning the file.
+ */
+const resourceTypeFor = (mimeType = '') => {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/') || mimeType.startsWith('audio/')) {
+    return 'video';
+  }
+  return 'raw';
+};
 
 /**
  * Upload a buffer directly to Cloudinary
@@ -62,18 +120,35 @@ const uploadToCloudinary = (buffer, folder, options = {}) => {
 };
 
 /**
- * Delete a file from Cloudinary
+ * Delete a file from Cloudinary.
+ *
+ * `resource_type` accepts image | video | raw — never 'auto', which was the
+ * previous default and silently failed for every PDF and document, leaving
+ * them orphaned in storage. When the stored type is unknown we try each in
+ * turn rather than guessing once.
  */
-const deleteFromCloudinary = async (publicId, resourceType = 'auto') => {
-  try {
-    const result = await cloudinary.uploader.destroy(publicId, {
-      resource_type: resourceType,
-    });
-    return result;
-  } catch (error) {
-    console.error(`Cloudinary delete error: ${error.message}`);
-    return null;
+const deleteFromCloudinary = async (publicId, resourceType) => {
+  if (!publicId) return null;
+
+  const candidates = resourceType && resourceType !== 'auto'
+    ? [resourceType]
+    : ['image', 'raw', 'video'];
+
+  for (const type of candidates) {
+    try {
+      const result = await cloudinary.uploader.destroy(publicId, {
+        resource_type: type,
+      });
+      if (result?.result === 'ok') return result;
+    } catch (error) {
+      console.error(
+        `Cloudinary delete error (${type}) for ${publicId}: ${error.message}`,
+      );
+    }
   }
+
+  console.warn(`Cloudinary: nothing deleted for publicId ${publicId}`);
+  return null;
 };
 
 /**
@@ -91,6 +166,9 @@ const processUploadedFiles = async (files, folder) => {
         name: file.originalname,
         url: result.secure_url,
         publicId: result.public_id,
+        // Recorded from Cloudinary's own response so deletion later knows
+        // which resource type to target.
+        resourceType: result.resource_type || resourceTypeFor(file.mimetype),
         mimeType: file.mimetype,
         size: file.size,
       };
@@ -102,8 +180,15 @@ const processUploadedFiles = async (files, folder) => {
 
 module.exports = {
   upload,
+  uploadAvatar,
+  uploadAssignment,
+  uploadSubmission,
+  makeUploader,
+  handleUploadErrors,
+  resourceTypeFor,
   uploadToCloudinary,
   deleteFromCloudinary,
   processUploadedFiles,
+  UPLOAD_LIMITS,
   cloudinary,
 };

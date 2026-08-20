@@ -11,7 +11,8 @@ const {
   getPaginationParams,
 } = require('../utils/apiResponse');
 const {
-  upload,
+  uploadAvatar,
+  handleUploadErrors,
   uploadToCloudinary,
   deleteFromCloudinary,
 } = require('../services/fileService');
@@ -159,7 +160,8 @@ router.delete('/:id', protect, authorize('Admin'), async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return sendError(res, 404, 'User not found');
-    if (user.avatar?.publicId) await deleteFromCloudinary(user.avatar.publicId);
+    if (user.avatar?.publicId)
+      await deleteFromCloudinary(user.avatar.publicId, 'image');
     await user.deleteOne();
     return sendSuccess(res, 200, 'User deleted');
   } catch (error) {
@@ -171,7 +173,8 @@ router.delete('/:id', protect, authorize('Admin'), async (req, res) => {
 router.post(
   '/:id/avatar',
   protect,
-  upload.single('avatar'),
+  uploadAvatar.single('avatar'),
+  handleUploadErrors,
   async (req, res) => {
     try {
       if (String(req.user._id) !== req.params.id && req.user.role !== 'Admin') {

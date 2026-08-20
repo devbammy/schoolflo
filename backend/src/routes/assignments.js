@@ -5,7 +5,11 @@ const { Assignment } = require('../models/Assignment');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
-const { upload, processUploadedFiles } = require('../services/fileService');
+const {
+  uploadAssignment,
+  handleUploadErrors,
+  processUploadedFiles,
+} = require('../services/fileService');
 
 // GET ALL ASSIGNMENTS
 router.get('/', protect, async (req, res) => {
@@ -133,7 +137,8 @@ router.post(
   '/',
   protect,
   authorize('Admin', 'Teacher'),
-  upload.array('attachments', 5),
+  uploadAssignment.array('attachments', 5),
+  handleUploadErrors,
   async (req, res) => {
     try {
       const attachments = req.files?.length
@@ -180,7 +185,8 @@ router.put(
   '/:id',
   protect,
   authorize('Admin', 'Teacher'),
-  upload.array('attachments', 5),
+  uploadAssignment.array('attachments', 5),
+  handleUploadErrors,
   async (req, res) => {
     try {
       const assignment = await Assignment.findById(req.params.id);

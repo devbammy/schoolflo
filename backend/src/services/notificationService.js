@@ -4,31 +4,59 @@ let transporter;
 
 const getTransporter = () => {
   if (!transporter) {
+    const port = parseInt(process.env.SMTP_PORT || '587', 10);
+
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
+      port,
+      // 465 is implicit TLS; 587 and 25 start plaintext and upgrade via
+      // STARTTLS, which nodemailer does automatically.
+      secure: port === 465,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
-      tls: { rejectUnauthorized: false },
+      // Certificate validation stays on. It was previously disabled, which
+      // left SMTP credentials and every email body open to interception.
+      // Self signed certs on a local mail server are the only legitimate
+      // reason to relax it, so that needs an explicit opt in.
+      tls: {
+        rejectUnauthorized: process.env.SMTP_ALLOW_SELF_SIGNED !== 'true',
+      },
+      pool: true,
+      maxConnections: 3,
     });
   }
   return transporter;
 };
 
 /**
+ * Verify the SMTP connection once at startup rather than before every send.
+ * Called from server.js; failures are logged, never fatal.
+ */
+const verifyTransport = async () => {
+  if (!process.env.SMTP_HOST) {
+    console.warn('⚠️  SMTP_HOST is not set — outbound email is disabled');
+    return false;
+  }
+
+  try {
+    await getTransporter().verify();
+    console.log('📧 SMTP connection verified');
+    return true;
+  } catch (error) {
+    console.error(`⚠️  SMTP verification failed: ${error.message}`);
+    return false;
+  }
+};
+
+/**
  * Send a single email
  */
 const sendEmail = async ({ to, subject, html, text }) => {
-  getTransporter().verify((error, success) => {
-    if (error) {
-      console.log(error);
-    } else {
-      console.log('SMTP Ready');
-    }
-  });
+  if (!process.env.SMTP_HOST) {
+    return { success: false, error: 'SMTP is not configured' };
+  }
 
   try {
     const info = await getTransporter().sendMail({
@@ -396,4 +424,10 @@ const emailTemplates = {
   `,
 };
 
-module.exports = { sendEmail, sendBulkEmails, sendSMS, emailTemplates };
+module.exports = {
+  sendEmail,
+  sendBulkEmails,
+  sendSMS,
+  verifyTransport,
+  emailTemplates,
+};

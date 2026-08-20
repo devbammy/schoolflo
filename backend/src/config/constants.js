@@ -55,16 +55,19 @@ module.exports = {
     PARENT: 'Parent',
   },
 
-  // Nigerian grading scale
+  // Nigerian grading scale — the single source of truth for grading.
+  // Change a boundary or a grade point here and every report card, GPA and
+  // transcript in the system follows.
   GRADE_SCALE: [
-    { min: 70, max: 100, grade: 'A', remark: 'Distinction' },
-    { min: 60, max: 69, grade: 'B', remark: 'Credit' },
-    { min: 50, max: 59, grade: 'C', remark: 'Merit' },
-    { min: 45, max: 49, grade: 'D', remark: 'Pass' },
-    { min: 40, max: 44, grade: 'E', remark: 'Weak Pass' },
-    { min: 0,  max: 39, grade: 'F', remark: 'Fail' },
+    { min: 70, max: 100, grade: 'A', remark: 'Distinction', gradePoint: 5.0 },
+    { min: 60, max: 69, grade: 'B', remark: 'Credit', gradePoint: 4.0 },
+    { min: 50, max: 59, grade: 'C', remark: 'Merit', gradePoint: 3.0 },
+    { min: 45, max: 49, grade: 'D', remark: 'Pass', gradePoint: 2.0 },
+    { min: 40, max: 44, grade: 'E', remark: 'Weak Pass', gradePoint: 1.0 },
+    { min: 0, max: 39, grade: 'F', remark: 'Fail', gradePoint: 0.0 },
   ],
 
+  // Per-component maximums that every score entry is validated against.
   SCORE_BREAKDOWN: {
     CA1_MAX: 10,
     CA2_MAX: 10,

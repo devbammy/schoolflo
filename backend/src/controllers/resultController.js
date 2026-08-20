@@ -16,8 +16,13 @@ const {
   emailTemplates,
 } = require('../services/notificationService');
 const caTrackingService = require('../services/caTrackingService');
+const {
+  validateScores,
+  validateScoreBatch,
+} = require('../utils/scoreValidation');
 
-// ✅ Helper (centralized calculation)
+// Centralized calculation. Callers must pass scores that have already been
+// through validateScores() — this only computes, it does not check.
 const computeResultFields = (scores = {}) => {
   const { ca1 = 0, ca2 = 0, midTerm = 0, exam = 0 } = scores;
 
@@ -77,19 +82,12 @@ const upsertResult = async (req, res) => {
       return sendError(res, 404, 'Student not found');
     }
 
-    // ✅ Validate score caps
-    const { ca1 = 0, ca2 = 0, midTerm = 0, exam: examScore = 0 } = scores || {};
-    if (ca1 > 10 || ca2 > 10 || midTerm > 10 || examScore > 70) {
-      return sendError(res, 400, 'Score exceeds maximum');
+    const validation = validateScores(scores);
+    if (!validation.valid) {
+      return sendError(res, 400, validation.errors.join(' '), validation.errors);
     }
 
-    // ✅ COMPUTE HERE (critical fix)
-    const computed = computeResultFields({
-      ca1,
-      ca2,
-      midTerm,
-      exam: examScore,
-    });
+    const computed = computeResultFields(validation.scores);
 
     const result = await Result.findOneAndUpdate(
       { student, subject, term, academicYear },
@@ -126,12 +124,27 @@ const bulkUpsertResults = async (req, res) => {
       return sendError(res, 400, 'Results array is required');
     }
 
-    const operations = results.map(
-      ({ student, scores = {}, teacherComment }) => {
-        const { ca1 = 0, ca2 = 0, midTerm = 0, exam = 0 } = scores;
+    // bulkWrite does not run Mongoose validators, so the schema's min/max on
+    // the score fields never fires on this path. Validate every row up front
+    // and reject the whole batch — a half applied set of scores is worse than
+    // none, since the teacher cannot tell which rows landed.
+    const batch = validateScoreBatch(
+      results,
+      (row, index) => `Student ${row?.student || index + 1}`,
+    );
 
-        // ✅ COMPUTE HERE (critical fix)
-        const computed = computeResultFields({ ca1, ca2, midTerm, exam });
+    if (!batch.valid) {
+      return sendError(
+        res,
+        400,
+        `${batch.errors.length} invalid score${batch.errors.length === 1 ? '' : 's'} — no results were saved.`,
+        batch.errors,
+      );
+    }
+
+    const operations = batch.rows.map(
+      ({ student, scores = {}, teacherComment }) => {
+        const computed = computeResultFields(scores);
 
         return {
           updateOne: {

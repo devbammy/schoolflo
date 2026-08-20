@@ -245,18 +245,28 @@ const recordManualPayment = async (req, res) => {
     const feeStructure = await Fees.findById(feeStructureId);
     if (!feeStructure) return sendError(res, 404, 'Fee structure not found');
 
+    const amount = Math.round(Number(amountPaid));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return sendError(res, 400, 'Amount paid must be a positive number.');
+    }
+
+    // Only ever accumulate onto another over-the-counter record. Matching any
+    // payment for this student and fee would let a cash entry attach itself to
+    // a pending Paystack record, whose transactionRef the gateway would later
+    // settle — overwriting the cash amount recorded here.
     const existing = await Payment.findOne({
       student: studentId,
       feeStructure: feeStructureId,
+      gateway: { $in: ['Cash', 'Bank Transfer'] },
     });
 
     let payment;
     if (existing) {
-      existing.amountPaid += amountPaid;
+      existing.amountPaid += amount;
       existing.notes = notes;
       existing.processedBy = req.user._id;
       existing.receiptNumber =
-        existing.receiptNumber || generateReceiptNumber();
+        existing.receiptNumber || (await generateReceiptNumber());
       payment = await existing.save();
     } else {
       payment = await Payment.create({
@@ -264,10 +274,10 @@ const recordManualPayment = async (req, res) => {
         feeStructure: feeStructureId,
         term: feeStructure.term,
         academicYear: feeStructure.academicYear,
-        amountPaid,
+        amountPaid: amount,
         amountDue: feeStructure.totalAmount,
         gateway: gateway || 'Cash',
-        receiptNumber: generateReceiptNumber(),
+        receiptNumber: await generateReceiptNumber(),
         processedBy: req.user._id,
         notes,
       });

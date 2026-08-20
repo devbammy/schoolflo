@@ -5,6 +5,13 @@ const streamifier = require('streamifier');
 const { Result } = require('../models/Exam');
 const User = require('../models/User');
 const Class = require('../models/Class');
+const { GRADE_SCALE } = require('../config/constants');
+
+// Rendered from GRADE_SCALE so the legend printed on a report card can never
+// disagree with the grades printed above it.
+const GRADING_SCALE_LEGEND = GRADE_SCALE.map(
+  (b) => `${b.grade}: ${b.min}-${b.max} (${b.remark})`,
+).join(' | ');
 
 class PDFService {
   // Generate Report Card PDF
@@ -257,12 +264,7 @@ class PDFService {
           .text('GRADING SCALE', 50, rowY + 130)
           .font('Helvetica')
           .fontSize(8)
-          .text(
-            'A: 70-100 (Distinction) | B: 60-69 (Credit) | C: 50-59 (Merit) | D: 45-49 (Pass) | E: 40-44 (Weak Pass) | F: 0-39 (Fail)',
-            50,
-            rowY + 145,
-            { width: 495 },
-          );
+          .text(GRADING_SCALE_LEGEND, 50, rowY + 145, { width: 495 });
 
         // Signature Section
         const sigY = rowY + 180;

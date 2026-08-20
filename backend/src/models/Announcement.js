@@ -39,6 +39,8 @@ const AnnouncementSchema = new mongoose.Schema({
     name: String,
     url: String,
     publicId: String,
+    // image | video | raw — Cloudinary needs this to delete the file later.
+    resourceType: String,
   }],
   scheduledAt: Date,
   expiresAt: Date,

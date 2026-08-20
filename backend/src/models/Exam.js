@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { EXAM_TYPES } = require('../config/constants');
+const { EXAM_TYPES, GRADE_SCALE } = require('../config/constants');
 
 // ─── EXAM SESSION MODEL ─────────────────────────────────────────────────────
 const ExamSchema = new mongoose.Schema({
@@ -142,13 +142,23 @@ ResultSchema.pre('save', function (next) {
   next();
 });
 
+/**
+ * Resolve a score to its band on the school's grading scale.
+ * Reads GRADE_SCALE in config/constants.js — there is no second ladder to keep
+ * in sync when the school changes its boundaries.
+ */
 function calculateGrade(score) {
-  if (score >= 70) return { grade: 'A', remark: 'Distinction', gradePoint: 5.0 };
-  if (score >= 60) return { grade: 'B', remark: 'Credit', gradePoint: 4.0 };
-  if (score >= 50) return { grade: 'C', remark: 'Merit', gradePoint: 3.0 };
-  if (score >= 45) return { grade: 'D', remark: 'Pass', gradePoint: 2.0 };
-  if (score >= 40) return { grade: 'E', remark: 'Weak Pass', gradePoint: 1.0 };
-  return { grade: 'F', remark: 'Fail', gradePoint: 0.0 };
+  const value = Number(score) || 0;
+
+  const band =
+    GRADE_SCALE.find((b) => value >= b.min && value <= b.max) ||
+    GRADE_SCALE[GRADE_SCALE.length - 1]; // out of range scores fall to the lowest band
+
+  return {
+    grade: band.grade,
+    remark: band.remark,
+    gradePoint: band.gradePoint,
+  };
 }
 
 ResultSchema.index({ student: 1, term: 1, academicYear: 1 });

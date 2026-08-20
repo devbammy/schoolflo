@@ -5,7 +5,11 @@ const { Submission, Assignment } = require('../models/Assignment');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
-const { upload, processUploadedFiles } = require('../services/fileService');
+const {
+  uploadSubmission,
+  handleUploadErrors,
+  processUploadedFiles,
+} = require('../services/fileService');
 const { SUBMISSION_STATUS } = require('../config/constants');
 
 // STUDENT SUBMITS ASSIGNMENT
@@ -14,7 +18,8 @@ router.post(
   '/',
   protect,
   authorize('Student'),
-  upload.array('files', 3),
+  uploadSubmission.array('files', 3),
+  handleUploadErrors,
   async (req, res) => {
     try {
       const { assignmentId, comment } = req.body;
