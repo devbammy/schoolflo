@@ -111,10 +111,12 @@ export default function ParentPayments() {
     if (!selectedChild?._id) return;
     setPaying(fee._id);
     try {
+      // No amount sent: the server computes the outstanding balance for this
+      // fee and charges exactly that, so part-payments already made are not
+      // billed twice.
       const res = await paymentService.initPaystack({
         studentId: selectedChild._id,
         feeStructureId: fee._id,
-        amount: fee.totalAmount,
       });
       window.open(res.data.data.authorizationUrl, '_blank');
       toast.success('Redirecting to Paystack...');

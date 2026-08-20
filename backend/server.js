@@ -37,6 +37,7 @@ const examScheduleRoutes = require('./src/routes/examSchedule.routes');
 const caTrackingRoutes = require('./src/routes/caTracking.routes');
 const promotionRoutes = require('./src/routes/promotion.routes');
 const certificateRoutes = require('./src/routes/certificate.routes');
+const webhookRoutes = require('./src/routes/webhooks');
 
 const app = express();
 
@@ -50,15 +51,32 @@ app.use(
   }),
 );
 
-// Connect to MongoDB
-connectDB();
-
 // Security Middleware
 
-const allowedOrigins =
-  process.env.CLIENT_URL ||
-  'http://localhost:5173' ||
-  'https://schoolflo.vercel.app';
+// An explicit list, matched exactly. CLIENT_URL may hold several comma
+// separated origins. The previous substring match on a single string would
+// have admitted `https://schoolflo.vercel.app.attacker.com`.
+const DEFAULT_ORIGINS = [
+  'http://localhost:5173',
+  'https://schoolflo.vercel.app',
+];
+
+const normalizeOrigin = (origin) => origin.trim().replace(/\/$/, '');
+
+const allowedOrigins = [
+  ...new Set(
+    [...(process.env.CLIENT_URL || '').split(','), ...DEFAULT_ORIGINS]
+      .map(normalizeOrigin)
+      .filter(Boolean),
+  ),
+];
+
+if (!process.env.CLIENT_URL) {
+  console.warn(
+    '⚠️  CLIENT_URL is not set — falling back to default CORS origins:',
+    DEFAULT_ORIGINS.join(', '),
+  );
+}
 
 app.use(
   cors({
@@ -66,7 +84,7 @@ app.use(
       // Allow mobile apps / Postman / server requests
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.includes(normalizeOrigin(origin))) {
         return callback(null, true);
       }
 
@@ -79,6 +97,11 @@ app.use(
 );
 
 app.use(compression());
+
+// Gateway webhooks are mounted ahead of the JSON parser: signature
+// verification needs the untouched raw body. They sit outside /api so the
+// rate limiter cannot reject a genuine payment notification.
+app.use('/webhooks', webhookRoutes);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

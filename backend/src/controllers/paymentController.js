@@ -8,16 +8,13 @@ const {
 } = require('../utils/apiResponse');
 const {
   initializePaystack,
-  verifyPaystack,
   initializeFlutterwave,
-  verifyFlutterwave,
   generateReceiptNumber,
   getFinancialSummary,
+  resolvePayableAmount,
+  settlePayment,
+  sendReceiptEmail,
 } = require('../services/paymentService');
-const {
-  sendEmail,
-  emailTemplates,
-} = require('../services/notificationService');
 
 // @desc    Create fee structure for a class/term
 // @route   POST /api/v1/fees
@@ -54,12 +51,38 @@ const getFeeStructures = async (req, res) => {
   }
 };
 
+/**
+ * Who is allowed to act on a given student's fees.
+ * Returns an error message, or null when the request is permitted.
+ */
+const checkStudentAccess = (user, studentId) => {
+  if (user.role === 'Admin') return null;
+
+  if (user.role === 'Student') {
+    return String(user._id) === String(studentId)
+      ? null
+      : 'You can only act on your own fees.';
+  }
+
+  if (user.role === 'Parent') {
+    const childIds = user.parentProfile?.children?.map(String) || [];
+    return childIds.includes(String(studentId))
+      ? null
+      : "You can only act on your own children's fees.";
+  }
+
+  return 'You are not permitted to make payments.';
+};
+
 // @desc    Initialize payment via Paystack
 // @route   POST /api/v1/payments/initialize/paystack
-// @access  Student, Parent, Admin
+// @access  Student (own), Parent (own child), Admin
 const initPaystack = async (req, res) => {
   try {
     const { studentId, feeStructureId, amount } = req.body;
+
+    const denied = checkStudentAccess(req.user, studentId);
+    if (denied) return sendError(res, 403, denied);
 
     const student = await User.findById(studentId).select(
       'firstName lastName email',
@@ -72,9 +95,18 @@ const initPaystack = async (req, res) => {
     );
     if (!feeStructure) return sendError(res, 404, 'Fee structure not found');
 
+    // The server decides what is owed and what may be sent to the gateway.
+    // Any `amount` in the request body is treated only as a part-payment
+    // request, and is rejected if it exceeds the outstanding balance.
+    const { amount: payableAmount, outstanding } = await resolvePayableAmount({
+      studentId,
+      feeStructure,
+      requestedAmount: amount,
+    });
+
     const { authorizationUrl, reference } = await initializePaystack({
       email: student.email,
-      amount,
+      amount: payableAmount,
       metadata: {
         studentId,
         feeStructureId,
@@ -91,7 +123,7 @@ const initPaystack = async (req, res) => {
       term: feeStructure.term,
       academicYear: feeStructure.academicYear,
       amountPaid: 0,
-      amountDue: feeStructure.totalAmount,
+      amountDue: payableAmount,
       gateway: 'Paystack',
       transactionRef: reference,
       status: 'Pending',
@@ -101,55 +133,61 @@ const initPaystack = async (req, res) => {
     return sendSuccess(res, 200, 'Payment initialized', {
       authorizationUrl,
       reference,
+      amount: payableAmount,
+      outstanding,
     });
   } catch (error) {
-    return sendError(res, 500, error.message);
+    return sendError(res, error.statusCode || 500, error.message);
   }
 };
 
-// @desc    Verify Paystack payment
+// @desc    Verify Paystack payment (browser redirect path)
 // @route   POST /api/v1/payments/verify/paystack
 // @access  Student, Parent, Admin
+//
+// Best-effort confirmation for the payer who made it back to the site. The
+// webhook at POST /webhooks/paystack is the authoritative path — both call the
+// same idempotent settlePayment(), so whichever arrives first wins and the
+// second is a no-op.
 const verifyPaystackPayment = async (req, res) => {
   try {
     const { reference } = req.body;
-    const verification = await verifyPaystack(reference);
+    if (!reference) return sendError(res, 400, 'Payment reference is required');
 
-    if (!verification.success) {
-      return sendError(res, 400, 'Payment verification failed');
+    // Establish who the reference belongs to before touching it, so a leaked
+    // reference cannot be used to probe another family's fee records.
+    const existing = await Payment.findOne({ transactionRef: reference }).select(
+      'student',
+    );
+    if (!existing) return sendError(res, 404, 'Payment record not found');
+
+    const denied = checkStudentAccess(req.user, existing.student);
+    if (denied) return sendError(res, 403, denied);
+
+    const { settled, reason, payment } = await settlePayment({ reference });
+
+    if (!settled) {
+      if (reason === 'currency_mismatch') {
+        return sendError(res, 400, 'Payment was made in an unsupported currency');
+      }
+      return sendError(res, 400, 'Payment has not been completed');
     }
-
-    const payment = await Payment.findOneAndUpdate(
-      { transactionRef: reference },
-      {
-        amountPaid: verification.amount,
-        status: 'Paid',
-        balance: 0,
-        paymentDate: new Date(verification.paidAt),
-        receiptNumber: generateReceiptNumber(),
-        gatewayResponse: verification.raw,
-      },
-      { new: true },
-    )
-      .populate('student', 'firstName lastName email')
-      .populate('feeStructure', 'title term academicYear');
-
-    if (!payment) return sendError(res, 404, 'Payment record not found');
-
-    // Send receipt email
 
     return sendSuccess(res, 200, 'Payment verified and confirmed', { payment });
   } catch (error) {
-    return sendError(res, 500, error.message);
+    return sendError(res, error.statusCode || 500, error.message);
   }
 };
 
 // @desc    Initialize Flutterwave payment
 // @route   POST /api/v1/payments/initialize/flutterwave
-// @access  Student, Parent, Admin
+// @access  Student (own), Parent (own child), Admin
 const initFlutterwave = async (req, res) => {
   try {
     const { studentId, feeStructureId, amount } = req.body;
+
+    const denied = checkStudentAccess(req.user, studentId);
+    if (denied) return sendError(res, 403, denied);
 
     const student = await User.findById(studentId).select(
       'firstName lastName email phone',
@@ -159,9 +197,15 @@ const initFlutterwave = async (req, res) => {
     const feeStructure = await Fees.findById(feeStructureId);
     if (!feeStructure) return sendError(res, 404, 'Fee structure not found');
 
+    const { amount: payableAmount, outstanding } = await resolvePayableAmount({
+      studentId,
+      feeStructure,
+      requestedAmount: amount,
+    });
+
     const { authorizationUrl, reference } = await initializeFlutterwave({
       email: student.email,
-      amount,
+      amount: payableAmount,
       name: `${student.firstName} ${student.lastName}`,
       phone: student.phone,
       metadata: { studentId, feeStructureId },
@@ -173,18 +217,21 @@ const initFlutterwave = async (req, res) => {
       term: feeStructure.term,
       academicYear: feeStructure.academicYear,
       amountPaid: 0,
-      amountDue: feeStructure.totalAmount,
+      amountDue: payableAmount,
       gateway: 'Flutterwave',
       transactionRef: reference,
       status: 'Pending',
+      processedBy: req.user._id,
     });
 
     return sendSuccess(res, 200, 'Payment initialized', {
       authorizationUrl,
       reference,
+      amount: payableAmount,
+      outstanding,
     });
   } catch (error) {
-    return sendError(res, 500, error.message);
+    return sendError(res, error.statusCode || 500, error.message);
   }
 };
 
@@ -230,6 +277,8 @@ const recordManualPayment = async (req, res) => {
       { path: 'student', select: 'firstName lastName email' },
       { path: 'feeStructure', select: 'title term' },
     ]);
+
+    await sendReceiptEmail(payment);
 
     return sendSuccess(res, 201, 'Payment recorded', { payment });
   } catch (error) {

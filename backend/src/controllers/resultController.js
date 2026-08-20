@@ -33,6 +33,29 @@ const computeResultFields = (scores = {}) => {
   };
 };
 
+/**
+ * Who may read a given student's academic records.
+ * Returns an error message, or null when the request is permitted.
+ */
+const checkResultAccess = (user, studentId) => {
+  if (user.role === 'Admin' || user.role === 'Teacher') return null;
+
+  if (user.role === 'Student') {
+    return String(user._id) === String(studentId)
+      ? null
+      : 'You can only view your own results.';
+  }
+
+  if (user.role === 'Parent') {
+    const childIds = user.parentProfile?.children?.map(String) || [];
+    return childIds.includes(String(studentId))
+      ? null
+      : "You can only view your own children's results.";
+  }
+
+  return 'Access denied.';
+};
+
 // @desc    Enter/update scores for a student subject
 // @route   POST /api/v1/results
 // @access  Teacher, Admin
@@ -151,8 +174,6 @@ const bulkUpsertResults = async (req, res) => {
 // @route   POST /api/v1/results/publish
 // @access  Admin
 const publishResults = async (req, res) => {
-  const showResults = await Result.findOne().select('scores totalScore grade');
-
   try {
     const { class: classId, term, academicYear } = req.body;
 
@@ -214,19 +235,65 @@ const publishResults = async (req, res) => {
   }
 };
 
-// Background: email parents
+// Background: email parents that a term's results are available.
+// Runs after the response has been sent, so a slow or failing SMTP server can
+// never hold up (or roll back) a publish that already succeeded.
 const notifyParentsOfResults = async (studentIds, term, academicYear) => {
-  for (const studentId of studentIds) {
-    const reportCard = await generateReportCard(studentId, term, academicYear);
-    if (!reportCard) continue;
+  let sent = 0;
+  let skipped = 0;
 
-    const student = await User.findById(studentId).populate(
-      'studentProfile.parentId',
-      'email firstName',
-    );
-    const parent = student?.studentProfile?.parentId;
-    if (!parent?.email) continue;
+  for (const studentId of studentIds) {
+    try {
+      const reportCard = await generateReportCard(
+        studentId,
+        term,
+        academicYear,
+      );
+      if (!reportCard) {
+        skipped += 1;
+        continue;
+      }
+
+      const student = await User.findById(studentId)
+        .select('firstName lastName studentProfile.parentId')
+        .populate('studentProfile.parentId', 'email firstName');
+
+      const parent = student?.studentProfile?.parentId;
+      if (!parent?.email) {
+        skipped += 1;
+        continue;
+      }
+
+      const { average, overallPosition, totalStudentsInClass } =
+        reportCard.summary;
+
+      const { success } = await sendEmail({
+        to: parent.email,
+        subject: `${term} results for ${student.firstName} ${student.lastName}`,
+        html: emailTemplates.resultPublished({
+          studentName: `${student.firstName} ${student.lastName}`,
+          term,
+          academicYear,
+          average,
+          position: `${overallPosition} of ${totalStudentsInClass}`,
+          loginUrl: `${process.env.CLIENT_URL}/login`,
+        }),
+      });
+
+      if (success) sent += 1;
+      else skipped += 1;
+    } catch (error) {
+      skipped += 1;
+      console.error(
+        `Result notification failed for student ${studentId}: ${error.message}`,
+      );
+    }
   }
+
+  console.log(
+    `Result notifications for ${term} ${academicYear}: ${sent} sent, ${skipped} skipped`,
+  );
+  return { sent, skipped };
 };
 
 // @desc    Get report card for a student
@@ -240,22 +307,8 @@ const getReportCard = async (req, res) => {
     if (!term || !academicYear)
       return sendError(res, 400, 'Term and academicYear are required');
 
-    // Parents can only view their children
-    if (req.user.role === 'Parent') {
-      const childIds = req.user.parentProfile?.children?.map(String) || [];
-      if (!childIds.includes(studentId)) {
-        return sendError(
-          res,
-          403,
-          "You can only view your own children's results",
-        );
-      }
-    }
-
-    // Students can only view their own
-    if (req.user.role === 'Student' && String(req.user._id) !== studentId) {
-      return sendError(res, 403, 'Access denied');
-    }
+    const denied = checkResultAccess(req.user, studentId);
+    if (denied) return sendError(res, 403, denied);
 
     const reportCard = await generateReportCard(studentId, term, academicYear);
     if (!reportCard)
@@ -310,6 +363,9 @@ const getClassResults = async (req, res) => {
 const getStudentResultHistory = async (req, res) => {
   try {
     const { studentId } = req.params;
+
+    const denied = checkResultAccess(req.user, studentId);
+    if (denied) return sendError(res, 403, denied);
 
     const results = await Result.find({ student: studentId, isPublished: true })
       .populate('subject', 'name code')

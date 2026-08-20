@@ -65,6 +65,23 @@ const register = async (req, res) => {
     const accessToken = user.generateAccessToken();
     const refreshToken = user.generateRefreshToken();
 
+    // Welcome email carrying the credentials the admin just set. Sent before
+    // `password` is cleared below, and never allowed to fail the registration —
+    // the account exists either way.
+    sendEmail({
+      to: user.email,
+      subject: 'Your account is ready',
+      html: emailTemplates.welcome({
+        firstName: user.firstName,
+        email: user.email,
+        password,
+        role: user.role,
+        loginUrl: `${process.env.CLIENT_URL}/login`,
+      }),
+    }).catch((err) =>
+      console.error(`Welcome email failed for ${user.email}: ${err.message}`),
+    );
+
     user.password = undefined;
 
     return sendSuccess(res, 201, 'User registered successfully', {
@@ -179,25 +196,60 @@ const updatePassword = async (req, res) => {
   }
 };
 
+const RESET_TOKEN_TTL_MINUTES = 10;
+
 // @desc    Forgot password (send reset email)
 // @route   POST /api/v1/auth/forgot-password
 // @access  Public
 const forgotPassword = async (req, res) => {
+  // Always the same answer, whether or not the address is on file — a
+  // different response for unknown emails turns this public endpoint into a
+  // way to enumerate the school's accounts.
+  const genericMessage =
+    'If an account exists for that email address, a password reset link has been sent.';
+
   try {
-    const user = await User.findOne({ email: req.body.email });
-    if (!user) return sendError(res, 404, 'No user with that email address');
+    const { email } = req.body;
+    if (!email) return sendError(res, 400, 'Email is required');
+
+    const user = await User.findOne({ email: String(email).toLowerCase() });
+    if (!user || !user.isActive) {
+      return sendSuccess(res, 200, genericMessage);
+    }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     user.passwordResetToken = crypto
       .createHash('sha256')
       .update(resetToken)
       .digest('hex');
-    user.passwordResetExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    user.passwordResetExpire = Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000;
     await user.save({ validateBeforeSave: false });
 
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
-    return sendSuccess(res, 200, 'Password reset email sent');
+    const { success } = await sendEmail({
+      to: user.email,
+      subject: 'Reset your password',
+      html: emailTemplates.passwordReset({
+        firstName: user.firstName,
+        resetUrl,
+        expiryMinutes: RESET_TOKEN_TTL_MINUTES,
+      }),
+    });
+
+    if (!success) {
+      // Don't leave a live token behind that its owner never received.
+      user.passwordResetToken = undefined;
+      user.passwordResetExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+      return sendError(
+        res,
+        502,
+        'Could not send the reset email. Please try again shortly.',
+      );
+    }
+
+    return sendSuccess(res, 200, genericMessage);
   } catch (error) {
     return sendError(res, 500, error.message);
   }

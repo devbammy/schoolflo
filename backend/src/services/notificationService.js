@@ -113,6 +113,28 @@ const emailTemplates = {
     </div>
   `,
 
+  passwordReset: ({ firstName, resetUrl, expiryMinutes }) => `
+    <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
+      <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(15, 28, 63, 0.1);">
+        <div style="background: #1a4fab; padding: 40px 20px; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: -0.5px;">Reset Your Password</h1>
+        </div>
+        <div style="padding: 40px; color: #3d4f73; line-height: 1.6;">
+          <h2 style="color: #0f1c3f; margin-top: 0;">Hello, ${firstName}!</h2>
+          <p style="font-size: 16px;">We received a request to reset the password on your account. Click the button below to choose a new one.</p>
+
+          <a href="${resetUrl}" style="display: block; background: #1a4fab; color: #ffffff; padding: 16px; border-radius: 10px; text-decoration: none; text-align: center; font-weight: 600; font-size: 16px; margin: 28px 0; box-shadow: 0 4px 12px rgba(26, 79, 171, 0.2);">Choose a New Password</a>
+
+          <div style="background: #fff7ed; border-radius: 12px; padding: 16px; border: 1px solid #fed7aa; color: #9a3412; font-size: 14px;">
+            This link expires in <strong>${expiryMinutes} minutes</strong> and can only be used once.
+          </div>
+
+          <p style="color: #7889a8; font-size: 13px; margin-top: 32px;">If you didn't request this, you can safely ignore this email — your password will stay as it is.</p>
+        </div>
+      </div>
+    </div>
+  `,
+
   paymentReceipt: ({
     studentName,
     receiptNumber,

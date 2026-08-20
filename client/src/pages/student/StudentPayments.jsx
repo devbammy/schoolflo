@@ -51,10 +51,12 @@ export default function StudentPayments() {
   const handlePaystack = async (fee) => {
     setPaying(fee._id);
     try {
+      // No amount sent: the server computes the outstanding balance for this
+      // fee and charges exactly that, so part-payments already made are not
+      // billed twice.
       const res = await paymentService.initPaystack({
         studentId,
         feeStructureId: fee._id,
-        amount: fee.totalAmount,
       });
       window.open(res.data.data.authorizationUrl, '_blank');
       toast.success('Redirecting to payment gateway...');
