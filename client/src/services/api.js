@@ -6,24 +6,39 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+/**
+ * The auth store registers itself here at start-up.
+ *
+ * api.js cannot import the store directly — the store imports api, and the
+ * resulting cycle risks a temporal-dead-zone error at module init. This keeps
+ * the dependency pointing one way while still giving the interceptors a single
+ * source of truth for tokens, instead of hand-parsing localStorage and writing
+ * refreshed tokens back by hand (two copies of the same state kept in sync
+ * manually).
+ */
+let authBridge = {
+  getAccessToken: () => null,
+  getRefreshToken: () => null,
+  setAccessToken: () => {},
+  onSessionExpired: () => {},
+};
+
+export const registerAuthBridge = (bridge) => {
+  authBridge = { ...authBridge, ...bridge };
+};
+
 // Request interceptor — attach token
 api.interceptors.request.use(
   (config) => {
-    const stored = localStorage.getItem('smp-auth');
-    if (stored) {
-      try {
-        const { state } = JSON.parse(stored);
-        if (state?.accessToken) {
-          config.headers.Authorization = `Bearer ${state.accessToken}`;
-        }
-      } catch {}
-    }
+    const token = authBridge.getAccessToken();
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
   (error) => Promise.reject(error),
 );
 
-// Response interceptor — handle 401 and retry
+// Response interceptor — refresh once on 401, queueing anything that arrives
+// while the refresh is in flight.
 let isRefreshing = false;
 let failedQueue = [];
 
@@ -40,62 +55,50 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (
-      error.response?.status === 401 &&
-      !originalRequest._retry &&
-      !originalRequest.url?.includes('/auth/login') &&
-      !originalRequest.url?.includes('/auth/refresh')
-    ) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return api(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
+    const isAuthCall =
+      originalRequest?.url?.includes('/auth/login') ||
+      originalRequest?.url?.includes('/auth/refresh');
 
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const stored = localStorage.getItem('smp-auth');
-        if (!stored) throw new Error('No stored auth state');
-        const parsed = JSON.parse(stored);
-        const state = parsed.state || {};
-        if (!state.refreshToken) throw new Error('No refresh token');
-
-        const { data } = await api.post('/auth/refresh', {
-          refreshToken: state.refreshToken,
-        });
-        const newToken = data.data.accessToken;
-
-        // Update stored token
-        const updated = {
-          ...JSON.parse(stored),
-          state: { ...state, accessToken: newToken },
-        };
-        localStorage.setItem('smp-auth', JSON.stringify(updated));
-
-        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-        processQueue(null, newToken);
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        return api(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        localStorage.removeItem('smp-auth');
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
+    if (error.response?.status !== 401 || originalRequest?._retry || isAuthCall) {
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      }).then((token) => {
+        originalRequest.headers.Authorization = `Bearer ${token}`;
+        return api(originalRequest);
+      });
+    }
+
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      const refreshToken = authBridge.getRefreshToken();
+      if (!refreshToken) throw new Error('No refresh token');
+
+      const { data } = await api.post('/auth/refresh', { refreshToken });
+      const newToken = data.data.accessToken;
+
+      authBridge.setAccessToken(newToken);
+      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+
+      processQueue(null, newToken);
+      originalRequest.headers.Authorization = `Bearer ${newToken}`;
+      return api(originalRequest);
+    } catch (refreshError) {
+      processQueue(refreshError, null);
+      authBridge.onSessionExpired();
+
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   },
 );
 

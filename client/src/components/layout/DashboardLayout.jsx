@@ -258,8 +258,9 @@ export default function DashboardLayout() {
   const navItems = NAV_CONFIG[user?.role] || [];
   const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : '?';
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    // Awaited so the server-side session is revoked before we navigate away.
+    await logout();
     navigate('/login');
   };
 

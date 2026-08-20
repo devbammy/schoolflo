@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Class = require('../models/Class');
 const CATracker = require('../models/CATracker');
 const { Result } = require('../models/Exam');
+const AppError = require('../utils/AppError');
 
 class PromotionService {
   // Create promotion batch
@@ -30,11 +31,11 @@ class PromotionService {
       .populate('criteria.coreSubjects');
 
     if (!promotion) {
-      throw new Error('Promotion batch not found');
+      throw AppError.notFound('Promotion batch not found');
     }
 
     if (promotion.status === 'Completed') {
-      throw new Error('Promotion already completed');
+      throw AppError.conflict('Promotion already completed');
     }
 
     // Get all students in the class
@@ -171,7 +172,7 @@ class PromotionService {
     const promotion = await Promotion.findById(promotionId);
 
     if (!promotion) {
-      throw new Error('Promotion batch not found');
+      throw AppError.notFound('Promotion batch not found');
     }
 
     const studentIndex = promotion.students.findIndex(
@@ -179,7 +180,7 @@ class PromotionService {
     );
 
     if (studentIndex === -1) {
-      throw new Error('Student not found in promotion batch');
+      throw AppError.notFound('Student not found in promotion batch');
     }
 
     // Update the student's promotion status
@@ -201,11 +202,11 @@ class PromotionService {
       .populate('students.promotedTo');
 
     if (!promotion) {
-      throw new Error('Promotion batch not found');
+      throw AppError.notFound('Promotion batch not found');
     }
 
     if (promotion.status !== 'Completed') {
-      throw new Error('Promotion must be completed before applying');
+      throw AppError.badRequest('Promotion must be completed before applying');
     }
 
     const updatePromises = promotion.students.map(async (entry) => {
@@ -245,7 +246,7 @@ class PromotionService {
       .populate('createdBy', 'firstName lastName');
 
     if (!promotion) {
-      throw new Error('Promotion batch not found');
+      throw AppError.notFound('Promotion batch not found');
     }
 
     return promotion;
@@ -273,11 +274,11 @@ class PromotionService {
     const promotion = await Promotion.findById(id);
 
     if (!promotion) {
-      throw new Error('Promotion batch not found');
+      throw AppError.notFound('Promotion batch not found');
     }
 
     if (promotion.status === 'Completed') {
-      throw new Error('Cannot delete completed promotion batch');
+      throw AppError.badRequest('Cannot delete completed promotion batch');
     }
 
     await promotion.deleteOne();
@@ -289,7 +290,7 @@ class PromotionService {
     const promotion = await Promotion.findById(promotionId);
 
     if (!promotion) {
-      throw new Error('Promotion batch not found');
+      throw AppError.notFound('Promotion batch not found');
     }
 
     const stats = {

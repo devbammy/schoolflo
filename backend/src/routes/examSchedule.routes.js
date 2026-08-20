@@ -3,12 +3,18 @@ const router = express.Router();
 const examScheduleController = require('../controllers/examScheduleController');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
+const validate = require('../middleware/validate');
+const {
+  examScheduleRules,
+  idParam,
+} = require('../validators/operationsValidators');
 
 // Admin & Teacher routes
 router.post(
   '/',
   protect,
   authorize('Admin', 'Teacher'),
+  validate(examScheduleRules),
   examScheduleController.createSchedule,
 );
 
@@ -20,6 +26,7 @@ router.put(
   '/:id',
   protect,
   authorize('Admin', 'Teacher'),
+  validate(idParam),
   examScheduleController.updateSchedule,
 );
 
@@ -27,6 +34,7 @@ router.post(
   '/:id/publish',
   protect,
   authorize('Admin'),
+  validate(idParam),
   examScheduleController.publishSchedule,
 );
 
@@ -34,6 +42,7 @@ router.delete(
   '/:id',
   protect,
   authorize('Admin'),
+  validate(idParam),
   examScheduleController.deleteSchedule,
 );
 

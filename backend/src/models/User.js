@@ -204,19 +204,22 @@ UserSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Generate JWT Access Token
+// Generate JWT Access Token.
+// Short lived on purpose: an access token cannot be revoked, so its lifetime
+// IS its blast radius. The client refreshes transparently on 401, and the
+// refresh token behind it is revocable (see models/Session.js).
 UserSchema.methods.generateAccessToken = function () {
   return jwt.sign(
     { id: this._id, role: this.role, email: this.email },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE || '30d' },
+    { expiresIn: process.env.JWT_EXPIRE || '1h' },
   );
 };
 
 // Generate JWT Refresh Token
 UserSchema.methods.generateRefreshToken = function () {
   return jwt.sign({ id: this._id }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRE || '90d',
+    expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d',
   });
 };
 

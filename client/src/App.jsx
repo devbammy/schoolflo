@@ -1,80 +1,108 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from './store/authStore';
 import api from './services/api';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import './styles/main.scss';
 
-// Auth Pages
-import LoginPage from './pages/auth/LoginPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-
-// Layout
+// Layout and login are needed on first paint, so they stay in the main bundle.
 import DashboardLayout from './components/layout/DashboardLayout';
+import LoginPage from './pages/auth/LoginPage';
 
-// Admin Pages
-import AdminDashboard from './pages/admin/AdminDashboard';
-import StudentsPage from './pages/admin/StudentsPage';
-import TeachersPage from './pages/admin/TeachersPage';
-import ParentsPage from './pages/admin/ParentsPage';
-import ClassesPage from './pages/admin/ClassesPage';
-import SubjectsPage from './pages/admin/SubjectsPage';
-import FeesPage from './pages/admin/FeesPage';
-import PaymentsPage from './pages/admin/PaymentsPage';
-import AnnouncementsPage from './pages/admin/AnnouncementsPage';
-import ResultsAdminPage from './pages/admin/ResultsAdminPage';
-import TimetablePage from './pages/admin/TimetablePage';
-import LibraryPage from './pages/admin/LibraryPage';
-import AcademicCalendarPage from './pages/admin/AcademicCalendarPage';
-import ExamSchedules from './pages/admin/ExamSchedules';
-import Promotions from './pages/admin/Promotions';
-import Certificates from './pages/admin/Certificates';
+// Everything else is split per route. Previously all 45 pages were imported
+// eagerly, so a parent checking one result downloaded the entire admin panel.
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
-// Teacher Pages
-import TeacherDashboard from './pages/teacher/TeacherDashboard';
-import AttendancePage from './pages/teacher/AttendancePage';
-import AssignmentsTeacherPage from './pages/teacher/AssignmentsPage';
-import GradesPage from './pages/teacher/GradesPage';
-import TeacherTimetable from './pages/teacher/TeacherTimetable';
-import TeacherExamSchedule from './pages/teacher/TeacherExamSchedule';
+// Admin
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const StudentsPage = lazy(() => import('./pages/admin/StudentsPage'));
+const TeachersPage = lazy(() => import('./pages/admin/TeachersPage'));
+const ParentsPage = lazy(() => import('./pages/admin/ParentsPage'));
+const ClassesPage = lazy(() => import('./pages/admin/ClassesPage'));
+const SubjectsPage = lazy(() => import('./pages/admin/SubjectsPage'));
+const FeesPage = lazy(() => import('./pages/admin/FeesPage'));
+const PaymentsPage = lazy(() => import('./pages/admin/PaymentsPage'));
+const AnnouncementsPage = lazy(() => import('./pages/admin/AnnouncementsPage'));
+const ResultsAdminPage = lazy(() => import('./pages/admin/ResultsAdminPage'));
+const TimetablePage = lazy(() => import('./pages/admin/TimetablePage'));
+const LibraryPage = lazy(() => import('./pages/admin/LibraryPage'));
+const AcademicCalendarPage = lazy(() =>
+  import('./pages/admin/AcademicCalendarPage'),
+);
+const ExamSchedules = lazy(() => import('./pages/admin/ExamSchedules'));
+const Promotions = lazy(() => import('./pages/admin/Promotions'));
+const Certificates = lazy(() => import('./pages/admin/Certificates'));
 
-// Student Pages
-import StudentDashboard from './pages/student/StudentDashboard';
-import StudentResults from './pages/student/StudentResults';
-import StudentAssignments from './pages/student/StudentAssignments';
-import StudentPayments from './pages/student/StudentPayments';
-import StudentTimetable from './pages/student/StudentTimetable';
-import StudentExamSchedule from './pages/student/StudentExamSchedule';
-import StudentCertificates from './pages/student/StudentCertificates';
-import CATracking from './pages/student/CATracking';
+// Teacher
+const TeacherDashboard = lazy(() => import('./pages/teacher/TeacherDashboard'));
+const AttendancePage = lazy(() => import('./pages/teacher/AttendancePage'));
+const AssignmentsTeacherPage = lazy(() =>
+  import('./pages/teacher/AssignmentsPage'),
+);
+const GradesPage = lazy(() => import('./pages/teacher/GradesPage'));
+const TeacherTimetable = lazy(() => import('./pages/teacher/TeacherTimetable'));
+const TeacherExamSchedule = lazy(() =>
+  import('./pages/teacher/TeacherExamSchedule'),
+);
 
-// Parent Pages
-import ParentDashboard from './pages/parent/ParentDashboard';
-import ParentResults from './pages/parent/ParentResults';
-import ParentPayments from './pages/parent/ParentPayments';
-import ParentTimetable from './pages/parent/ParentTimetable';
-import ParentExamSchedule from './pages/parent/ParentExamSchedule';
-import ParentAssignments from './pages/parent/ParentAssignments';
-import ParentCertificates from './pages/parent/ParentCertificates';
+// Student
+const StudentDashboard = lazy(() => import('./pages/student/StudentDashboard'));
+const StudentResults = lazy(() => import('./pages/student/StudentResults'));
+const StudentAssignments = lazy(() =>
+  import('./pages/student/StudentAssignments'),
+);
+const StudentPayments = lazy(() => import('./pages/student/StudentPayments'));
+const StudentTimetable = lazy(() => import('./pages/student/StudentTimetable'));
+const StudentExamSchedule = lazy(() =>
+  import('./pages/student/StudentExamSchedule'),
+);
+const StudentCertificates = lazy(() =>
+  import('./pages/student/StudentCertificates'),
+);
+const CATracking = lazy(() => import('./pages/student/CATracking'));
 
-// Shared Pages
-import MyLibraryPage from './pages/shared/MyLibraryPage';
-import CalendarViewPage from './pages/shared/CalendarViewPage';
-import ViewResults from './pages/shared/ViewResults';
+// Parent
+const ParentDashboard = lazy(() => import('./pages/parent/ParentDashboard'));
+const ParentResults = lazy(() => import('./pages/parent/ParentResults'));
+const ParentPayments = lazy(() => import('./pages/parent/ParentPayments'));
+const ParentTimetable = lazy(() => import('./pages/parent/ParentTimetable'));
+const ParentExamSchedule = lazy(() =>
+  import('./pages/parent/ParentExamSchedule'),
+);
+const ParentAssignments = lazy(() => import('./pages/parent/ParentAssignments'));
+const ParentCertificates = lazy(() =>
+  import('./pages/parent/ParentCertificates'),
+);
+
+// Shared
+const MyLibraryPage = lazy(() => import('./pages/shared/MyLibraryPage'));
+const CalendarViewPage = lazy(() => import('./pages/shared/CalendarViewPage'));
+const ViewResults = lazy(() => import('./pages/shared/ViewResults'));
+
+const PageLoader = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
+    <div className="spinner" />
+  </div>
+);
 
 // Guards
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user } = useAuthStore();
+  // Selectors, so a guard does not re-render on every unrelated store change.
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const role = useAuthStore((s) => s.user?.role);
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (allowedRoles && !allowedRoles.includes(user?.role)) {
+  if (allowedRoles && !allowedRoles.includes(role)) {
     return <Navigate to="/unauthorized" replace />;
   }
   return children;
 };
 
 const RoleRedirect = () => {
-  const { user } = useAuthStore();
+  const role = useAuthStore((s) => s.user?.role);
 
   const map = {
     Admin: '/admin',
@@ -82,11 +110,11 @@ const RoleRedirect = () => {
     Student: '/student',
     Parent: '/parent',
   };
-  return <Navigate to={map[user?.role] || '/login'} replace />;
+  return <Navigate to={map[role] || '/login'} replace />;
 };
 
 export default function App() {
-  const { accessToken } = useAuthStore();
+  const accessToken = useAuthStore((s) => s.accessToken);
 
   useEffect(() => {
     if (accessToken) {
@@ -109,133 +137,143 @@ export default function App() {
         }}
       />
 
-      <Routes>
-        {/* Public */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* Public */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route
+              path="/reset-password/:token"
+              element={<ResetPasswordPage />}
+            />
 
-        {/* Role redirect */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <RoleRedirect />
-            </ProtectedRoute>
-          }
-        />
+            {/* Role redirect */}
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <RoleRedirect />
+                </ProtectedRoute>
+              }
+            />
 
-        {/* Admin */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute allowedRoles={['Admin']}>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<AdminDashboard />} />
-          <Route path="students" element={<StudentsPage />} />
-          <Route path="teachers" element={<TeachersPage />} />
-          <Route path="parents" element={<ParentsPage />} />
-          <Route path="classes" element={<ClassesPage />} />
-          <Route path="subjects" element={<SubjectsPage />} />
-          <Route path="fees" element={<FeesPage />} />
-          <Route path="payments" element={<PaymentsPage />} />
-          <Route path="results" element={<ResultsAdminPage />} />
-          <Route path="timetables" element={<TimetablePage />} />
-          <Route path="library" element={<LibraryPage />} />
-          <Route path="calendar" element={<AcademicCalendarPage />} />
-          <Route path="announcements" element={<AnnouncementsPage />} />
-          <Route path="exam-schedules" element={<ExamSchedules />} />
-          <Route path="promotions" element={<Promotions />} />
-          <Route path="certificates" element={<Certificates />} />
-        </Route>
-
-        {/* Teacher */}
-        <Route
-          path="/teacher"
-          element={
-            <ProtectedRoute allowedRoles={['Teacher']}>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<TeacherDashboard />} />
-          <Route path="attendance" element={<AttendancePage />} />
-          <Route path="assignments" element={<AssignmentsTeacherPage />} />
-          <Route path="grades" element={<GradesPage />} />
-          <Route path="library" element={<MyLibraryPage />} />
-          <Route path="announcements" element={<AnnouncementsPage />} />
-          <Route path="calendar" element={<CalendarViewPage />} />
-          <Route path="timetable" element={<TeacherTimetable />} />
-          <Route path="exam-schedules" element={<TeacherExamSchedule />} />
-        </Route>
-
-        {/* Student */}
-        <Route
-          path="/student"
-          element={
-            <ProtectedRoute allowedRoles={['Student']}>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<StudentDashboard />} />
-          <Route path="results" element={<StudentResults />} />
-          <Route path="assignments" element={<StudentAssignments />} />
-          <Route path="payments" element={<StudentPayments />} />
-          <Route path="library" element={<MyLibraryPage />} />
-          <Route path="timetable" element={<StudentTimetable />} />
-          <Route path="calendar" element={<CalendarViewPage />} />
-          <Route path="announcements" element={<AnnouncementsPage />} />
-          <Route path="print-results" element={<ViewResults />} />
-          <Route path="ca-tracking" element={<CATracking />} />
-          <Route path="exam-schedules" element={<StudentExamSchedule />} />
-          <Route path="certificates" element={<StudentCertificates />} />
-        </Route>
-
-        {/* Parent */}
-        <Route
-          path="/parent"
-          element={
-            <ProtectedRoute allowedRoles={['Parent']}>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<ParentDashboard />} />
-          <Route path="results" element={<ParentResults />} />
-          <Route path="payments" element={<ParentPayments />} />
-          <Route path="assignments" element={<ParentAssignments />} />
-          <Route path="timetable" element={<ParentTimetable />} />
-          <Route path="calendar" element={<CalendarViewPage />} />
-          <Route path="announcements" element={<AnnouncementsPage />} />
-          <Route path="print-results" element={<ViewResults />} />
-          <Route path="exam-schedules" element={<ParentExamSchedule />} />
-          <Route path="certificates" element={<ParentCertificates />} />
-        </Route>
-
-        <Route
-          path="/unauthorized"
-          element={
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '100vh',
-                gap: 16,
-              }}
+            {/* Admin */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={['Admin']}>
+                  <DashboardLayout />
+                </ProtectedRoute>
+              }
             >
-              <h2>Access Denied</h2>
-              <p>You don't have permission to view this page.</p>
-            </div>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+              <Route index element={<AdminDashboard />} />
+              <Route path="students" element={<StudentsPage />} />
+              <Route path="teachers" element={<TeachersPage />} />
+              <Route path="parents" element={<ParentsPage />} />
+              <Route path="classes" element={<ClassesPage />} />
+              <Route path="subjects" element={<SubjectsPage />} />
+              <Route path="fees" element={<FeesPage />} />
+              <Route path="payments" element={<PaymentsPage />} />
+              <Route path="results" element={<ResultsAdminPage />} />
+              <Route path="timetables" element={<TimetablePage />} />
+              <Route path="library" element={<LibraryPage />} />
+              <Route path="calendar" element={<AcademicCalendarPage />} />
+              <Route path="announcements" element={<AnnouncementsPage />} />
+              <Route path="exam-schedules" element={<ExamSchedules />} />
+              <Route path="promotions" element={<Promotions />} />
+              <Route path="certificates" element={<Certificates />} />
+            </Route>
+
+            {/* Teacher */}
+            <Route
+              path="/teacher"
+              element={
+                <ProtectedRoute allowedRoles={['Teacher']}>
+                  <DashboardLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<TeacherDashboard />} />
+              <Route path="attendance" element={<AttendancePage />} />
+              <Route path="assignments" element={<AssignmentsTeacherPage />} />
+              <Route path="grades" element={<GradesPage />} />
+              <Route path="library" element={<MyLibraryPage />} />
+              <Route path="announcements" element={<AnnouncementsPage />} />
+              <Route path="calendar" element={<CalendarViewPage />} />
+              <Route path="timetable" element={<TeacherTimetable />} />
+              <Route path="exam-schedules" element={<TeacherExamSchedule />} />
+            </Route>
+
+            {/* Student */}
+            <Route
+              path="/student"
+              element={
+                <ProtectedRoute allowedRoles={['Student']}>
+                  <DashboardLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<StudentDashboard />} />
+              <Route path="results" element={<StudentResults />} />
+              <Route path="assignments" element={<StudentAssignments />} />
+              <Route path="payments" element={<StudentPayments />} />
+              <Route path="library" element={<MyLibraryPage />} />
+              <Route path="timetable" element={<StudentTimetable />} />
+              <Route path="calendar" element={<CalendarViewPage />} />
+              <Route path="announcements" element={<AnnouncementsPage />} />
+              <Route path="print-results" element={<ViewResults />} />
+              <Route path="ca-tracking" element={<CATracking />} />
+              <Route path="exam-schedules" element={<StudentExamSchedule />} />
+              <Route path="certificates" element={<StudentCertificates />} />
+            </Route>
+
+            {/* Parent */}
+            <Route
+              path="/parent"
+              element={
+                <ProtectedRoute allowedRoles={['Parent']}>
+                  <DashboardLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<ParentDashboard />} />
+              <Route path="results" element={<ParentResults />} />
+              <Route path="payments" element={<ParentPayments />} />
+              <Route path="assignments" element={<ParentAssignments />} />
+              <Route path="timetable" element={<ParentTimetable />} />
+              <Route path="calendar" element={<CalendarViewPage />} />
+              <Route path="announcements" element={<AnnouncementsPage />} />
+              <Route path="print-results" element={<ViewResults />} />
+              <Route path="exam-schedules" element={<ParentExamSchedule />} />
+              <Route path="certificates" element={<ParentCertificates />} />
+            </Route>
+
+            <Route
+              path="/unauthorized"
+              element={
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '100vh',
+                    gap: 16,
+                  }}
+                >
+                  <h2>Access Denied</h2>
+                  <p>You don&apos;t have permission to view this page.</p>
+                </div>
+              }
+            />
+
+            {/* A real 404 — this used to redirect to '/', which hid typos and
+                broken links behind a silent bounce to the dashboard. */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

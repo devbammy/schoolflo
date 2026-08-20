@@ -8,13 +8,13 @@ const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
 const hpp = require('hpp');
 const axios = require('axios');
 
 const connectDB = require('./src/config/db');
 const errorHandler = require('./src/middleware/errorHandler');
 const { verifyTransport } = require('./src/services/notificationService');
+const { startJobQueue, stopJobQueue } = require('./src/services/jobQueue');
 
 // Route imports
 const authRoutes = require('./src/routes/auth');
@@ -89,7 +89,12 @@ app.use(
         return callback(null, true);
       }
 
-      return callback(new Error('CORS policy violation'));
+      // Flagged operational so a blocked origin gets a clean 403 instead of
+      // being logged and reported as an unexpected server fault.
+      const err = new Error('This origin is not allowed by CORS policy.');
+      err.statusCode = 403;
+      err.isOperational = true;
+      return callback(err);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -108,8 +113,19 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(mongoSanitize());
-app.use(xss());
 app.use(hpp());
+
+// `xss-clean` used to sit here. It was removed rather than replaced:
+//   - it has been unmaintained since 2019 and is deprecated by its author
+//   - it HTML-escapes every request field in place, so legitimate input is
+//     silently corrupted on the way in ("R&D" stored as "R&amp;D")
+//   - it defends the wrong layer. XSS is an output concern, and this API's
+//     only consumer is React, which escapes everything it renders. Nothing in
+//     the client uses dangerouslySetInnerHTML.
+//
+// If a field is ever rendered as raw HTML (a rich-text announcement body, say)
+// sanitize that specific field on write with `sanitize-html` — do not reach
+// for a blanket request-mangling middleware again.
 
 // Logging
 if (process.env.NODE_ENV === 'development') {
@@ -233,6 +249,10 @@ const startServer = async () => {
     // a round trip to each email. Non-fatal: the app runs without email.
     verifyTransport();
 
+    // Needs the Mongo connection above. Non-fatal: if it fails to start,
+    // enqueueEmail() falls back to sending inline.
+    await startJobQueue();
+
     const server = app.listen(PORT, () => {
       console.log(`
 🚀 Server running in ${process.env.NODE_ENV} mode
@@ -245,8 +265,12 @@ const startServer = async () => {
     const shutdown = (signal) => {
       console.log(`\n⚠️  ${signal} received. Shutting down gracefully...`);
 
-      server.close(() => {
+      server.close(async () => {
         console.log('✅ HTTP server closed');
+
+        // Let in-flight jobs finish rather than killing them mid-send.
+        await stopJobQueue().catch(() => {});
+
         process.exit(0);
       });
     };

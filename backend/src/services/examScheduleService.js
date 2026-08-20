@@ -3,6 +3,7 @@ const Class = require('../models/Class');
 const Subject = require('../models/Subject');
 const User = require('../models/User');
 const notificationService = require('./notificationService');
+const AppError = require('../utils/AppError');
 
 class ExamScheduleService {
   // Create exam schedule
@@ -53,7 +54,7 @@ class ExamScheduleService {
       .populate('createdBy', 'firstName lastName');
 
     if (!schedule) {
-      throw new Error('Exam schedule not found');
+      throw AppError.notFound('Exam schedule not found');
     }
 
     return schedule;
@@ -71,7 +72,7 @@ class ExamScheduleService {
     ]);
 
     if (!schedule) {
-      throw new Error('Exam schedule not found');
+      throw AppError.notFound('Exam schedule not found');
     }
 
     return schedule;
@@ -85,11 +86,11 @@ class ExamScheduleService {
       .populate('sessions.invigilator');
 
     if (!schedule) {
-      throw new Error('Exam schedule not found');
+      throw AppError.notFound('Exam schedule not found');
     }
 
     if (schedule.isPublished) {
-      throw new Error('Schedule already published');
+      throw AppError.conflict('Schedule already published');
     }
 
     schedule.isPublished = true;
@@ -158,7 +159,7 @@ class ExamScheduleService {
     const schedule = await ExamSchedule.findById(id);
 
     if (!schedule) {
-      throw new Error('Exam schedule not found');
+      throw AppError.notFound('Exam schedule not found');
     }
 
     await schedule.deleteOne();

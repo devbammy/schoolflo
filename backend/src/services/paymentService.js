@@ -3,7 +3,8 @@ const { v4: uuidv4 } = require('uuid');
 const { Payment } = require('../models/Fees');
 const Sequence = require('../models/Sequence');
 const { PAYMENT_STATUS, PAYMENT_GATEWAY } = require('../config/constants');
-const { sendEmail, emailTemplates } = require('./notificationService');
+const { emailTemplates } = require('./notificationService');
+const { enqueueEmail } = require('./jobQueue');
 
 // Smallest amount we will hand to a gateway. Anything below this is a nuisance
 // transaction that costs more in gateway fees than it collects.
@@ -275,7 +276,7 @@ const sendReceiptEmail = async (payment) => {
     const student = payment.student;
     if (!student?.email) return;
 
-    await sendEmail({
+    await enqueueEmail({
       to: student.email,
       subject: `Payment Receipt — ${payment.receiptNumber}`,
       html: emailTemplates.paymentReceipt({

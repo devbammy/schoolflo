@@ -36,6 +36,14 @@ router.post(
       return res.sendStatus(500);
     }
 
+    // express.raw() only populates a Buffer when the request actually carries
+    // Content-Type: application/json. Anything else leaves req.body as a plain
+    // object, which crypto.update() rejects outright — so check before hashing
+    // rather than throwing a 500 out of an unauthenticated endpoint.
+    if (!Buffer.isBuffer(req.body)) {
+      return res.sendStatus(400);
+    }
+
     const expected = crypto
       .createHmac('sha512', secret)
       .update(req.body)

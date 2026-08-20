@@ -3,12 +3,17 @@ const router = express.Router();
 const caTrackingController = require('../controllers/caTrackingController');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
+const validate = require('../middleware/validate');
+const {
+  caSyncRules,
+} = require('../validators/operationsValidators');
 
 // Sync trackers after results publish
 router.post(
   '/sync',
   protect,
   authorize('Admin', 'Teacher'),
+  validate(caSyncRules),
   caTrackingController.syncTrackers,
 );
 
