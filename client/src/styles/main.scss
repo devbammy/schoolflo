@@ -2838,3 +2838,340 @@ select.form-control {
     flex-basis: 100%;
   }
 }
+
+// ─── Admin Overview: Attention Panel ──────────────────────────────────────────
+// The worklist that answers "what needs my attention". It sits above the
+// metrics, so it is styled to be read first: bigger type, coloured spine per
+// severity, and the whole row clickable.
+.attention-panel {
+  margin-bottom: var(--space-8);
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  &__title {
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--clr-text-1);
+  }
+
+  &__count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--clr-text-3);
+    background: var(--clr-bg-alt);
+    border-radius: var(--radius-full);
+    padding: 3px 10px;
+  }
+}
+
+.attention-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.attention-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  text-align: left;
+  padding: var(--space-4) var(--space-5);
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-left: 4px solid var(--severity-color, var(--clr-info));
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover,
+  &:focus-visible {
+    transform: translateX(2px);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--severity-color, var(--clr-info));
+  }
+
+  &--critical {
+    --severity-color: var(--clr-danger);
+  }
+  &--warning {
+    --severity-color: var(--clr-warning);
+  }
+  &--info {
+    --severity-color: var(--clr-info);
+  }
+
+  &__icon {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    color: var(--severity-color);
+    background: color-mix(in srgb, var(--severity-color) 12%, transparent);
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--clr-text-1);
+  }
+
+  &__detail {
+    font-size: 0.8125rem;
+    color: var(--clr-text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--severity-color);
+  }
+
+  @media (max-width: 720px) {
+    align-items: flex-start;
+    flex-wrap: wrap;
+
+    &__detail {
+      white-space: normal;
+    }
+    &__cta {
+      margin-left: 52px;
+    }
+  }
+}
+
+.attention-clear {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  border: 1px solid
+    color-mix(in srgb, var(--clr-success) 30%, var(--clr-border));
+  background: color-mix(in srgb, var(--clr-success) 7%, var(--clr-surface));
+  color: var(--clr-success);
+
+  &__title {
+    font-weight: 600;
+    color: var(--clr-text-1);
+  }
+  &__detail {
+    font-size: 0.8125rem;
+    color: var(--clr-text-3);
+  }
+}
+
+// ─── Admin Overview: Pulse Tiles ──────────────────────────────────────────────
+// Denser than .stat-card on purpose — each tile carries a value, a trend and a
+// denominator, and four of them have to sit on one line without crowding.
+.pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.pulse-tile {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: var(--shadow-xs);
+  transition:
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &--link {
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      box-shadow: var(--shadow-sm);
+      border-color: var(--accent-color, var(--clr-primary));
+    }
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
+  }
+
+  &__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--clr-text-3);
+  }
+
+  &__icon {
+    color: var(--accent-color, var(--clr-primary));
+    display: flex;
+  }
+
+  &__value {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--clr-text-1);
+  }
+
+  &__foot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  &__delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+
+    &.is-up {
+      color: var(--clr-success);
+      background: color-mix(in srgb, var(--clr-success) 12%, transparent);
+    }
+    &.is-down {
+      color: var(--clr-danger);
+      background: color-mix(in srgb, var(--clr-danger) 12%, transparent);
+    }
+  }
+
+  &__meta {
+    font-size: 0.8125rem;
+    color: var(--clr-text-3);
+  }
+}
+
+// ─── Admin Overview: Upcoming + Announcement Rows ─────────────────────────────
+.upcoming-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.upcoming-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--clr-border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &__marker {
+    width: 4px;
+    align-self: stretch;
+    min-height: 32px;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--clr-text-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__meta {
+    font-size: 0.8125rem;
+    color: var(--clr-text-3);
+  }
+
+  &__when {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--clr-text-3);
+
+    &.is-soon {
+      color: var(--clr-accent);
+    }
+  }
+}
+
+.announcement-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--clr-border);
+
+  &:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  &__icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__meta {
+    font-size: 0.8125rem;
+    color: var(--clr-text-3);
+  }
+}

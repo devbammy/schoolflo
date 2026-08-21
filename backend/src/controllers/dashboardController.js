@@ -7,15 +7,16 @@ const { Assignment, Submission } = require('../models/Assignment');
 const Announcement = require('../models/Announcement');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
 const { getFeeBalances } = require('../services/paymentService');
+const { buildAdminOverview } = require('../services/adminOverviewService');
 
 // @desc    Admin master dashboard
 // @route   GET /api/v1/dashboard/admin
 // @access  Admin
 const getAdminDashboard = async (req, res) => {
   const { academicYear, term } = req.query;
-  const now = new Date();
 
   const [
+    overview,
     totalStudents,
     totalTeachers,
     totalParents,
@@ -23,9 +24,13 @@ const getAdminDashboard = async (req, res) => {
     paymentStats,
     recentPayments,
     announcements,
-    attendanceToday,
     assignmentStats,
   ] = await Promise.all([
+    // The three questions the overview actually answers: what is happening,
+    // what needs attention, what to do next. The counts below are context for
+    // those answers, not the point of the screen.
+    buildAdminOverview({ academicYear, term }),
+
     User.countDocuments({ role: 'Student' }),
     User.countDocuments({ role: 'Teacher' }),
     User.countDocuments({ role: 'Parent' }),
@@ -55,18 +60,6 @@ const getAdminDashboard = async (req, res) => {
       .populate('author', 'firstName lastName role')
       .sort({ publishedAt: -1 })
       .limit(5),
-
-    Attendance.aggregate([
-      {
-        $match: {
-          date: {
-            $gte: new Date(now.setHours(0, 0, 0, 0)),
-            $lt: new Date(now.setHours(23, 59, 59, 999)),
-          },
-        },
-      },
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-    ]),
 
     Assignment.aggregate([
       {
@@ -108,24 +101,23 @@ const getAdminDashboard = async (req, res) => {
     if (p._id === 'Paid') paymentSummary.totalRevenue = p.total;
   });
 
-  const attendanceSummary = { Present: 0, Absent: 0, Late: 0 };
-  attendanceToday.forEach((a) => {
-    attendanceSummary[a._id] = a.count;
-  });
-
   return sendSuccess(res, 200, 'Admin dashboard data', {
+    ...overview,
     stats: {
       totalStudents,
       totalTeachers,
       totalParents,
       activeStudents,
-      attendance: attendanceSummary,
+      // Today's roll call now comes from the overview, which knows the
+      // difference between "nobody was absent" and "nobody marked the register".
+      attendance: overview.pulse.attendance,
       payments: paymentSummary,
       assignments: assignmentStats[0] || { total: 0, active: 0 },
     },
     recentPayments,
     announcements,
     enrollmentTrend,
+    generatedAt: new Date(),
   });
 };
 
