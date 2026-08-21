@@ -152,8 +152,14 @@ export const subjectService = {
 
 export const attendanceService = {
   mark: (data) => api.post('/attendance/mark', data),
-  getClassAttendance: (classId, params) =>
+  // One day's register: the class list plus whatever was already marked, so
+  // reopening the page never silently resets everyone to Present.
+  getClassRegister: (classId, params) =>
     api.get(`/attendance/class/${classId}`, { params }),
+  getClassReport: (classId, params) =>
+    api.get(`/attendance/class/${classId}/report`, { params }),
+  // Only the classes the signed-in teacher may mark a register for.
+  getMyClasses: () => api.get('/attendance/my-classes'),
   getStudentSummary: (studentId, params) =>
     api.get(`/attendance/student/${studentId}/summary`, { params }),
 };
@@ -402,6 +408,29 @@ export const certificateService = {
   getChildrenCertificates: () =>
     api.get('/certificates/parent/children-certificates'),
   revoke: (id, data) => api.put(`/certificates/${id}/revoke`, data),
+};
+
+export const taskService = {
+  // Admin
+  create: (data) => api.post('/tasks', data),
+  update: (id, data) => api.put(`/tasks/${id}`, data),
+  review: (id, data) => api.post(`/tasks/${id}/review`, data),
+  cancel: (id, data) => api.patch(`/tasks/${id}/cancel`, data),
+  delete: (id) => api.delete(`/tasks/${id}`),
+  // Teacher — the server scopes the list to the caller, so there is no
+  // "my tasks" endpoint to get wrong.
+  start: (id) => api.patch(`/tasks/${id}/start`),
+  submit: (id, data) => api.post(`/tasks/${id}/submit`, data),
+  // Both
+  getAll: (params) => api.get('/tasks', { params }),
+  getById: (id) => api.get(`/tasks/${id}`),
+  getStats: () => api.get('/tasks/stats'),
+};
+
+export const searchService = {
+  query: (q, params, config) =>
+    api.get('/search', { params: { q, ...params }, ...config }),
+  getScopes: () => api.get('/search/scopes'),
 };
 
 export const auditService = {

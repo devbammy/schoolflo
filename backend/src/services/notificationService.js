@@ -453,6 +453,60 @@ const emailTemplates = {
       </div>
     </div>
   `,
+
+  taskAssigned: ({
+    teacherName,
+    title,
+    description,
+    priority,
+    dueDate,
+    assignedByName,
+    portalUrl,
+  }) => `
+    <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; border-left: 6px solid #0891b2;">
+        <div style="padding: 30px;">
+          <div style="color: #0891b2; font-size: 12px; font-weight: 800; text-transform: uppercase; margin-bottom: 5px;">New Task Assigned</div>
+          <h2 style="color: #0f1c3f; margin: 0 0 10px 0;">${title}</h2>
+          <p style="color: #3d4f73; margin: 0 0 15px 0;">Hi ${teacherName}, ${assignedByName} has assigned you a task.</p>
+          ${description ? `<p style="color: #3d4f73; margin: 0 0 20px 0;">${description}</p>` : ''}
+
+          <div style="background: #ecfeff; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+            <p style="margin: 0; color: #0e7490; font-size: 14px;">📅 Due: <strong>${new Date(dueDate).toLocaleDateString('en-GB', { dateStyle: 'full' })}</strong></p>
+            <p style="margin: 6px 0 0 0; color: #0e7490; font-size: 14px;">⚑ Priority: <strong>${priority}</strong></p>
+          </div>
+
+          <a href="${portalUrl}" style="display: inline-block; background: #0891b2; color: #ffffff; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600;">Open Task</a>
+        </div>
+      </div>
+    </div>
+  `,
+
+  taskReviewed: ({ teacherName, title, decision, comment, portalUrl }) => {
+    const approved = decision === 'approved';
+    const accent = approved ? '#059669' : '#dc2626';
+    const tint = approved ? '#d1fae5' : '#fee2e2';
+
+    return `
+    <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; border-left: 6px solid ${accent};">
+        <div style="padding: 30px;">
+          <div style="color: ${accent}; font-size: 12px; font-weight: 800; text-transform: uppercase; margin-bottom: 5px;">Task ${approved ? 'Approved' : 'Sent Back'}</div>
+          <h2 style="color: #0f1c3f; margin: 0 0 10px 0;">${title}</h2>
+          <p style="color: #3d4f73; margin: 0 0 20px 0;">Hi ${teacherName}, your submission was ${approved ? 'approved' : 'returned for changes'}.</p>
+          ${
+            comment
+              ? `<div style="background: ${tint}; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+                   <p style="margin: 0; color: #0f1c3f; font-size: 14px;">${comment}</p>
+                 </div>`
+              : ''
+          }
+          <a href="${portalUrl}" style="display: inline-block; background: ${accent}; color: #ffffff; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600;">View Task</a>
+        </div>
+      </div>
+    </div>
+  `;
+  },
 };
 
 module.exports = {

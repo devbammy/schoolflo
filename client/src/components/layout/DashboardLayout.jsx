@@ -24,8 +24,10 @@ import {
   Printer,
   BookCheck,
   ScrollText,
+  CheckSquare,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
+import GlobalSearch from '../common/GlobalSearch';
 
 const NAV_CONFIG = {
   Admin: [
@@ -88,7 +90,10 @@ const NAV_CONFIG = {
     },
     {
       section: 'Oversight',
-      items: [{ to: '/admin/audit', icon: ScrollText, label: 'Audit Log' }],
+      items: [
+        { to: '/admin/tasks', icon: CheckSquare, label: 'Tasks & Approvals' },
+        { to: '/admin/audit', icon: ScrollText, label: 'Audit Log' },
+      ],
     },
   ],
 
@@ -126,6 +131,7 @@ const NAV_CONFIG = {
           label: 'School Calendar',
         },
         { to: '/teacher/library', icon: BookMarked, label: 'Library' },
+        { to: '/teacher/tasks', icon: CheckSquare, label: 'My Tasks' },
       ],
     },
     {
@@ -391,7 +397,15 @@ export default function DashboardLayout() {
       <div className={`main-content ${collapsed ? 'sidebar-collapsed' : ''}`}>
         {/* Topbar */}
         <header className={`topbar ${collapsed ? 'sidebar-collapsed' : ''}`}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
             <button
               className="btn btn--ghost btn--icon hidden-mobile"
               onClick={() => setCollapsed(!collapsed)}
@@ -406,6 +420,8 @@ export default function DashboardLayout() {
             >
               <Menu size={20} />
             </button>
+
+            <GlobalSearch />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

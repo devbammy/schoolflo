@@ -85,8 +85,11 @@ const markAttendanceRules = [
   objectIdBody('classId', 'Class'),
   stringBody('section', 'Section', { optional: true, max: 30 }),
   dateBody('date', 'Date', { optional: false }),
-  termBody(),
-  academicYearBody(),
+  // Optional: the controller fills these in from the active academic calendar
+  // when the client does not send them, which is the normal case. They stay
+  // accepted so a register for an earlier term can still be backfilled.
+  termBody('term', { optional: true }),
+  academicYearBody('academicYear', { optional: true }),
   body('records')
     .isArray({ min: 1, max: 500 })
     .withMessage('Provide between 1 and 500 attendance records.'),

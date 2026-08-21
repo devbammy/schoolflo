@@ -38,6 +38,7 @@ const ExamSchedules = lazy(() => import('./pages/admin/ExamSchedules'));
 const Promotions = lazy(() => import('./pages/admin/Promotions'));
 const Certificates = lazy(() => import('./pages/admin/Certificates'));
 const AuditLogPage = lazy(() => import('./pages/admin/AuditLogPage'));
+const TasksPage = lazy(() => import('./pages/admin/TasksPage'));
 
 // Teacher
 const TeacherDashboard = lazy(() => import('./pages/teacher/TeacherDashboard'));
@@ -47,6 +48,7 @@ const AssignmentsTeacherPage = lazy(
 );
 const GradesPage = lazy(() => import('./pages/teacher/GradesPage'));
 const TeacherTimetable = lazy(() => import('./pages/teacher/TeacherTimetable'));
+const MyTasksPage = lazy(() => import('./pages/teacher/MyTasksPage'));
 const TeacherExamSchedule = lazy(
   () => import('./pages/teacher/TeacherExamSchedule'),
 );
@@ -189,6 +191,7 @@ export default function App() {
               <Route path="promotions" element={<Promotions />} />
               <Route path="certificates" element={<Certificates />} />
               <Route path="audit" element={<AuditLogPage />} />
+              <Route path="tasks" element={<TasksPage />} />
             </Route>
 
             {/* Teacher */}
@@ -209,6 +212,7 @@ export default function App() {
               <Route path="calendar" element={<CalendarViewPage />} />
               <Route path="timetable" element={<TeacherTimetable />} />
               <Route path="exam-schedules" element={<TeacherExamSchedule />} />
+              <Route path="tasks" element={<MyTasksPage />} />
             </Route>
 
             {/* Student */}

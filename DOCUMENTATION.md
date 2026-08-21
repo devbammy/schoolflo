@@ -540,6 +540,65 @@ The Admin UI for this lives at `/admin/audit` (sidebar → Oversight → Audit
 Log): a filterable table where each row expands to show the field-level diff,
 the request origin, and the reason a failed action failed.
 
+### Tasks & approvals — `/tasks` (10 routes, staff only)
+
+| Method | Endpoint        | Who    | Does                                        |
+| ------ | --------------- | ------ | ------------------------------------------- |
+| POST   | `/`             | Admin  | Assign one task per named staff member      |
+| GET    | `/`             | Staff  | Paginated list — a teacher sees only theirs |
+| GET    | `/stats`        | Staff  | Counts by status, plus overdue              |
+| GET    | `/:id`          | Staff  | One task                                    |
+| PUT    | `/:id`          | Admin  | Edit a task that is not yet closed          |
+| PATCH  | `/:id/start`    | Owner  | Pending → In Progress                       |
+| POST   | `/:id/submit`   | Owner  | Hand in, with an optional note              |
+| POST   | `/:id/review`   | Admin  | Approve, or send back with a reason         |
+| PATCH  | `/:id/cancel`   | Admin  | Withdraw a task                             |
+| DELETE | `/:id`          | Admin  | Delete outright                             |
+
+One document per assignee, never one document with an array of them: a task
+given to six teachers is six pieces of work, each with its own status and
+approval. Tasks created together share a `batchId`.
+
+The lifecycle is `Pending → In Progress → Submitted → Completed`, with
+`Rejected` sending it back to the teacher and `Cancelled` withdrawing it. A
+task created with `requiresApproval: false` closes on hand-in instead of
+queueing for a sign-off nobody reads. A rejection without a comment is refused
+by the validator — a teacher cannot act on "no".
+
+A teacher's scope is enforced in the controller, not by the query string:
+passing `?assignedTo=` as a Teacher is ignored. Assignment, submission and
+every review decision are written to the audit log (`task.assign`,
+`task.submit`, `task.approve`, `task.reject`, `task.cancel`, `task.delete`).
+
+UI: `/admin/tasks` (Oversight → Tasks & Approvals) to assign and review;
+`/teacher/tasks` (Classroom → My Tasks) to start, submit and resubmit.
+
+### Search — `/search` (2 routes)
+
+| Method | Endpoint   | Returns                                          |
+| ------ | ---------- | ------------------------------------------------ |
+| GET    | `/?q=`     | Hits grouped by type, scoped to the caller's role |
+| GET    | `/scopes`  | Which groups this role may search                 |
+
+Groups: students, children, teachers, parents, classes, subjects, assignments,
+tasks, announcements, books. Which of them a role may see is declared once in
+`searchService.GROUP_ROLES` — a search result is a permission decision, and
+leaving it to whichever page renders the hit is how a parent learns that
+another family exists.
+
+The scoping that matters: a Teacher sees only students in classes they are
+responsible for; a Parent sees only their own children; a Student never sees an
+unpublished assignment; announcements respect `targetAudience`. The query is
+regex-escaped, so `.*` is text rather than a full-collection scan, and anything
+under two characters returns nothing.
+
+Each hit carries the URL that opens it, resolved for the caller's role. Groups
+are queried in parallel with `Promise.allSettled`, so one failing collection
+leaves the rest of the results standing.
+
+UI: the topbar box on every dashboard (`Ctrl`/`⌘`+`K`), with arrow-key and
+Enter navigation.
+
 ### Other domains
 
 | Base                | Routes | Controller                  |
@@ -548,7 +607,7 @@ the request origin, and the reason a failed action failed.
 | `/parents`          | 7      | `parentController`          |
 | `/classes`          | 5      | `classController`           |
 | `/subjects`         | 4      | `subjectController`         |
-| `/attendance`       | 3      | `attendanceController`      |
+| `/attendance`       | 5      | `attendanceController`      |
 | `/exams`            | 4      | `examController`            |
 | `/assignments`      | 6      | `assignmentController`      |
 | `/submissions`      | 5      | `submissionController`      |
@@ -563,7 +622,32 @@ the request origin, and the reason a failed action failed.
 | `/certificates`     | 8      | `certificateController`     |
 | `/webhooks`         | 1      | HMAC-verified, no JWT       |
 
-**147 routes total.**
+**161 routes total.**
+
+### Attendance — `/attendance` (5 routes)
+
+| Method | Endpoint                            | Who              | Does                             |
+| ------ | ----------------------------------- | ---------------- | -------------------------------- |
+| POST   | `/mark`                             | Admin, Teacher   | Bulk upsert, one record per student per day |
+| GET    | `/my-classes`                       | Admin, Teacher   | Classes the caller may mark       |
+| GET    | `/class/:classId?date=`             | Admin, Teacher   | The register: students + what is already marked |
+| GET    | `/class/:classId/report?from=&to=`  | Admin, Teacher   | Per-student totals over a range    |
+| GET    | `/student/:studentId/summary`       | Any (own data)   | One student's totals               |
+
+Three rules the marking flow depends on:
+
+- **The calendar decides the term, not the page.** `POST /mark` stamps `term`
+  and `academicYear` from the active `AcademicCalendar` unless the client
+  explicitly sends them (which is how an earlier term gets backfilled). The
+  attendance page used to send hard-coded values, so every register in the
+  system was filed under First Term 2024/2025.
+- **A teacher marks only their own classes.** `utils/teacherScope` is the one
+  definition of that — form teacher of the class, or class teacher of one of
+  its sections — and it guards marking, reading and reporting alike. The page
+  previously listed every class in the school.
+- **Dates are flattened to midnight UTC** before they touch the collection, so
+  the unique index on `{ student, date }` cannot be defeated by a timestamp.
+  A future-dated register is refused, as is a student who is not in the class.
 
 ### Response shape
 
@@ -603,6 +687,11 @@ matter of opinion.
 | `auth.password_reset`, `auth.logout_all`      | Account, sessions ended              |
 | `certificate.revoke`                          | Certificate number, reason           |
 | `promotion.apply`                             | Promoted / repeated / graduated counts |
+| `attendance.mark`                             | Class, date, term, how many absent, created vs updated |
+| `task.assign`                                 | Batch, assignees, due date, priority |
+| `task.submit`                                 | Attempt number, whether it was late  |
+| `task.approve` / `task.reject`                | Decision and the reason given        |
+| `task.cancel` / `task.delete`                 | Task, assignee, status at the time   |
 
 Failed attempts are recorded as well as successful ones — a run of failed
 logins is exactly the signal worth keeping.
@@ -725,7 +814,8 @@ three ways it actually gets read.
 `Class`, `Subject`, `Attendance` (unique `{student, date}`), `Exam`,
 `Assignment` / `Submission` (unique `{assignment, student}`), `Announcement`,
 `AcademicCalendar`, `Timetable`, `Library` (Book + BorrowRecord), `CATracker`,
-`Certificate`, `ExamSchedule`, `Promotion`, `Counter`.
+`Certificate`, `ExamSchedule`, `Promotion`, `Counter`, `Task` (one per
+assignee, grouped by `batchId`).
 
 ---
 
@@ -826,7 +916,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 107 tests
+pnpm test              # 247 tests
 pnpm test:coverage
 ```
 
@@ -836,6 +926,9 @@ pnpm test:coverage
 | `unit/validation.test.js`    | Score caps, request validators, error-handler status mapping |
 | `integration/payments.test.js` | Settlement, idempotency, underpayment, receipt uniqueness |
 | `integration/auth.test.js`   | Password hashing, token lifetimes, session revocation    |
+| `integration/tasks.test.js`  | The approval workflow, and that one teacher cannot touch another's task |
+| `integration/attendance.test.js` | Class scoping, calendar-stamped term, one record per student per day |
+| `integration/search.test.js` | What each role may and may not find                       |
 
 Integration tests run against a **real MongoDB in memory**
 (`mongodb-memory-server`). Mocking Mongoose would defeat the purpose — the

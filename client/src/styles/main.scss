@@ -3175,3 +3175,176 @@ select.form-control {
     color: var(--clr-text-3);
   }
 }
+
+// ─── Global Search ────────────────────────────────────────────────────────────
+// Lives in the topbar, so it has to survive a collapsed sidebar and a phone.
+.global-search {
+  position: relative;
+  flex: 1;
+  max-width: 420px;
+
+  @media (max-width: 640px) {
+    max-width: none;
+  }
+
+  &__field {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-md);
+    background: var(--clr-bg);
+    transition: border-color var(--transition-base);
+
+    &:focus-within {
+      border-color: var(--clr-primary);
+      background: var(--clr-surface);
+    }
+  }
+
+  &__icon {
+    color: var(--clr-text-3);
+    flex-shrink: 0;
+  }
+
+  &__input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: var(--clr-text-1);
+
+    &::placeholder {
+      color: var(--clr-text-3);
+    }
+  }
+
+  &__kbd {
+    font-family: var(--font-body);
+    font-size: 0.6875rem;
+    color: var(--clr-text-3);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-sm);
+    padding: 2px 6px;
+    flex-shrink: 0;
+
+    @media (max-width: 900px) {
+      display: none;
+    }
+  }
+
+  &__clear {
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--clr-text-3);
+    display: flex;
+    padding: 2px;
+
+    &:hover {
+      color: var(--clr-text-1);
+    }
+  }
+
+  &__panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg, 0 12px 40px rgba(15, 28, 63, 0.18));
+    z-index: 200;
+    padding: 6px;
+  }
+
+  &__state {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 18px 14px;
+    font-size: 0.875rem;
+    color: var(--clr-text-3);
+  }
+
+  &__group {
+    & + & {
+      border-top: 1px solid var(--clr-border);
+      margin-top: 4px;
+      padding-top: 4px;
+    }
+  }
+
+  &__group-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px 4px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--clr-text-3);
+  }
+
+  &__result {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    border-radius: var(--radius-md);
+    background: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: var(--font-body);
+
+    &.is-active {
+      background: color-mix(in srgb, var(--clr-primary) 8%, transparent);
+    }
+  }
+
+  &__result-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__result-title {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--clr-text-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__result-subtitle {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--clr-text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__result-meta {
+    font-size: 0.75rem;
+    color: var(--clr-text-3);
+    flex-shrink: 0;
+  }
+
+  &__result-enter {
+    color: var(--clr-primary);
+    flex-shrink: 0;
+  }
+}

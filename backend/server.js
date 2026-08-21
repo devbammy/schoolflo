@@ -40,6 +40,8 @@ const promotionRoutes = require('./src/routes/promotion.routes');
 const certificateRoutes = require('./src/routes/certificate.routes');
 const webhookRoutes = require('./src/routes/webhooks');
 const auditRoutes = require('./src/routes/audit');
+const taskRoutes = require('./src/routes/tasks');
+const searchRoutes = require('./src/routes/search');
 
 const app = express();
 
@@ -199,6 +201,8 @@ app.use('/api/v1/ca-tracking', caTrackingRoutes);
 app.use('/api/v1/promotions', promotionRoutes);
 app.use('/api/v1/certificates', certificateRoutes);
 app.use('/api/v1/audit', auditRoutes);
+app.use('/api/v1/tasks', taskRoutes);
+app.use('/api/v1/search', searchRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).json({

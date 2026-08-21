@@ -47,6 +47,37 @@ module.exports = {
     LATE: 'Late',
   },
 
+  // Tasks an admin assigns to staff. The lifecycle is:
+  //   Pending → In Progress → Submitted → Completed
+  // with Rejected sending it back to the teacher, and Cancelled withdrawing it.
+  // A task that does not require approval skips Submitted and closes on hand-in.
+  TASK_STATUS: {
+    PENDING: 'Pending',
+    IN_PROGRESS: 'In Progress',
+    SUBMITTED: 'Submitted',
+    REJECTED: 'Rejected',
+    COMPLETED: 'Completed',
+    CANCELLED: 'Cancelled',
+  },
+
+  TASK_PRIORITY: {
+    LOW: 'Low',
+    NORMAL: 'Normal',
+    HIGH: 'High',
+    URGENT: 'Urgent',
+  },
+
+  TASK_CATEGORY: {
+    GENERAL: 'General',
+    RESULT_ENTRY: 'Result Entry',
+    ATTENDANCE: 'Attendance',
+    LESSON_PLAN: 'Lesson Plan',
+    REPORT: 'Report',
+    MEETING: 'Meeting',
+    DOCUMENT: 'Document',
+    OTHER: 'Other',
+  },
+
   ANNOUNCEMENT_TARGET: {
     ALL: 'All',
     ADMIN: 'Admin',
