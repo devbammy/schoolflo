@@ -68,11 +68,13 @@ module.exports = {
   ],
 
   // Per-component maximums that every score entry is validated against.
+  // 1st CA 10 + 2nd CA 10 + Class Work 10 + Project 10 + Exam 60 = 100.
   SCORE_BREAKDOWN: {
     CA1_MAX: 10,
     CA2_MAX: 10,
-    MID_TERM_MAX: 10,
-    EXAM_MAX: 70,
+    CLASS_WORK_MAX: 10,
+    PROJECT_MAX: 10,
+    EXAM_MAX: 60,
     TOTAL_MAX: 100,
   },
 };

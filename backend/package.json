@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "build": "echo Build complete",
     "seed": "node src/utils/seed.js",
+    "migrate:scores": "node src/utils/migrateScoreBreakdown.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

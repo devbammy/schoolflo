@@ -222,9 +222,10 @@ export default function StudentResults() {
                   <tr>
                     <th>#</th>
                     <th>Subject</th>
-                    <th style={{ textAlign: 'center' }}>CA1</th>
-                    <th style={{ textAlign: 'center' }}>CA2</th>
-                    <th style={{ textAlign: 'center' }}>Mid-Term</th>
+                    <th style={{ textAlign: 'center' }}>1st CA</th>
+                    <th style={{ textAlign: 'center' }}>2nd CA</th>
+                    <th style={{ textAlign: 'center' }}>Class Work</th>
+                    <th style={{ textAlign: 'center' }}>Project</th>
                     <th style={{ textAlign: 'center' }}>Exam</th>
                     <th style={{ textAlign: 'center' }}>Total</th>
                     <th style={{ textAlign: 'center' }}>Grade</th>
@@ -244,7 +245,10 @@ export default function StudentResults() {
                         {r.scores?.ca2 || 0}
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        {r.scores?.midTerm || 0}
+                        {r.scores?.classWork || 0}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {r.scores?.project || 0}
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         {r.scores?.exam || 0}
@@ -293,7 +297,7 @@ export default function StudentResults() {
                 <tfoot>
                   <tr style={{ background: 'var(--clr-bg)', fontWeight: 700 }}>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       style={{
                         padding: '14px 16px',
                         textAlign: 'right',

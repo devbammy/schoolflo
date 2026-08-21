@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
-const { EXAM_TYPES, GRADE_SCALE } = require('../config/constants');
+const {
+  EXAM_TYPES,
+  GRADE_SCALE,
+  SCORE_BREAKDOWN,
+} = require('../config/constants');
 
 // ─── EXAM SESSION MODEL ─────────────────────────────────────────────────────
 const ExamSchema = new mongoose.Schema(
@@ -68,10 +72,21 @@ const Exam = mongoose.model('Exam', ExamSchema);
 // ─── RESULT MODEL ─────────────────────────────────────────────────────────────
 const ScoreBreakdownSchema = new mongoose.Schema(
   {
-    ca1: { type: Number, default: 0, min: 0, max: 10 },
-    ca2: { type: Number, default: 0, min: 0, max: 10 },
-    midTerm: { type: Number, default: 0, min: 0, max: 10 },
-    exam: { type: Number, default: 0, min: 0, max: 70 },
+    ca1: { type: Number, default: 0, min: 0, max: SCORE_BREAKDOWN.CA1_MAX },
+    ca2: { type: Number, default: 0, min: 0, max: SCORE_BREAKDOWN.CA2_MAX },
+    classWork: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: SCORE_BREAKDOWN.CLASS_WORK_MAX,
+    },
+    project: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: SCORE_BREAKDOWN.PROJECT_MAX,
+    },
+    exam: { type: Number, default: 0, min: 0, max: SCORE_BREAKDOWN.EXAM_MAX },
   },
   { _id: false },
 );
@@ -141,8 +156,9 @@ const ResultSchema = new mongoose.Schema(
 // Auto-calculate total score and grade
 ResultSchema.pre('save', function (next) {
   if (this.isModified('scores')) {
-    const { ca1, ca2, midTerm, exam } = this.scores;
-    this.totalScore = (ca1 || 0) + (ca2 || 0) + (midTerm || 0) + (exam || 0);
+    const { ca1, ca2, classWork, project, exam } = this.scores;
+    this.totalScore =
+      (ca1 || 0) + (ca2 || 0) + (classWork || 0) + (project || 0) + (exam || 0);
     const grading = calculateGrade(this.totalScore);
     this.grade = grading.grade;
     this.remark = grading.remark;

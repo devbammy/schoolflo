@@ -3,6 +3,7 @@ import { resultService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { getCurrentAcademicYear } from '../../utils/academicYear';
+import { CA_MAX, caTotal } from '../../utils/scoreComponents';
 export default function ParentResults() {
   const { user } = useAuthStore();
   const children = user?.parentProfile?.children || [];
@@ -92,7 +93,7 @@ export default function ParentResults() {
               <thead>
                 <tr>
                   <th>Subject</th>
-                  <th style={{ textAlign: 'center' }}>CA Total</th>
+                  <th style={{ textAlign: 'center' }}>CA Total /{CA_MAX}</th>
                   <th style={{ textAlign: 'center' }}>Exam</th>
                   <th style={{ textAlign: 'center' }}>Total</th>
                   <th style={{ textAlign: 'center' }}>Grade</th>
@@ -104,9 +105,7 @@ export default function ParentResults() {
                   <tr key={r._id}>
                     <td style={{ fontWeight: 600 }}>{r.subject?.name}</td>
                     <td style={{ textAlign: 'center' }}>
-                      {(r.scores?.ca1 || 0) +
-                        (r.scores?.ca2 || 0) +
-                        (r.scores?.midTerm || 0)}
+                      {caTotal(r.scores)}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       {r.scores?.exam || 0}

@@ -211,9 +211,10 @@ const ViewResults = () => {
                   <thead>
                     <tr>
                       <th>Subject</th>
-                      <th className="text-center">CA1</th>
-                      <th className="text-center">CA2</th>
-                      <th className="text-center">Mid-Term</th>
+                      <th className="text-center">1st CA</th>
+                      <th className="text-center">2nd CA</th>
+                      <th className="text-center">Class Work</th>
+                      <th className="text-center">Project</th>
                       <th className="text-center">Exam</th>
                       <th className="text-center">Total</th>
                       <th className="text-center">Grade</th>
@@ -226,7 +227,12 @@ const ViewResults = () => {
                         <td className="subject-col">{result.subject?.name}</td>
                         <td className="text-center">{result.scores.ca1}</td>
                         <td className="text-center">{result.scores.ca2}</td>
-                        <td className="text-center">{result.scores.midTerm}</td>
+                        <td className="text-center">
+                          {result.scores.classWork}
+                        </td>
+                        <td className="text-center">
+                          {result.scores.project}
+                        </td>
                         <td className="text-center">{result.scores.exam}</td>
                         <td className="text-center font-bold text-primary">
                           {result.totalScore}

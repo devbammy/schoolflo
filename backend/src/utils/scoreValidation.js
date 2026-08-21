@@ -1,13 +1,18 @@
 const { SCORE_BREAKDOWN } = require('../config/constants');
 
 /**
- * The four components of a result, with the maximum each may carry.
+ * The five components of a result, with the maximum each may carry.
  * Derived from SCORE_BREAKDOWN so the caps live in exactly one place.
  */
 const SCORE_COMPONENTS = [
-  { key: 'ca1', label: 'CA1', max: SCORE_BREAKDOWN.CA1_MAX },
-  { key: 'ca2', label: 'CA2', max: SCORE_BREAKDOWN.CA2_MAX },
-  { key: 'midTerm', label: 'Mid-Term', max: SCORE_BREAKDOWN.MID_TERM_MAX },
+  { key: 'ca1', label: '1st CA', max: SCORE_BREAKDOWN.CA1_MAX },
+  { key: 'ca2', label: '2nd CA', max: SCORE_BREAKDOWN.CA2_MAX },
+  {
+    key: 'classWork',
+    label: 'Class Work',
+    max: SCORE_BREAKDOWN.CLASS_WORK_MAX,
+  },
+  { key: 'project', label: 'Project', max: SCORE_BREAKDOWN.PROJECT_MAX },
   { key: 'exam', label: 'Exam', max: SCORE_BREAKDOWN.EXAM_MAX },
 ];
 

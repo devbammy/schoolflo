@@ -182,23 +182,24 @@ class PDFService {
         // Table headers
         const tableTop = doc.y;
         const col1X = 50;
-        const col2X = 220;
-        const col3X = 280;
-        const col4X = 330;
-        const col5X = 380;
-        const col6X = 430;
-        const col7X = 480;
+        // Seven narrow columns share the space to the right of the subject
+        // name: the five score components, then the total and the grade.
+        const cell = { width: 40, align: 'center' };
+        const [ca1X, ca2X, classWorkX, projectX, examX, totalX, gradeX] = [
+          215, 262, 309, 356, 403, 450, 497,
+        ];
 
         doc
           .fontSize(9)
           .font('Helvetica-Bold')
           .text('Subject', col1X, tableTop)
-          .text('CA1', col2X, tableTop, { width: 30, align: 'center' })
-          .text('CA2', col3X, tableTop, { width: 30, align: 'center' })
-          .text('Mid', col4X, tableTop, { width: 30, align: 'center' })
-          .text('Exam', col5X, tableTop, { width: 30, align: 'center' })
-          .text('Total', col6X, tableTop, { width: 30, align: 'center' })
-          .text('Grade', col7X, tableTop, { width: 30, align: 'center' });
+          .text('1st CA', ca1X, tableTop, cell)
+          .text('2nd CA', ca2X, tableTop, cell)
+          .text('Class Wk', classWorkX, tableTop, cell)
+          .text('Project', projectX, tableTop, cell)
+          .text('Exam', examX, tableTop, cell)
+          .text('Total', totalX, tableTop, cell)
+          .text('Grade', gradeX, tableTop, cell);
 
         doc
           .moveTo(50, tableTop + 15)
@@ -216,27 +217,13 @@ class PDFService {
 
           doc
             .text(result.subject.name, col1X, rowY, { width: 160 })
-            .text(result.scores.ca1 || '-', col2X, rowY, {
-              width: 30,
-              align: 'center',
-            })
-            .text(result.scores.ca2 || '-', col3X, rowY, {
-              width: 30,
-              align: 'center',
-            })
-            .text(result.scores.midTerm || '-', col4X, rowY, {
-              width: 30,
-              align: 'center',
-            })
-            .text(result.scores.exam || '-', col5X, rowY, {
-              width: 30,
-              align: 'center',
-            })
-            .text(result.totalScore, col6X, rowY, {
-              width: 30,
-              align: 'center',
-            })
-            .text(result.grade, col7X, rowY, { width: 30, align: 'center' });
+            .text(result.scores.ca1 || '-', ca1X, rowY, cell)
+            .text(result.scores.ca2 || '-', ca2X, rowY, cell)
+            .text(result.scores.classWork || '-', classWorkX, rowY, cell)
+            .text(result.scores.project || '-', projectX, rowY, cell)
+            .text(result.scores.exam || '-', examX, rowY, cell)
+            .text(result.totalScore, totalX, rowY, cell)
+            .text(result.grade, gradeX, rowY, cell);
 
           rowY += 20;
         });

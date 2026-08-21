@@ -12,9 +12,16 @@ import {
   generateAcademicYearOptions,
   getCurrentAcademicYear,
 } from '../../utils/academicYear';
+import {
+  SCORE_COMPONENTS,
+  SCORE_CAPS,
+  EMPTY_SCORES,
+  CA_MAX,
+  caTotal,
+  scoreTotal,
+} from '../../utils/scoreComponents';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
-const SCORE_CAPS = { ca1: 10, ca2: 10, midTerm: 10, exam: 70 };
 
 function gradeOf(score) {
   if (score >= 70) return 'A';
@@ -103,10 +110,8 @@ export default function ResultsAdminPage() {
     }));
   };
 
-  const calcTotal = (studentId, subjectId) => {
-    const s = scores[studentId]?.[subjectId] || {};
-    return (s.ca1 || 0) + (s.ca2 || 0) + (s.midTerm || 0) + (s.exam || 0);
-  };
+  const calcTotal = (studentId, subjectId) =>
+    scoreTotal(scores[studentId]?.[subjectId]);
 
   const handleBulkSave = async () => {
     if (!filters.class || !filters.subject)
@@ -115,12 +120,7 @@ export default function ResultsAdminPage() {
     try {
       const payload = students.map((s) => ({
         student: s._id,
-        scores: scores[s._id]?.[filters.subject] || {
-          ca1: 0,
-          ca2: 0,
-          midTerm: 0,
-          exam: 0,
-        },
+        scores: scores[s._id]?.[filters.subject] || { ...EMPTY_SCORES },
       }));
       await resultService.bulkUpsert({
         class: filters.class,
@@ -380,10 +380,11 @@ export default function ResultsAdminPage() {
                 <tr>
                   <th>#</th>
                   <th>Student</th>
-                  <th style={{ textAlign: 'center' }}>CA1 /10</th>
-                  <th style={{ textAlign: 'center' }}>CA2 /10</th>
-                  <th style={{ textAlign: 'center' }}>Mid /10</th>
-                  <th style={{ textAlign: 'center' }}>Exam /70</th>
+                  {SCORE_COMPONENTS.map(({ key, label, max }) => (
+                    <th key={key} style={{ textAlign: 'center' }}>
+                      {label} /{max}
+                    </th>
+                  ))}
                   <th style={{ textAlign: 'center' }}>Total</th>
                   <th style={{ textAlign: 'center' }}>Grade</th>
                   <th>Published</th>
@@ -411,7 +412,7 @@ export default function ResultsAdminPage() {
                           {s.studentProfile?.admissionNumber}
                         </div>
                       </td>
-                      {['ca1', 'ca2', 'midTerm', 'exam'].map((field) => (
+                      {SCORE_COMPONENTS.map(({ key: field }) => (
                         <td
                           key={field}
                           style={{ textAlign: 'center', padding: '8px 4px' }}
@@ -714,7 +715,7 @@ export default function ResultsAdminPage() {
                 <thead>
                   <tr>
                     <th>Subject</th>
-                    <th style={{ textAlign: 'center' }}>CA</th>
+                    <th style={{ textAlign: 'center' }}>CA /{CA_MAX}</th>
                     <th style={{ textAlign: 'center' }}>Exam</th>
                     <th style={{ textAlign: 'center' }}>Total</th>
                     <th style={{ textAlign: 'center' }}>Grade</th>
@@ -726,9 +727,7 @@ export default function ResultsAdminPage() {
                     <tr key={r._id}>
                       <td style={{ fontWeight: 600 }}>{r.subject?.name}</td>
                       <td style={{ textAlign: 'center' }}>
-                        {(r.scores?.ca1 || 0) +
-                          (r.scores?.ca2 || 0) +
-                          (r.scores?.midTerm || 0)}
+                        {caTotal(r.scores)}
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         {r.scores?.exam || 0}

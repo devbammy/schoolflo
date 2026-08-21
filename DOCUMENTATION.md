@@ -228,10 +228,11 @@ Unexpected faults never expose `err.message` to the caller.
 
 | Component     | Max    |
 | ------------- | ------ |
-| CA1           | 10     |
-| CA2           | 10     |
-| Mid-Term Test | 10     |
-| Final Exam    | 70     |
+| 1st CA        | 10     |
+| 2nd CA        | 10     |
+| Class Work    | 10     |
+| Project       | 10     |
+| Exam          | 60     |
 | **Total**     | **100**|
 
 Caps live in `SCORE_BREAKDOWN` (`config/constants.js`) and are enforced in two
@@ -634,7 +635,7 @@ Admission numbers and staff IDs are generated in a `pre('save')` hook from the
 
 ```
 student→User, class→Class, subject→Subject, term, academicYear,
-scores{ca1,ca2,midTerm,exam}, totalScore, grade, remark, gradePoint,
+scores{ca1,ca2,classWork,project,exam}, totalScore, grade, remark, gradePoint,
 classAverage, classHighest, classLowest, position, isPublished, gradedBy
 ```
 

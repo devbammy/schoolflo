@@ -33,7 +33,12 @@ const caTrackerSchema = new mongoose.Schema(
           min: 0,
           max: 10,
         },
-        midTerm: {
+        classWork: {
+          type: Number,
+          min: 0,
+          max: 10,
+        },
+        project: {
           type: Number,
           min: 0,
           max: 10,
@@ -41,7 +46,7 @@ const caTrackerSchema = new mongoose.Schema(
         exam: {
           type: Number,
           min: 0,
-          max: 70,
+          max: 60,
         },
         total: {
           type: Number,

@@ -5,6 +5,7 @@ import { dashboardService } from '../../services/api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { getCurrentAcademicYear } from '../../utils/academicYear';
+import { CA_MAX, caTotal } from '../../utils/scoreComponents';
 
 export default function StudentDashboard() {
   const [data, setData] = useState(null);
@@ -127,7 +128,7 @@ export default function StudentDashboard() {
                 <thead>
                   <tr>
                     <th>Subject</th>
-                    <th>CA Total</th>
+                    <th>CA Total /{CA_MAX}</th>
                     <th>Exam</th>
                     <th>Total</th>
                     <th>Grade</th>
@@ -139,11 +140,7 @@ export default function StudentDashboard() {
                     return (
                       <tr key={r._id}>
                         <td style={{ fontWeight: 600 }}>{r.subject?.name}</td>
-                        <td>
-                          {(r.scores?.ca1 || 0) +
-                            (r.scores?.ca2 || 0) +
-                            (r.scores?.midTerm || 0)}
-                        </td>
+                        <td>{caTotal(r.scores)}</td>
                         <td>{r.scores?.exam || 0}</td>
                         <td
                           style={{

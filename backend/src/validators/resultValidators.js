@@ -1,5 +1,5 @@
 const { body } = require('express-validator');
-const { SCORE_BREAKDOWN } = require('../config/constants');
+const { SCORE_COMPONENTS } = require('../utils/scoreValidation');
 const {
   objectIdBody,
   objectIdParam,
@@ -20,30 +20,14 @@ const {
  * (including any future importer that does not go through these routes).
  * Both read their bounds from SCORE_BREAKDOWN, so they cannot drift apart.
  */
-const scoreRules = (prefix) => [
-  body(`${prefix}.ca1`)
-    .optional({ values: 'null' })
-    .isFloat({ min: 0, max: SCORE_BREAKDOWN.CA1_MAX })
-    .withMessage(`CA1 must be between 0 and ${SCORE_BREAKDOWN.CA1_MAX}.`)
-    .toFloat(),
-  body(`${prefix}.ca2`)
-    .optional({ values: 'null' })
-    .isFloat({ min: 0, max: SCORE_BREAKDOWN.CA2_MAX })
-    .withMessage(`CA2 must be between 0 and ${SCORE_BREAKDOWN.CA2_MAX}.`)
-    .toFloat(),
-  body(`${prefix}.midTerm`)
-    .optional({ values: 'null' })
-    .isFloat({ min: 0, max: SCORE_BREAKDOWN.MID_TERM_MAX })
-    .withMessage(
-      `Mid-Term must be between 0 and ${SCORE_BREAKDOWN.MID_TERM_MAX}.`,
-    )
-    .toFloat(),
-  body(`${prefix}.exam`)
-    .optional({ values: 'null' })
-    .isFloat({ min: 0, max: SCORE_BREAKDOWN.EXAM_MAX })
-    .withMessage(`Exam must be between 0 and ${SCORE_BREAKDOWN.EXAM_MAX}.`)
-    .toFloat(),
-];
+const scoreRules = (prefix) =>
+  SCORE_COMPONENTS.map(({ key, label, max }) =>
+    body(`${prefix}.${key}`)
+      .optional({ values: 'null' })
+      .isFloat({ min: 0, max })
+      .withMessage(`${label} must be between 0 and ${max}.`)
+      .toFloat(),
+  );
 
 const upsertResultRules = [
   objectIdBody('student', 'Student'),

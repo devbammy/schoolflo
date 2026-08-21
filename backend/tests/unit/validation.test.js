@@ -32,16 +32,18 @@ const appWith = (rules) => {
 
 describe('validateScores', () => {
   it('accepts full marks in every component', () => {
-    const result = validateScores({ ca1: 10, ca2: 10, midTerm: 10, exam: 70 });
+    const scores = { ca1: 10, ca2: 10, classWork: 10, project: 10, exam: 60 };
+    const result = validateScores(scores);
     expect(result.valid).toBe(true);
-    expect(result.scores).toEqual({ ca1: 10, ca2: 10, midTerm: 10, exam: 70 });
+    expect(result.scores).toEqual(scores);
   });
 
   it.each([
-    ['ca1', 11, 'CA1 cannot exceed 10.'],
-    ['ca2', 11, 'CA2 cannot exceed 10.'],
-    ['midTerm', 11, 'Mid-Term cannot exceed 10.'],
-    ['exam', 71, 'Exam cannot exceed 70.'],
+    ['ca1', 11, '1st CA cannot exceed 10.'],
+    ['ca2', 11, '2nd CA cannot exceed 10.'],
+    ['classWork', 11, 'Class Work cannot exceed 10.'],
+    ['project', 11, 'Project cannot exceed 10.'],
+    ['exam', 61, 'Exam cannot exceed 60.'],
   ])('rejects %s above its cap', (field, value, message) => {
     const result = validateScores({ [field]: value });
     expect(result.valid).toBe(false);
@@ -50,7 +52,7 @@ describe('validateScores', () => {
 
   it('rejects negative scores', () => {
     // A negative exam score would drag down the whole class average.
-    expect(validateScores({ exam: -70 }).valid).toBe(false);
+    expect(validateScores({ exam: -60 }).valid).toBe(false);
   });
 
   it('rejects non-numeric input', () => {
@@ -61,7 +63,8 @@ describe('validateScores', () => {
     expect(validateScores({}).scores).toEqual({
       ca1: 0,
       ca2: 0,
-      midTerm: 0,
+      classWork: 0,
+      project: 0,
       exam: 0,
     });
   });
@@ -89,7 +92,7 @@ describe('validateScoreBatch', () => {
     );
 
     expect(batch.valid).toBe(false);
-    expect(batch.errors).toContain('Student b: CA1 cannot exceed 10.');
+    expect(batch.errors).toContain('Student b: 1st CA cannot exceed 10.');
   });
 
   it('labels each failing row so the teacher knows which to fix', () => {
@@ -102,7 +105,7 @@ describe('validateScoreBatch', () => {
     );
 
     expect(batch.errors).toEqual([
-      'Student a: CA1 cannot exceed 10.',
+      'Student a: 1st CA cannot exceed 10.',
       'Student b: Exam cannot be negative.',
     ]);
   });
@@ -113,7 +116,8 @@ describe('validateScoreBatch', () => {
     expect(batch.rows[0].scores).toEqual({
       ca1: 9,
       ca2: 0,
-      midTerm: 0,
+      classWork: 0,
+      project: 0,
       exam: 0,
     });
   });
@@ -184,7 +188,7 @@ describe('request validation middleware', () => {
         results: [{ student: OID, scores: { ca1: 99 } }],
       });
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/CA1/);
+    expect(res.body.message).toMatch(/1st CA/);
   });
 
   it('rejects an invalid term', async () => {

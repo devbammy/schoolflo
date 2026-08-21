@@ -22,13 +22,13 @@ const {
 // Centralized calculation. Callers must pass scores that have already been
 // through validateScores() — this only computes, it does not check.
 const computeResultFields = (scores = {}) => {
-  const { ca1 = 0, ca2 = 0, midTerm = 0, exam = 0 } = scores;
+  const { ca1 = 0, ca2 = 0, classWork = 0, project = 0, exam = 0 } = scores;
 
-  const totalScore = ca1 + ca2 + midTerm + exam;
+  const totalScore = ca1 + ca2 + classWork + project + exam;
   const grading = calculateGrade(totalScore);
 
   return {
-    scores: { ca1, ca2, midTerm, exam },
+    scores: { ca1, ca2, classWork, project, exam },
     totalScore,
     grade: grading.grade,
     remark: grading.remark,

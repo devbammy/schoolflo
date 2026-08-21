@@ -90,9 +90,10 @@ const PrintableReportCard = ({ student, results, term, academicYear }) => {
           <thead>
             <tr>
               <th>Subject</th>
-              <th>CA1</th>
-              <th>CA2</th>
-              <th>Mid-Term</th>
+              <th>1st CA</th>
+              <th>2nd CA</th>
+              <th>Class Work</th>
+              <th>Project</th>
               <th>Exam</th>
               <th>Total</th>
               <th>Grade</th>
@@ -106,7 +107,8 @@ const PrintableReportCard = ({ student, results, term, academicYear }) => {
                 <td>{result.subject?.name}</td>
                 <td>{result.scores.ca1}</td>
                 <td>{result.scores.ca2}</td>
-                <td>{result.scores.midTerm}</td>
+                <td>{result.scores.classWork}</td>
+                <td>{result.scores.project}</td>
                 <td>{result.scores.exam}</td>
                 <td>
                   <strong>{result.totalScore}</strong>

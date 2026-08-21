@@ -11,9 +11,14 @@ import {
   getCurrentAcademicYear,
   generateAcademicYearOptions,
 } from '../../utils/academicYear';
+import {
+  SCORE_COMPONENTS,
+  SCORE_CAPS,
+  EMPTY_SCORES,
+  scoreTotal,
+} from '../../utils/scoreComponents';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
-const SCORE_CAPS = { ca1: 10, ca2: 10, midTerm: 10, exam: 70 };
 
 export default function GradesPage() {
   const [classes, setClasses] = useState([]);
@@ -77,10 +82,7 @@ export default function GradesPage() {
     }));
   };
 
-  const calcTotal = (studentId) => {
-    const s = scores[studentId] || {};
-    return (s.ca1 || 0) + (s.ca2 || 0) + (s.midTerm || 0) + (s.exam || 0);
-  };
+  const calcTotal = (studentId) => scoreTotal(scores[studentId]);
 
   const getGrade = (total) => {
     if (total >= 70) return { g: 'A', c: 'A' };
@@ -98,7 +100,7 @@ export default function GradesPage() {
     try {
       const results = students.map((s) => ({
         student: s._id,
-        scores: scores[s._id] || { ca1: 0, ca2: 0, midTerm: 0, exam: 0 },
+        scores: scores[s._id] || { ...EMPTY_SCORES },
       }));
       await resultService.bulkUpsert({
         class: filters.class,
@@ -264,15 +266,15 @@ export default function GradesPage() {
                 flexWrap: 'wrap',
               }}
             >
-              {Object.entries(SCORE_CAPS).map(([k, v]) => (
+              {SCORE_COMPONENTS.map(({ key, label, max }) => (
                 <span
-                  key={k}
+                  key={key}
                   style={{ fontSize: '0.8125rem', color: 'var(--clr-text-3)' }}
                 >
                   <strong style={{ color: 'var(--clr-text-2)' }}>
-                    {k.toUpperCase()}
+                    {label}
                   </strong>
-                  : max {v}
+                  : max {max}
                 </span>
               ))}
             </div>
@@ -286,10 +288,11 @@ export default function GradesPage() {
                   <tr>
                     <th>#</th>
                     <th>Student</th>
-                    <th style={{ textAlign: 'center' }}>CA1 /10</th>
-                    <th style={{ textAlign: 'center' }}>CA2 /10</th>
-                    <th style={{ textAlign: 'center' }}>Mid-Term /10</th>
-                    <th style={{ textAlign: 'center' }}>Exam /70</th>
+                    {SCORE_COMPONENTS.map(({ key, label, max }) => (
+                      <th key={key} style={{ textAlign: 'center' }}>
+                        {label} /{max}
+                      </th>
+                    ))}
                     <th style={{ textAlign: 'center' }}>Total /100</th>
                     <th style={{ textAlign: 'center' }}>Grade</th>
                   </tr>
@@ -323,7 +326,7 @@ export default function GradesPage() {
                             {s.studentProfile?.admissionNumber}
                           </div>
                         </td>
-                        {['ca1', 'ca2', 'midTerm', 'exam'].map((field) => (
+                        {SCORE_COMPONENTS.map(({ key: field }) => (
                           <td
                             key={field}
                             style={{ textAlign: 'center', padding: '8px 4px' }}
