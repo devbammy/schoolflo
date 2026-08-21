@@ -12,7 +12,9 @@ import LoginPage from './pages/auth/LoginPage';
 
 // Everything else is split per route. Previously all 45 pages were imported
 // eagerly, so a parent checking one result downloaded the entire admin panel.
-const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ForgotPasswordPage = lazy(
+  () => import('./pages/auth/ForgotPasswordPage'),
+);
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -29,38 +31,39 @@ const AnnouncementsPage = lazy(() => import('./pages/admin/AnnouncementsPage'));
 const ResultsAdminPage = lazy(() => import('./pages/admin/ResultsAdminPage'));
 const TimetablePage = lazy(() => import('./pages/admin/TimetablePage'));
 const LibraryPage = lazy(() => import('./pages/admin/LibraryPage'));
-const AcademicCalendarPage = lazy(() =>
-  import('./pages/admin/AcademicCalendarPage'),
+const AcademicCalendarPage = lazy(
+  () => import('./pages/admin/AcademicCalendarPage'),
 );
 const ExamSchedules = lazy(() => import('./pages/admin/ExamSchedules'));
 const Promotions = lazy(() => import('./pages/admin/Promotions'));
 const Certificates = lazy(() => import('./pages/admin/Certificates'));
+const AuditLogPage = lazy(() => import('./pages/admin/AuditLogPage'));
 
 // Teacher
 const TeacherDashboard = lazy(() => import('./pages/teacher/TeacherDashboard'));
 const AttendancePage = lazy(() => import('./pages/teacher/AttendancePage'));
-const AssignmentsTeacherPage = lazy(() =>
-  import('./pages/teacher/AssignmentsPage'),
+const AssignmentsTeacherPage = lazy(
+  () => import('./pages/teacher/AssignmentsPage'),
 );
 const GradesPage = lazy(() => import('./pages/teacher/GradesPage'));
 const TeacherTimetable = lazy(() => import('./pages/teacher/TeacherTimetable'));
-const TeacherExamSchedule = lazy(() =>
-  import('./pages/teacher/TeacherExamSchedule'),
+const TeacherExamSchedule = lazy(
+  () => import('./pages/teacher/TeacherExamSchedule'),
 );
 
 // Student
 const StudentDashboard = lazy(() => import('./pages/student/StudentDashboard'));
 const StudentResults = lazy(() => import('./pages/student/StudentResults'));
-const StudentAssignments = lazy(() =>
-  import('./pages/student/StudentAssignments'),
+const StudentAssignments = lazy(
+  () => import('./pages/student/StudentAssignments'),
 );
 const StudentPayments = lazy(() => import('./pages/student/StudentPayments'));
 const StudentTimetable = lazy(() => import('./pages/student/StudentTimetable'));
-const StudentExamSchedule = lazy(() =>
-  import('./pages/student/StudentExamSchedule'),
+const StudentExamSchedule = lazy(
+  () => import('./pages/student/StudentExamSchedule'),
 );
-const StudentCertificates = lazy(() =>
-  import('./pages/student/StudentCertificates'),
+const StudentCertificates = lazy(
+  () => import('./pages/student/StudentCertificates'),
 );
 const CATracking = lazy(() => import('./pages/student/CATracking'));
 
@@ -69,12 +72,14 @@ const ParentDashboard = lazy(() => import('./pages/parent/ParentDashboard'));
 const ParentResults = lazy(() => import('./pages/parent/ParentResults'));
 const ParentPayments = lazy(() => import('./pages/parent/ParentPayments'));
 const ParentTimetable = lazy(() => import('./pages/parent/ParentTimetable'));
-const ParentExamSchedule = lazy(() =>
-  import('./pages/parent/ParentExamSchedule'),
+const ParentExamSchedule = lazy(
+  () => import('./pages/parent/ParentExamSchedule'),
 );
-const ParentAssignments = lazy(() => import('./pages/parent/ParentAssignments'));
-const ParentCertificates = lazy(() =>
-  import('./pages/parent/ParentCertificates'),
+const ParentAssignments = lazy(
+  () => import('./pages/parent/ParentAssignments'),
+);
+const ParentCertificates = lazy(
+  () => import('./pages/parent/ParentCertificates'),
 );
 
 // Shared
@@ -183,6 +188,7 @@ export default function App() {
               <Route path="exam-schedules" element={<ExamSchedules />} />
               <Route path="promotions" element={<Promotions />} />
               <Route path="certificates" element={<Certificates />} />
+              <Route path="audit" element={<AuditLogPage />} />
             </Route>
 
             {/* Teacher */}

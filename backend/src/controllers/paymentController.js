@@ -7,6 +7,7 @@ const {
   getPaginationParams,
 } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
+const audit = require('../services/auditService');
 const {
   initializePaystack,
   initializeFlutterwave,
@@ -22,6 +23,20 @@ const {
 // @access  Admin
 const createFeeStructure = async (req, res) => {
   const fee = await Fees.create({ ...req.body, createdBy: req.user._id });
+
+  await audit.record(req, {
+    action: 'fee.create',
+    entity: 'Fees',
+    entityId: fee._id,
+    entityLabel: fee.title,
+    meta: {
+      totalAmount: fee.totalAmount,
+      class: fee.class,
+      term: fee.term,
+      academicYear: fee.academicYear,
+    },
+  });
+
   return sendSuccess(res, 201, 'Fee structure created', { fee });
 };
 
@@ -161,6 +176,22 @@ const verifyPaystackPayment = async (req, res) => {
     return sendError(res, 400, 'Payment has not been completed');
   }
 
+  await audit.record(req, {
+    action: 'payment.settle',
+    entity: 'Payment',
+    entityId: payment._id,
+    entityLabel: payment.receiptNumber,
+    subject: payment.student?._id || existing.student,
+    meta: {
+      reference,
+      amountPaid: payment.amountPaid,
+      status: payment.status,
+      balance: payment.balance,
+      gateway: payment.gateway,
+      viaRedirect: true,
+    },
+  });
+
   return sendSuccess(res, 200, 'Payment verified and confirmed', { payment });
 };
 
@@ -269,6 +300,22 @@ const recordManualPayment = async (req, res) => {
   ]);
 
   await sendReceiptEmail(payment);
+
+  await audit.record(req, {
+    action: 'payment.manual',
+    entity: 'Payment',
+    entityId: payment._id,
+    entityLabel: payment.receiptNumber,
+    subject: studentId,
+    meta: {
+      amount,
+      gateway: payment.gateway,
+      status: payment.status,
+      balance: payment.balance,
+      feeStructure: feeStructureId,
+      notes,
+    },
+  });
 
   return sendSuccess(res, 201, 'Payment recorded', { payment });
 };

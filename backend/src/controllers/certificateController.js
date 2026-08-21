@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Certificate = require('../models/Certificate');
 const User = require('../models/User');
 const pdfService = require('../services/pdfService');
+const audit = require('../services/auditService');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
 const {
   sendEmail,
@@ -276,6 +277,19 @@ exports.revokeCertificate = async (req, res) => {
   notifyCertificateRevoked(certificate).catch((err) =>
     console.error('Certificate revocation notification failed:', err.message),
   );
+
+  await audit.record(req, {
+    action: 'certificate.revoke',
+    entity: 'Certificate',
+    entityId: certificate._id,
+    entityLabel: certificate.certificateType,
+    subject: certificate.student,
+    meta: {
+      certificateNumber: certificate.certificateNumber,
+      revokeReason,
+    },
+    reason: revokeReason,
+  });
 
   sendSuccess(res, 201, 'Certificate revoked successfully', certificate);
 };

@@ -17,6 +17,7 @@
 8. [Authentication & sessions](#8-authentication--sessions)
 9. [Role-based access control](#9-role-based-access-control)
 10. [API reference](#10-api-reference)
+10a. [Audit log](#10a-audit-log)
 11. [Database schema](#11-database-schema)
 12. [File storage](#12-file-storage)
 13. [Notifications & the job queue](#13-notifications--the-job-queue)
@@ -84,8 +85,8 @@ schoolflo/
 │   │   ├── config/
 │   │   │   ├── db.js
 │   │   │   └── constants.js       # roles, terms, GRADE_SCALE, score caps
-│   │   ├── models/                # 18 Mongoose models
-│   │   ├── controllers/           # 20 controllers, one per domain
+│   │   ├── models/                # 19 Mongoose models
+│   │   ├── controllers/           # 21 controllers, one per domain
 │   │   ├── services/
 │   │   │   ├── gradingService.js      # class stats, ranking, report cards
 │   │   │   ├── paymentService.js      # gateways + settlement
@@ -177,6 +178,8 @@ inconsistent.
 | Coverage          | `pnpm test:coverage`       |
 | Lint              | `pnpm lint`                |
 | Format            | `pnpm format`              |
+| Audit payments    | `pnpm reconcile`           |
+| Repair payments   | `pnpm reconcile:apply`     |
 
 CI runs lint, format check, tests and the client build on every push and pull
 request to `main`.
@@ -317,6 +320,40 @@ the atomic `Sequence` model.
 Paystack dashboard. Without it, a payment is only confirmed if the payer
 returns to the site.
 
+### Reconciliation
+
+`pnpm reconcile` audits the payment collection and prints a report. It is
+**read-only** until you pass `--apply`, and never deletes anything.
+
+It reports two independent things:
+
+- **Record drift** — payments whose stored `status`/`balance` disagree with
+  what the schema would derive from `amountPaid` vs `amountDue`. Records marked
+  `Paid` while under-collected are called out separately, with the total
+  shortfall: that is the signature of the pre-fix settlement bug.
+- **Ledger** — what was actually collected per student per fee structure,
+  summed from `amountPaid` and compared against the fee total. This ignores
+  every status field, so it tells you who genuinely still owes money even when
+  the records claim otherwise.
+
+It also counts abandoned gateway attempts (initialised, never paid). These
+inflate `totalExpected` in the financial report, but are deliberately **not**
+deleted — a late webhook for an abandoned-then-completed attempt would lose a
+real payment.
+
+Overpayments (more collected than the fee is worth, usually a duplicate) are
+reported for a human to decide on, never auto-adjusted.
+
+```bash
+pnpm reconcile          # report only
+pnpm reconcile:apply    # correct the drifted records
+pnpm reconcile -- --json
+```
+
+Corrections re-save each record so the schema hook derives `balance` and
+`status`. `amountPaid` is never rewritten — the money that came in is the one
+fact that is trusted. Running it twice is safe: the second run finds nothing.
+
 ---
 
 ## 8. Authentication & sessions
@@ -419,6 +456,26 @@ if any row is invalid — a half-applied set of scores is worse than none.
 `amount` is optional on initialize. Omit it to settle the outstanding balance
 in full — which is what the client does.
 
+### Audit log — `/audit` (5 routes, Admin only)
+
+| Method | Endpoint                          | Returns                              |
+| ------ | --------------------------------- | ------------------------------------ |
+| GET    | `/`                               | Filtered, paginated log              |
+| GET    | `/summary?days=7`                 | Recent activity, top actors, failures |
+| GET    | `/actions`                        | Distinct action names, for filters   |
+| GET    | `/student/:studentId`             | Everything concerning one student    |
+| GET    | `/entity/:entity/:entityId`       | History of one record                |
+
+Filters on `/audit`: `action` (prefix match — `result` finds all `result.*`),
+`entity`, `entityId`, `actor`, `subject`, `outcome`, `from`, `to`.
+
+**There is no write, update or delete route.** Entries are created by the
+actions they describe and cannot be altered through the API.
+
+The Admin UI for this lives at `/admin/audit` (sidebar → Oversight → Audit
+Log): a filterable table where each row expands to show the field-level diff,
+the request origin, and the reason a failed action failed.
+
 ### Other domains
 
 | Base                | Routes | Controller                  |
@@ -442,7 +499,7 @@ in full — which is what the client does.
 | `/certificates`     | 8      | `certificateController`     |
 | `/webhooks`         | 1      | HMAC-verified, no JWT       |
 
-**142 routes total.**
+**147 routes total.**
 
 ### Response shape
 
@@ -459,9 +516,66 @@ in full — which is what the client does.
 
 ---
 
+## 10a. Audit log
+
+Sensitive actions are recorded to an append-only `AuditLog` collection. The
+question it exists to answer is *"who changed this score, and when"* — and its
+financial equivalent. Without it, a disputed result or a missing payment is a
+matter of opinion.
+
+### What is recorded
+
+| Action                                       | Captures                             |
+| -------------------------------------------- | ------------------------------------ |
+| `result.create` / `result.update`             | Score diff (from → to), subject, student |
+| `result.bulk_upsert`                          | Class, subject, student count        |
+| `result.publish`                              | Class, term, records published       |
+| `payment.manual`                              | Amount, gateway, resulting balance   |
+| `payment.settle`                              | Reference, amount, resulting status  |
+| `fee.create`                                  | Fee total, class, term               |
+| `user.create` / `user.delete`                 | Email, role, admission or staff number |
+| `user.activate` / `user.deactivate`           | Role, whether sessions were revoked  |
+| `auth.login`                                  | Success **and** failure, with reason |
+| `auth.password_reset`, `auth.logout_all`      | Account, sessions ended              |
+| `certificate.revoke`                          | Certificate number, reason           |
+| `promotion.apply`                             | Promoted / repeated / graduated counts |
+
+Failed attempts are recorded as well as successful ones — a run of failed
+logins is exactly the signal worth keeping.
+
+### Design rules
+
+- **An audit failure never fails the action.** A school cannot be blocked from
+  publishing results because a log write failed. Errors are swallowed and
+  logged.
+- **Nothing sensitive is ever written.** Passwords, tokens, and gateway
+  payloads are stripped at any depth before the entry is created. Long strings
+  and arrays are summarised rather than copied.
+- **Only diffs, never whole documents.** Copying records into the log would
+  make it unreadable and would quietly duplicate personal data.
+- **`subject`** links an entry to the student it concerns even when the entity
+  is something else (a Payment, a Certificate). That is what makes
+  "everything that happened to this child" a single query.
+
+### Recording an action
+
+```js
+const audit = require('../services/auditService');
+
+await audit.record(req, {
+  action: 'result.update',
+  entity: 'Result',
+  entityId: result._id,
+  entityLabel: 'Mathematics',
+  subject: studentId,
+  changes: audit.diff(before, after),
+  meta: { term, academicYear },
+});
+```
+
 ## 11. Database schema
 
-18 models. The ones with non-obvious behaviour:
+19 models. The ones with non-obvious behaviour:
 
 ### User
 
@@ -520,6 +634,18 @@ TTL index on `expiresAt`.
 Named atomic counters (`Sequence.next('receipt-25')`). Deliberately separate
 from `Counter`, which numbers admissions — changing that model's query shape
 would risk reissuing duplicate admission numbers.
+
+### AuditLog
+
+```
+actor→User, actorName, actorRole (snapshot, so the log survives a rename),
+action, entity, entityId, entityLabel, subject→User,
+changes, meta, ip, userAgent, outcome, reason, createdAt
+```
+
+Append-only: `updatedAt` is disabled and nothing in the API can modify an
+entry. Indexed on `{entity, entityId}`, `{actor}` and `{createdAt}` — the
+three ways it actually gets read.
 
 ### Others
 
@@ -685,6 +811,11 @@ Recorded honestly so nobody rediscovers them the hard way.
 
 - **No test coverage** for `pdfService`, the dashboard aggregations, the
   library and timetable domains, or any client code.
+- **The audit log UI has no automated test.** The page is smoke-checked to
+  mount without throwing, but the client has no test runner, so the loaded
+  state (filters, expanded rows) is unverified.
+- **The audit log has no retention policy.** It grows without bound. That is
+  the right default for an audit trail, but it will eventually want archiving.
 - **`pdfService` uses async Promise executors.** Safe today (each wraps its
   body in try/catch and calls `reject`), but the lint rule is disabled at file
   scope until those three generators are restructured.
@@ -694,11 +825,13 @@ Recorded honestly so nobody rediscovers them the hard way.
   drift unless the scale is served from an endpoint.
 - **`getFinancialReport` over-counts `totalExpected`.** Every abandoned payment
   attempt leaves a `Pending` row with an `amountDue`, and the report sums them.
-  Cleaning them up risks losing a late webhook for an abandoned-then-completed
-  attempt, so it needs a real reconciliation design.
-- **Historic payment data may be wrong.** Anything settled before the settlement
-  fix is marked `Paid` with `balance: 0` regardless of what was collected. A
-  reconciliation script should re-derive status from `amountPaid`.
+  `pnpm reconcile` counts them so you can see the scale, but the report itself
+  still needs fixing — probably by excluding zero-paid pending rows, or by
+  reporting expected revenue from fee structures and enrolment rather than from
+  payment attempts.
+- **Historic payment data may still be wrong** until `pnpm reconcile:apply` has
+  been run against production. Anything settled before the settlement fix is
+  marked `Paid` with `balance: 0` regardless of what was collected.
 - **Refresh tokens are not rotated** on use. Sessions are revocable, which
   covers the main risk, but rotation would be stronger.
 - **`GET /users/:id`** is open to any Teacher, returning full profiles.

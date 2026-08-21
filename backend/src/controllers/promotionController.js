@@ -1,5 +1,6 @@
 const promotionService = require('../services/promotionService');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
+const audit = require('../services/auditService');
 
 // Create promotion batch
 exports.createPromotionBatch = async (req, res) => {
@@ -38,6 +39,22 @@ exports.applyPromotions = async (req, res) => {
     req.params.id,
     req.user._id,
   );
+
+  // Applying a promotion batch moves entire cohorts between classes. If it is
+  // ever run twice, or against the wrong batch, this is the record that shows
+  // what happened.
+  await audit.record(req, {
+    action: 'promotion.apply',
+    entity: 'Promotion',
+    entityId: req.params.id,
+    meta: {
+      promoted: result?.promoted,
+      repeated: result?.repeated,
+      graduated: result?.graduated,
+      total: result?.total,
+    },
+  });
+
   sendSuccess(res, 201, 'Promotions applied successfully', result);
 };
 

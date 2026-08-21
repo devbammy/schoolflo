@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Printer,
   BookCheck,
+  ScrollText,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 
@@ -84,6 +85,10 @@ const NAV_CONFIG = {
       items: [
         { to: '/admin/announcements', icon: Bell, label: 'Announcements' },
       ],
+    },
+    {
+      section: 'Oversight',
+      items: [{ to: '/admin/audit', icon: ScrollText, label: 'Audit Log' }],
     },
   ],
 

@@ -13,6 +13,7 @@ const {
 const { emailTemplates } = require('../services/notificationService');
 const caTrackingService = require('../services/caTrackingService');
 const { enqueueEmail } = require('../services/jobQueue');
+const audit = require('../services/auditService');
 const {
   validateScores,
   validateScoreBatch,
@@ -139,6 +140,18 @@ const upsertResult = async (req, res) => {
 
   const computed = computeResultFields(validation.scores);
 
+  // Captured before the write so the audit entry can show what a score was
+  // changed FROM — the question that actually gets asked when a mark is
+  // disputed.
+  const previous = await Result.findOne({
+    student,
+    subject,
+    term,
+    academicYear,
+  })
+    .select('scores totalScore grade')
+    .lean();
+
   const result = await Result.findOneAndUpdate(
     { student, subject, term, academicYear },
     {
@@ -156,6 +169,27 @@ const upsertResult = async (req, res) => {
   )
     .populate('subject', 'name code')
     .populate('student', 'firstName lastName');
+
+  await audit.record(req, {
+    action: previous ? 'result.update' : 'result.create',
+    entity: 'Result',
+    entityId: result._id,
+    entityLabel: result.subject?.name,
+    subject: student,
+    changes: audit.diff(
+      {
+        ...previous?.scores,
+        totalScore: previous?.totalScore,
+        grade: previous?.grade,
+      },
+      {
+        ...computed.scores,
+        totalScore: computed.totalScore,
+        grade: computed.grade,
+      },
+    ),
+    meta: { term, academicYear, class: classId },
+  });
 
   return sendSuccess(res, 200, 'Result saved successfully', { result });
 };
@@ -221,6 +255,23 @@ const bulkUpsertResults = async (req, res) => {
 
   const bulkResult = await Result.bulkWrite(operations);
 
+  // One entry for the batch rather than one per student: the meaningful event
+  // is "this teacher entered marks for this class and subject".
+  await audit.record(req, {
+    action: 'result.bulk_upsert',
+    entity: 'Result',
+    meta: {
+      class: classId,
+      subject,
+      term,
+      academicYear,
+      studentCount: batch.rows.length,
+      inserted: bulkResult.upsertedCount,
+      updated: bulkResult.modifiedCount,
+      students: batch.rows.map((row) => String(row.student)),
+    },
+  });
+
   return sendSuccess(
     res,
     200,
@@ -277,6 +328,19 @@ const publishResults = async (req, res) => {
   notifyParentsOfResults(studentsForNotification, term, academicYear).catch(
     console.error,
   );
+
+  await audit.record(req, {
+    action: 'result.publish',
+    entity: 'Result',
+    meta: {
+      class: classId,
+      term,
+      academicYear,
+      published: updated.modifiedCount,
+      statsProcessed: statsResult.processed,
+      studentsNotified: studentsForNotification.length,
+    },
+  });
 
   return sendSuccess(
     res,

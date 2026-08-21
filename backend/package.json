@@ -14,7 +14,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\" server.js",
-    "format:check": "prettier --check \"src/**/*.js\" \"tests/**/*.js\" server.js"
+    "format:check": "prettier --check \"src/**/*.js\" \"tests/**/*.js\" server.js",
+    "reconcile": "node src/utils/reconcilePayments.js",
+    "reconcile:apply": "node src/utils/reconcilePayments.js --apply"
   },
   "dependencies": {
     "agenda": "^6.2.6",

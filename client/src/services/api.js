@@ -59,7 +59,11 @@ api.interceptors.response.use(
       originalRequest?.url?.includes('/auth/login') ||
       originalRequest?.url?.includes('/auth/refresh');
 
-    if (error.response?.status !== 401 || originalRequest?._retry || isAuthCall) {
+    if (
+      error.response?.status !== 401 ||
+      originalRequest?._retry ||
+      isAuthCall
+    ) {
       return Promise.reject(error);
     }
 
@@ -394,4 +398,13 @@ export const certificateService = {
   getChildrenCertificates: () =>
     api.get('/certificates/parent/children-certificates'),
   revoke: (id, data) => api.put(`/certificates/${id}/revoke`, data),
+};
+
+export const auditService = {
+  getLog: (params) => api.get('/audit', { params }),
+  getSummary: (params) => api.get('/audit/summary', { params }),
+  getActions: () => api.get('/audit/actions'),
+  getStudentHistory: (studentId) => api.get(`/audit/student/${studentId}`),
+  getEntityHistory: (entity, entityId) =>
+    api.get(`/audit/entity/${entity}/${entityId}`),
 };

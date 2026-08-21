@@ -6,6 +6,7 @@ const {
   getPaginationParams,
 } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
+const audit = require('../services/auditService');
 const {
   uploadToCloudinary,
   deleteFromCloudinary,
@@ -101,6 +102,14 @@ const toggleUserStatus = async (req, res) => {
     await Session.deleteMany({ user: user._id });
   }
 
+  await audit.record(req, {
+    action: user.isActive ? 'user.activate' : 'user.deactivate',
+    entity: 'User',
+    entityId: user._id,
+    entityLabel: `${user.firstName} ${user.lastName}`,
+    meta: { role: user.role, sessionsRevoked: !user.isActive },
+  });
+
   return sendSuccess(
     res,
     200,
@@ -125,6 +134,22 @@ const deleteUser = async (req, res) => {
   }
 
   await Session.deleteMany({ user: user._id });
+
+  // Recorded BEFORE the delete — afterwards there is nothing left to describe.
+  await audit.record(req, {
+    action: 'user.delete',
+    entity: 'User',
+    entityId: user._id,
+    entityLabel: `${user.firstName} ${user.lastName}`,
+    subject: user.role === 'Student' ? user._id : undefined,
+    meta: {
+      email: user.email,
+      role: user.role,
+      admissionNumber: user.studentProfile?.admissionNumber,
+      staffId: user.teacherProfile?.staffId,
+    },
+  });
+
   await user.deleteOne();
 
   return sendSuccess(res, 200, 'User deleted');

@@ -1,17 +1,16 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-
-let mongod;
 
 /**
- * Spin up a real MongoDB in memory for integration tests.
+ * Connect to the MongoDB started once in globalSetup.
  *
- * Mocking Mongoose would defeat the purpose here: the bugs these tests exist
- * to catch (a pre-save hook being bypassed, a unique index not firing,
+ * Mocking Mongoose would defeat the purpose of these tests: the bugs they
+ * exist to catch (a bypassed pre-save hook, a unique index not firing,
  * bulkWrite skipping validators) only appear against a real database.
  */
+
 /**
  * Register every model on the connection.
  *
@@ -28,8 +27,20 @@ const registerModels = () => {
 };
 
 const connect = async () => {
-  mongod = await MongoMemoryServer.create();
-  await mongoose.connect(mongod.getUri(), { dbName: 'schoolflo-test' });
+  const uri = process.env.MONGO_TEST_URI;
+
+  if (!uri) {
+    throw new Error(
+      'MONGO_TEST_URI is not set — tests must be run through jest so that ' +
+        'globalSetup starts the shared MongoDB.',
+    );
+  }
+
+  // A database per suite, so suites stay isolated even if they ever run in
+  // parallel.
+  const dbName = `test-${crypto.randomBytes(6).toString('hex')}`;
+
+  await mongoose.connect(uri, { dbName });
   registerModels();
 };
 
@@ -43,7 +54,6 @@ const clear = async () => {
 const close = async () => {
   await mongoose.connection.dropDatabase();
   await mongoose.connection.close();
-  if (mongod) await mongod.stop();
 };
 
 module.exports = { connect, clear, close };

@@ -7,6 +7,7 @@ const AppError = require('../utils/AppError');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
 const { emailTemplates } = require('../services/notificationService');
 const { enqueueEmail } = require('../services/jobQueue');
+const audit = require('../services/auditService');
 
 /**
  * Record a refresh token as a live session so it can later be revoked.
@@ -101,6 +102,20 @@ const register = async (req, res) => {
 
   user.password = undefined;
 
+  await audit.record(req, {
+    action: 'user.create',
+    entity: 'User',
+    entityId: user._id,
+    entityLabel: `${user.firstName} ${user.lastName}`,
+    subject: user.role === 'Student' ? user._id : undefined,
+    meta: {
+      email: user.email,
+      role: user.role,
+      admissionNumber: user.studentProfile?.admissionNumber,
+      staffId: user.teacherProfile?.staffId,
+    },
+  });
+
   return sendSuccess(res, 201, 'User registered successfully', {
     user,
     accessToken,
@@ -128,7 +143,17 @@ const login = async (req, res) => {
   }
 
   const isMatch = await user.comparePassword(password);
-  if (!isMatch) return sendError(res, 401, 'Invalid credentials');
+  if (!isMatch) {
+    await audit.recordAnonymous(req, {
+      action: 'auth.login',
+      entity: 'User',
+      entityId: user._id,
+      entityLabel: user.email,
+      outcome: 'failure',
+      reason: 'Incorrect password',
+    });
+    return sendError(res, 401, 'Invalid credentials');
+  }
 
   // 🕒 Update last login
   user.lastLogin = new Date();
@@ -152,6 +177,18 @@ const login = async (req, res) => {
         select: 'name level',
       },
     });
+
+  // Attach the user to the request rather than spreading it into a new object:
+  // `ip` and `get()` live on Express's prototype and would be lost by a spread,
+  // silently dropping the origin of every successful login.
+  req.user = user;
+
+  await audit.record(req, {
+    action: 'auth.login',
+    entity: 'User',
+    entityId: user._id,
+    entityLabel: user.email,
+  });
 
   return sendSuccess(res, 200, 'Login successful', {
     user: populatedUser,
@@ -275,6 +312,13 @@ const resetPassword = async (req, res) => {
   user.passwordResetExpire = undefined;
   await user.save();
 
+  await audit.recordAnonymous(req, {
+    action: 'auth.password_reset',
+    entity: 'User',
+    entityId: user._id,
+    entityLabel: user.email,
+  });
+
   const accessToken = user.generateAccessToken();
   return sendSuccess(res, 200, 'Password reset successful', { accessToken });
 };
@@ -343,6 +387,14 @@ const logout = async (req, res) => {
 // @access  Private
 const logoutAll = async (req, res) => {
   const { deletedCount } = await Session.deleteMany({ user: req.user._id });
+
+  await audit.record(req, {
+    action: 'auth.logout_all',
+    entity: 'User',
+    entityId: req.user._id,
+    meta: { sessionsEnded: deletedCount },
+  });
+
   return sendSuccess(res, 200, 'Logged out of all devices', {
     sessionsEnded: deletedCount,
   });

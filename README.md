@@ -48,6 +48,7 @@ Run from `backend/`:
 | `pnpm lint`          | ESLint                           |
 | `pnpm format`        | Prettier                         |
 | `pnpm seed`          | Seed the first admin account     |
+| `pnpm reconcile`     | Audit payment records (read-only)|
 
 CI runs lint, format check, tests and the client build on every push and pull
 request to `main`.
