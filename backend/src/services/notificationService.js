@@ -170,6 +170,9 @@ const emailTemplates = {
     term,
     academicYear,
     date,
+    method,
+    feeTitle,
+    outstanding = 0,
   }) => `
     <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
       <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(15, 28, 63, 0.1);">
@@ -180,7 +183,7 @@ const emailTemplates = {
         </div>
         <div style="padding: 40px;">
           <div style="text-align: center; margin-bottom: 30px;">
-            <p style="color: #7889a8; text-transform: uppercase; letter-spacing: 1px; font-size: 12px; margin-bottom: 8px;">Amount Paid</p>
+            <p style="color: #7889a8; text-transform: uppercase; letter-spacing: 1px; font-size: 12px; margin-bottom: 8px;">${outstanding > 0 ? 'Part-Payment Received' : 'Amount Paid'}</p>
             <h2 style="color: #1a4fab; font-size: 36px; margin: 0;">₦${amount.toLocaleString()}</h2>
           </div>
           
@@ -197,9 +200,37 @@ const emailTemplates = {
               <td style="padding: 12px 0; border-bottom: 1px solid #f0f4fb;"><strong>Date</strong></td>
               <td style="padding: 12px 0; border-bottom: 1px solid #f0f4fb; text-align: right;">${new Date(date).toLocaleDateString('en-NG', { dateStyle: 'long' })}</td>
             </tr>
+            ${
+              feeTitle
+                ? `<tr>
+              <td style="padding: 12px 0; border-bottom: 1px solid #f0f4fb;"><strong>Fee</strong></td>
+              <td style="padding: 12px 0; border-bottom: 1px solid #f0f4fb; text-align: right;">${feeTitle}</td>
+            </tr>`
+                : ''
+            }
+            ${
+              method
+                ? `<tr>
+              <td style="padding: 12px 0; border-bottom: 1px solid #f0f4fb;"><strong>Method</strong></td>
+              <td style="padding: 12px 0; border-bottom: 1px solid #f0f4fb; text-align: right;">${method}</td>
+            </tr>`
+                : ''
+            }
+            <tr>
+              <td style="padding: 12px 0;"><strong>Balance remaining</strong></td>
+              <td style="padding: 12px 0; text-align: right; font-weight: 600; color: ${outstanding > 0 ? '#b45309' : '#065f46'};">${outstanding > 0 ? `₦${outstanding.toLocaleString()}` : 'Nil'}</td>
+            </tr>
           </table>
 
-          <div style="margin-top: 30px; padding: 15px; background: #ecfdf5; border-radius: 8px; color: #065f46; text-align: center; font-size: 14px; font-weight: 500;">
+          ${
+            outstanding > 0
+              ? `<div style="margin-top: 30px; padding: 15px; background: #fffbeb; border-radius: 8px; color: #92400e; text-align: center; font-size: 14px; font-weight: 500;">
+            ₦${outstanding.toLocaleString()} is still outstanding on this fee. The balance can be paid online, or in cash at the school office.
+          </div>`
+              : ''
+          }
+
+          <div style="margin-top: 16px; padding: 15px; background: #ecfdf5; border-radius: 8px; color: #065f46; text-align: center; font-size: 14px; font-weight: 500;">
             This is an official electronic receipt for your records.
           </div>
         </div>

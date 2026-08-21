@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
+const AppError = require('../utils/AppError');
 const { Payment } = require('../models/Fees');
 const Sequence = require('../models/Sequence');
 const { PAYMENT_STATUS, PAYMENT_GATEWAY } = require('../config/constants');
@@ -153,45 +154,151 @@ const generateReceiptNumber = async () => {
   return `RCP-${year}-${String(seq).padStart(6, '0')}`;
 };
 
+// A fee may be settled in instalments across both channels — part on a card
+// now, the rest in cash at the school office. Which side of this line a
+// payment arrived on is what the balances below are broken down by.
+const OFFLINE_GATEWAYS = [PAYMENT_GATEWAY.CASH, PAYMENT_GATEWAY.BANK_TRANSFER];
+
 /**
- * Sum of everything actually paid against a fee structure by a student.
+ * Money received against each of the given fee structures, split by the
+ * channel it arrived through.
+ *
  * Covers both data shapes in use: one document per gateway transaction, and
- * the single accumulating document written by manual/cash entries.
+ * the single accumulating document written by manual/cash entries. Returns a
+ * Map keyed by fee structure id with an entry for every id asked about, so
+ * callers never have to guard against a missing key.
  */
-const getAmountPaidSoFar = async (studentId, feeStructureId) => {
-  const [agg] = await Payment.aggregate([
+const getPaidBreakdown = async (studentId, feeStructureIds) => {
+  const ids = (
+    Array.isArray(feeStructureIds) ? feeStructureIds : [feeStructureIds]
+  )
+    .filter(Boolean)
+    .map((id) => new mongoose.Types.ObjectId(String(id)));
+
+  const byFee = new Map(
+    ids.map((id) => [String(id), { online: 0, offline: 0, total: 0 }]),
+  );
+  if (ids.length === 0) return byFee;
+
+  const rows = await Payment.aggregate([
     {
       $match: {
         student: new mongoose.Types.ObjectId(String(studentId)),
-        feeStructure: new mongoose.Types.ObjectId(String(feeStructureId)),
+        feeStructure: { $in: ids },
       },
     },
-    { $group: { _id: null, paid: { $sum: '$amountPaid' } } },
+    {
+      $group: {
+        _id: { feeStructure: '$feeStructure', gateway: '$gateway' },
+        paid: { $sum: '$amountPaid' },
+      },
+    },
   ]);
 
-  return agg?.paid || 0;
+  rows.forEach((row) => {
+    const entry = byFee.get(String(row._id.feeStructure));
+    if (!entry) return;
+    const paid = Number(row.paid) || 0;
+    if (OFFLINE_GATEWAYS.includes(row._id.gateway)) entry.offline += paid;
+    else entry.online += paid;
+    entry.total += paid;
+  });
+
+  return byFee;
+};
+
+/**
+ * Sum of everything actually paid against a fee structure by a student.
+ */
+const getAmountPaidSoFar = async (studentId, feeStructureId) => {
+  const breakdown = await getPaidBreakdown(studentId, feeStructureId);
+  return breakdown.get(String(feeStructureId))?.total || 0;
+};
+
+/**
+ * The split-payment view of one fee: what it costs, how much arrived through
+ * a gateway, how much was handed over at the office, and what is still owed.
+ *
+ * This — not any individual payment document — is the answer to "has this
+ * student paid?". A part-payment document is itself fully settled the moment
+ * the gateway confirms it, so its own Paid status says nothing about whether
+ * the fee behind it is clear.
+ */
+const describeFeeBalance = (feeStructure, paid) => {
+  const totalAmount = Math.round(Number(feeStructure.totalAmount) || 0);
+  const paidOnline = Math.round(paid?.online || 0);
+  const paidOffline = Math.round(paid?.offline || 0);
+  const paidTotal = paidOnline + paidOffline;
+  const outstanding = Math.max(0, totalAmount - paidTotal);
+
+  let status;
+  if (totalAmount > 0 && outstanding === 0) status = PAYMENT_STATUS.PAID;
+  else if (paidTotal > 0) status = PAYMENT_STATUS.PARTIAL;
+  else if (feeStructure.dueDate && new Date(feeStructure.dueDate) < new Date())
+    status = PAYMENT_STATUS.OVERDUE;
+  else status = PAYMENT_STATUS.PENDING;
+
+  return {
+    totalAmount,
+    paidOnline,
+    paidOffline,
+    paidTotal,
+    outstanding,
+    status,
+    percentPaid:
+      totalAmount > 0
+        ? Math.min(100, Math.round((paidTotal / totalAmount) * 100))
+        : 0,
+    // Smallest amount the payer may send to a gateway right now. Below the
+    // gateway minimum the only online payment still allowed is the exact
+    // remainder; once the fee is clear there is nothing to send at all.
+    minimumOnlinePayment:
+      outstanding > 0 ? Math.min(MIN_PAYMENT_NGN, outstanding) : 0,
+  };
+};
+
+/**
+ * Balances for a batch of fee structures in a single aggregation.
+ */
+const getFeeBalances = async (studentId, feeStructures) => {
+  const list = (
+    Array.isArray(feeStructures) ? feeStructures : [feeStructures]
+  ).filter(Boolean);
+
+  const breakdown = await getPaidBreakdown(
+    studentId,
+    list.map((fee) => fee._id),
+  );
+
+  return list.map((fee) => ({
+    feeStructure: fee,
+    ...describeFeeBalance(fee, breakdown.get(String(fee._id))),
+  }));
 };
 
 /**
  * Server-side authority on what a student still owes and what they are allowed
- * to send to a gateway. The client never gets to define the debt — it may only
+ * to pay right now. The client never gets to define the debt — it may only
  * request a part-payment of an amount the server already computed.
+ *
+ * `enforceMinimum` is the gateway floor. Cash taken over the counter is not
+ * subject to it: a parent settling the last ₦40 of a fee at the office is a
+ * normal thing to do, and refusing it would leave the fee permanently open.
  */
 const resolvePayableAmount = async ({
   studentId,
   feeStructure,
   requestedAmount,
+  enforceMinimum = true,
 }) => {
-  const paidSoFar = await getAmountPaidSoFar(studentId, feeStructure._id);
-  const outstanding = Math.max(
-    0,
-    Math.round((feeStructure.totalAmount || 0) - paidSoFar),
+  const paid = (await getPaidBreakdown(studentId, feeStructure._id)).get(
+    String(feeStructure._id),
   );
+  const balance = describeFeeBalance(feeStructure, paid);
+  const { paidTotal: paidSoFar, outstanding } = balance;
 
   if (outstanding <= 0) {
-    const err = new Error('This fee has already been fully paid.');
-    err.statusCode = 400;
-    throw err;
+    throw AppError.badRequest('This fee has already been fully paid.');
   }
 
   // No requested amount means "settle it in full".
@@ -201,28 +308,30 @@ const resolvePayableAmount = async ({
       : Math.round(Number(requestedAmount));
 
   if (!Number.isFinite(requested) || requested <= 0) {
-    const err = new Error('Payment amount must be a positive number.');
-    err.statusCode = 400;
-    throw err;
+    throw AppError.badRequest('Payment amount must be a positive number.');
   }
 
-  if (requested < MIN_PAYMENT_NGN) {
-    const err = new Error(
-      `The minimum payment amount is ₦${MIN_PAYMENT_NGN.toLocaleString()}.`,
+  // Paying off the exact remainder is always allowed, however small it is.
+  // Only a part-payment that deliberately leaves a balance behind has to
+  // clear the gateway floor.
+  if (
+    enforceMinimum &&
+    requested < MIN_PAYMENT_NGN &&
+    requested !== outstanding
+  ) {
+    throw AppError.badRequest(
+      `The minimum part-payment is ₦${MIN_PAYMENT_NGN.toLocaleString()}. ` +
+        `Pay the full outstanding ₦${outstanding.toLocaleString()} to clear this fee.`,
     );
-    err.statusCode = 400;
-    throw err;
   }
 
   if (requested > outstanding) {
-    const err = new Error(
+    throw AppError.badRequest(
       `Amount exceeds the outstanding balance of ₦${outstanding.toLocaleString()}.`,
     );
-    err.statusCode = 400;
-    throw err;
   }
 
-  return { amount: requested, outstanding, paidSoFar };
+  return { amount: requested, outstanding, paidSoFar, balance };
 };
 
 /**
@@ -236,7 +345,7 @@ const resolvePayableAmount = async ({
 const settlePayment = async ({ reference }) => {
   const payment = await Payment.findOne({ transactionRef: reference })
     .populate('student', 'firstName lastName email')
-    .populate('feeStructure', 'title term academicYear');
+    .populate('feeStructure', 'title term academicYear totalAmount dueDate');
 
   if (!payment) return { settled: false, reason: 'not_found' };
 
@@ -279,7 +388,21 @@ const settlePayment = async ({ reference }) => {
   // and status from the amount that actually landed.
   await payment.save();
 
-  await sendReceiptEmail(payment);
+  // This document's own balance is zero the moment the gateway confirms it —
+  // it only ever owed the instalment it was raised for. What the receipt has
+  // to report is what the *fee* still owes once this money is counted.
+  // populated('student') survives a populate that matched nothing, which the
+  // raw field does not.
+  const studentId = payment.populated('student') || payment.student;
+  const [feeBalance] =
+    studentId && payment.feeStructure
+      ? await getFeeBalances(studentId, [payment.feeStructure])
+      : [];
+
+  await sendReceiptEmail(payment, {
+    amount: payment.amountPaid,
+    outstanding: feeBalance?.outstanding,
+  });
 
   return {
     settled: true,
@@ -302,22 +425,36 @@ const publicPayment = (payment) => {
 
 /**
  * Receipt email. Never allowed to fail a settlement — the money is already in.
+ *
+ * `amount` and `outstanding` are passed explicitly by callers recording an
+ * instalment. Over-the-counter payments accumulate onto a single record, so
+ * its amountPaid is the running total: a parent who paid ₦10,000 and then
+ * ₦5,000 would otherwise be e-mailed a receipt for ₦15,000 the second time.
  */
-const sendReceiptEmail = async (payment) => {
+const sendReceiptEmail = async (payment, { amount, outstanding } = {}) => {
   try {
     const student = payment.student;
     if (!student?.email) return;
 
+    const paidNow = amount ?? payment.amountPaid;
+    const stillOwed = outstanding ?? payment.balance ?? 0;
+
     await enqueueEmail({
       to: student.email,
-      subject: `Payment Receipt — ${payment.receiptNumber}`,
+      subject:
+        stillOwed > 0
+          ? `Part-Payment Receipt — ${payment.receiptNumber}`
+          : `Payment Receipt — ${payment.receiptNumber}`,
       html: emailTemplates.paymentReceipt({
         studentName: `${student.firstName} ${student.lastName}`,
         receiptNumber: payment.receiptNumber,
-        amount: payment.amountPaid,
+        amount: paidNow,
         term: payment.term,
         academicYear: payment.academicYear,
         date: payment.paymentDate,
+        method: payment.gateway,
+        feeTitle: payment.feeStructure?.title,
+        outstanding: stillOwed,
       }),
     });
   } catch (error) {
@@ -375,6 +512,9 @@ module.exports = {
   generateReceiptNumber,
   getFinancialSummary,
   getAmountPaidSoFar,
+  getPaidBreakdown,
+  describeFeeBalance,
+  getFeeBalances,
   resolvePayableAmount,
   settlePayment,
   sendReceiptEmail,

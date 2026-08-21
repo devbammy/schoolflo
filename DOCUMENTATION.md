@@ -316,6 +316,45 @@ Two rules that matter:
 Receipt numbers are sequential and collision-free: `RCP-25-000042`, backed by
 the atomic `Sequence` model.
 
+### Split payments
+
+A fee does not have to be settled in one go, or through one channel. A family
+can pay part of it by card and hand the rest over at the school office, in any
+order and across as many instalments as they need.
+
+That makes **no single Payment document the answer to "is this fee paid?"**. A
+₦20,000 instalment against a ₦45,000 fee is a document with
+`amountDue === amountPaid`, so its own status is `Paid` while ₦25,000 is still
+owed. Reading a record's status as the fee's status is the bug this model
+exists to prevent.
+
+The authority is `describeFeeBalance()` / `getFeeBalances()` in
+`paymentService.js`, served to clients by:
+
+```
+GET /api/v1/payments/balance/:studentId?term=&academicYear=
+GET /api/v1/payments/balance/:studentId?feeStructureId=   ← one named fee
+
+→ { balances: [{ feeStructure, totalAmount, paidOnline, paidOffline,
+                 paidTotal, outstanding, status, percentPaid,
+                 minimumOnlinePayment }],
+    totals: { ... } }
+```
+
+- `paidOnline` is Paystack + Flutterwave; `paidOffline` is Cash + Bank
+  Transfer. The split is what the parent and student pages draw their progress
+  bars from, and what the office sees before taking cash.
+- **Both channels are capped by the same balance.** `resolvePayableAmount()`
+  guards the manual/cash route as well as the gateways, so cash cannot be
+  recorded on top of money already paid online.
+- The gateway floor (`MIN_PAYMENT_NGN`) applies to a part-payment that leaves
+  a balance behind, never to a payment that clears the fee — otherwise a ₦40
+  remainder could never be paid off. Cash is exempt entirely
+  (`enforceMinimum: false`).
+- Each e-receipt reports **that instalment** and the balance left after it.
+  Over-the-counter payments accumulate onto one record, so its `amountPaid` is
+  a running total and callers pass the instalment amount explicitly.
+
 **Webhook setup:** register `https://<your-api-host>/webhooks/paystack` in the
 Paystack dashboard. Without it, a payment is only confirmed if the payer
 returns to the site.
@@ -620,6 +659,15 @@ computed in `pre('save')` can never be satisfied.
 
 `Payment.balance` and `.status` are derived in `pre('save')` from `amountPaid`
 vs `amountDue`.
+
+**`amountDue` is what that record is answerable for, not what the fee costs.**
+A gateway document owes the instalment it was raised for. The single
+accumulating cash document owes the cash it has taken plus whatever of the fee
+is still unpaid — charging it the whole fee would double-count anything already
+settled online and pin it on `Partial` for good. Summed across a fee's records
+the two still come to the fee total, which is what keeps the financial report's
+`totalExpected` honest. For what a student actually owes, use
+`getFeeBalances()`, never one record's `balance`.
 
 ### Session
 

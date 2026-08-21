@@ -31,6 +31,11 @@ const verifyPaymentRules = [
   stringBody('reference', 'Payment reference', { min: 4, max: 100 }),
 ];
 
+/**
+ * Over-the-counter entry. `amountPaid` is a part-payment like any other —
+ * the controller caps it at what the fee still owes after online payments,
+ * so the two channels can settle one fee between them.
+ */
 const manualPaymentRules = [
   objectIdBody('studentId', 'Student'),
   objectIdBody('feeStructureId', 'Fee structure'),

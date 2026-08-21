@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { CreditCard, CheckCircle, Users, ChevronDown } from 'lucide-react';
-import { paymentService, feeService } from '../../services/api';
+import React, { useCallback, useEffect, useState } from 'react';
+import { CreditCard, Users } from 'lucide-react';
+import { paymentService } from '../../services/api';
+import FeeBalanceCard from '../../components/payments/FeeBalanceCard';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -63,7 +64,8 @@ export default function ParentPayments() {
   const [selectedChild, setSelectedChild] = useState(null);
   const [term, setTerm] = useState('First Term');
   const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
-  const [fees, setFees] = useState([]);
+  const [balances, setBalances] = useState([]);
+  const [totals, setTotals] = useState({});
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [paying, setPaying] = useState(null);
@@ -75,48 +77,51 @@ export default function ParentPayments() {
     }
   }, [children.length]);
 
-  // Load fees + payments whenever child / term / year changes
-  useEffect(() => {
+  // Load balances + payment history whenever child / term / year changes.
+  const load = useCallback(() => {
     if (!selectedChild?._id) return;
 
     setLoading(true);
-    setFees([]);
-    setPayments([]);
-
-    const childClassId =
-      selectedChild.studentProfile?.class?._id ||
-      selectedChild.studentProfile?.class;
 
     Promise.all([
       paymentService.getStudentPayments(selectedChild._id, {
         term,
         academicYear,
       }),
-      feeService.getAll({
-        term,
-        academicYear,
-        ...(childClassId ? { classId: childClassId } : {}),
-      }),
+      // The server works out which fees apply to this child and how much of
+      // each is left after everything already received, online and in cash.
+      paymentService.getBalances(selectedChild._id, { term, academicYear }),
     ])
-      .then(([pRes, fRes]) => {
+      .then(([pRes, bRes]) => {
         setPayments(pRes.data.data?.payments || []);
-        setFees(fRes.data.data?.fees || []);
+        setBalances(bRes.data.data?.balances || []);
+        setTotals(bRes.data.data?.totals || {});
       })
       .catch(() => toast.error('Failed to load payment data'))
       .finally(() => setLoading(false));
   }, [selectedChild?._id, term, academicYear]);
 
+  useEffect(load, [load]);
+
+  // Paystack opens in another tab, so coming back to this one is the moment
+  // a part-payment has most likely just gone through.
+  useEffect(() => {
+    window.addEventListener('focus', load);
+    return () => window.removeEventListener('focus', load);
+  }, [load]);
+
   // ── Pay via Paystack ───────────────────────────────────────────────────────
-  const handlePaystack = async (fee) => {
+  const handlePaystack = async (fee, amount) => {
     if (!selectedChild?._id) return;
     setPaying(fee._id);
     try {
-      // No amount sent: the server computes the outstanding balance for this
-      // fee and charges exactly that, so part-payments already made are not
-      // billed twice.
+      // `amount` is only a request. The server re-checks it against what the
+      // fee actually still owes, so a part-payment can never be billed twice
+      // and can never exceed the balance.
       const res = await paymentService.initPaystack({
         studentId: selectedChild._id,
         feeStructureId: fee._id,
+        amount,
       });
       window.open(res.data.data.authorizationUrl, '_blank');
       toast.success('Redirecting to Paystack...');
@@ -154,16 +159,6 @@ export default function ParentPayments() {
       </>
     );
   }
-
-  const isPaid = (fee) =>
-    payments.some(
-      (p) =>
-        (p.feeStructure?._id || p.feeStructure) === fee._id &&
-        p.status === 'Paid',
-    );
-
-  const totalPaid = payments.reduce((s, p) => s + (p.amountPaid || 0), 0);
-  const totalOutstanding = payments.reduce((s, p) => s + (p.balance || 0), 0);
 
   return (
     <>
@@ -282,7 +277,7 @@ export default function ParentPayments() {
       ) : (
         <>
           {/* ── Summary strip ─────────────────────────────────────────── */}
-          {(totalPaid > 0 || totalOutstanding > 0) && (
+          {(totals.paidTotal > 0 || totals.outstanding > 0) && (
             <div
               style={{
                 display: 'flex',
@@ -293,14 +288,20 @@ export default function ParentPayments() {
             >
               {[
                 {
-                  label: 'Total Paid',
-                  value: `₦${totalPaid.toLocaleString()}`,
+                  label: 'Paid Online',
+                  value: `₦${(totals.paidOnline || 0).toLocaleString()}`,
+                  color: 'var(--clr-primary)',
+                  bg: '#dbeafe',
+                },
+                {
+                  label: 'Paid at School',
+                  value: `₦${(totals.paidOffline || 0).toLocaleString()}`,
                   color: 'var(--clr-success)',
                   bg: '#d1fae5',
                 },
                 {
                   label: 'Outstanding',
-                  value: `₦${totalOutstanding.toLocaleString()}`,
+                  value: `₦${(totals.outstanding || 0).toLocaleString()}`,
                   color: 'var(--clr-warning)',
                   bg: '#fef3c7',
                 },
@@ -342,8 +343,8 @@ export default function ParentPayments() {
             </div>
           )}
 
-          {/* ── Fee structure cards ───────────────────────────────────── */}
-          {fees.length > 0 && (
+          {/* ── Fees, each with its own split-payment progress ─────────── */}
+          {balances.length > 0 && (
             <div style={{ marginBottom: 32 }}>
               <h3
                 style={{
@@ -362,173 +363,22 @@ export default function ParentPayments() {
                   gap: 16,
                 }}
               >
-                {fees.map((fee) => {
-                  const paid = isPaid(fee);
-                  return (
-                    <div
-                      key={fee._id}
-                      className="card"
-                      style={{
-                        borderTop: `3px solid ${paid ? 'var(--clr-success)' : 'var(--clr-warning)'}`,
-                      }}
-                    >
-                      <div className="card__body">
-                        {/* Title + badge */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            marginBottom: 16,
-                          }}
-                        >
-                          <div>
-                            <div
-                              style={{
-                                fontWeight: 700,
-                                fontSize: '1rem',
-                                marginBottom: 4,
-                              }}
-                            >
-                              {fee.title}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: '0.8125rem',
-                                color: 'var(--clr-text-3)',
-                              }}
-                            >
-                              {fee.term} • {fee.academicYear}
-                            </div>
-                          </div>
-                          {paid ? (
-                            <span
-                              className="badge badge--success"
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 4,
-                              }}
-                            >
-                              <CheckCircle size={11} /> Paid
-                            </span>
-                          ) : (
-                            <span className="badge badge--warning">Unpaid</span>
-                          )}
-                        </div>
-
-                        {/* Amount */}
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-display)',
-                            fontSize: '1.875rem',
-                            fontWeight: 800,
-                            color: 'var(--clr-text-1)',
-                            marginBottom: 14,
-                          }}
-                        >
-                          ₦{fee.totalAmount?.toLocaleString()}
-                        </div>
-
-                        {/* Line items */}
-                        {(fee.items || []).map((item, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              fontSize: '0.8125rem',
-                              marginBottom: 5,
-                            }}
-                          >
-                            <span
-                              style={{
-                                color: 'var(--clr-text-2)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 6,
-                              }}
-                            >
-                              {item.label}
-                              {!item.isCompulsory && (
-                                <span
-                                  style={{
-                                    fontSize: '0.7rem',
-                                    border: '1px solid var(--clr-border)',
-                                    borderRadius: 4,
-                                    padding: '1px 5px',
-                                    color: 'var(--clr-text-3)',
-                                  }}
-                                >
-                                  optional
-                                </span>
-                              )}
-                            </span>
-                            <span
-                              style={{
-                                fontWeight: 600,
-                                color: 'var(--clr-text-1)',
-                              }}
-                            >
-                              ₦{item.amount?.toLocaleString()}
-                            </span>
-                          </div>
-                        ))}
-
-                        {/* Due date */}
-                        {fee.dueDate && (
-                          <div
-                            style={{
-                              marginTop: 10,
-                              fontSize: '0.8125rem',
-                              color: 'var(--clr-text-3)',
-                            }}
-                          >
-                            Due: {format(new Date(fee.dueDate), 'dd MMM yyyy')}
-                            {fee.lateFee > 0 && (
-                              <span
-                                style={{
-                                  marginLeft: 8,
-                                  color: 'var(--clr-warning)',
-                                }}
-                              >
-                                +₦{fee.lateFee.toLocaleString()} late fee
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Pay button */}
-                        {!paid && (
-                          <button
-                            className="btn btn--primary btn--full"
-                            style={{
-                              marginTop: 16,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 8,
-                            }}
-                            onClick={() => handlePaystack(fee)}
-                            disabled={paying === fee._id}
-                          >
-                            <CreditCard size={15} />
-                            {paying === fee._id
-                              ? 'Processing...'
-                              : 'Pay with Paystack'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                {balances.map((balance) => (
+                  <FeeBalanceCard
+                    key={balance.feeStructure._id}
+                    balance={balance}
+                    paying={paying === balance.feeStructure._id}
+                    onPay={(amount) =>
+                      handlePaystack(balance.feeStructure, amount)
+                    }
+                  />
+                ))}
               </div>
             </div>
           )}
 
           {/* ── No fee structures for this class/term ─────────────────── */}
-          {fees.length === 0 && !loading && (
+          {balances.length === 0 && !loading && (
             <div className="card" style={{ marginBottom: 28 }}>
               <div className="empty-state" style={{ padding: '40px 24px' }}>
                 <CreditCard size={40} className="empty-state__icon" />
@@ -563,7 +413,6 @@ export default function ParentPayments() {
                   <tr>
                     <th>Fee</th>
                     <th>Amount Paid</th>
-                    <th>Balance</th>
                     <th>Status</th>
                     <th>Gateway</th>
                     <th>Receipt No.</th>
@@ -574,7 +423,7 @@ export default function ParentPayments() {
                   {payments.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={6}
                         style={{
                           textAlign: 'center',
                           padding: '40px 16px',
@@ -597,19 +446,6 @@ export default function ParentPayments() {
                           }}
                         >
                           ₦{(p.amountPaid || 0).toLocaleString()}
-                        </td>
-                        <td
-                          style={{
-                            fontWeight: p.balance > 0 ? 600 : 400,
-                            color:
-                              p.balance > 0
-                                ? 'var(--clr-warning)'
-                                : 'var(--clr-text-3)',
-                          }}
-                        >
-                          {p.balance > 0
-                            ? `₦${p.balance.toLocaleString()}`
-                            : '—'}
                         </td>
                         <td>
                           <span

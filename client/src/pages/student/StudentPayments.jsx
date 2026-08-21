@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { CreditCard, CheckCircle } from 'lucide-react';
-import { paymentService, feeService } from '../../services/api';
+import React, { useCallback, useEffect, useState } from 'react';
+import { paymentService } from '../../services/api';
+import FeeBalanceCard from '../../components/payments/FeeBalanceCard';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -15,7 +15,7 @@ export default function StudentPayments() {
   const { user } = useAuthStore();
   const [term, setTerm] = useState('First Term');
   const [payments, setPayments] = useState([]);
-  const [fees, setFees] = useState([]);
+  const [balances, setBalances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(null);
   const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
@@ -23,40 +23,40 @@ export default function StudentPayments() {
   const studentId = user?.studentProfile
     ? user._id
     : user?.parentProfile?.children?.[0]?._id || user?._id;
-  const studentClassId =
-    user?.studentProfile?.class?._id ||
-    user?.studentProfile?.class ||
-    user?.parentProfile?.children?.[0]?.studentProfile?.class?._id ||
-    user?.parentProfile?.children?.[0]?.studentProfile?.class;
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!studentId) return;
 
     Promise.all([
       paymentService.getStudentPayments(studentId, { term, academicYear }),
-      feeService.getAll({
-        term,
-        academicYear,
-        ...(studentClassId ? { classId: studentClassId } : {}),
-      }),
+      paymentService.getBalances(studentId, { term, academicYear }),
     ])
-      .then(([pRes, fRes]) => {
-        setPayments(pRes.data.data.payments || []);
-        setFees(fRes.data.data?.fees || []);
+      .then(([pRes, bRes]) => {
+        setPayments(pRes.data.data?.payments || []);
+        setBalances(bRes.data.data?.balances || []);
       })
       .catch(() => toast.error('Failed to load payments'))
       .finally(() => setLoading(false));
-  }, [studentId, studentClassId, term, academicYear]);
+  }, [studentId, term, academicYear]);
 
-  const handlePaystack = async (fee) => {
+  useEffect(load, [load]);
+
+  // The gateway opens in another tab; returning to this one is when a
+  // part-payment has most likely just gone through.
+  useEffect(() => {
+    window.addEventListener('focus', load);
+    return () => window.removeEventListener('focus', load);
+  }, [load]);
+
+  const handlePaystack = async (fee, amount) => {
     setPaying(fee._id);
     try {
-      // No amount sent: the server computes the outstanding balance for this
-      // fee and charges exactly that, so part-payments already made are not
-      // billed twice.
+      // `amount` is only a request. The server re-checks it against what the
+      // fee actually still owes before handing anything to the gateway.
       const res = await paymentService.initPaystack({
         studentId,
         feeStructureId: fee._id,
+        amount,
       });
       window.open(res.data.data.authorizationUrl, '_blank');
       toast.success('Redirecting to payment gateway...');
@@ -109,7 +109,7 @@ export default function StudentPayments() {
         </select>
       </div>
 
-      {fees.length > 0 && (
+      {balances.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <h3
             style={{
@@ -118,7 +118,7 @@ export default function StudentPayments() {
               color: 'var(--clr-text-2)',
             }}
           >
-            Outstanding Fees
+            Your Fees
           </h3>
           <div
             style={{
@@ -127,91 +127,14 @@ export default function StudentPayments() {
               gap: 16,
             }}
           >
-            {fees.map((fee) => {
-              const paid = payments.find(
-                (p) => p.feeStructure?._id === fee._id && p.status === 'Paid',
-              );
-              return (
-                <div key={fee._id} className="card">
-                  <div className="card__body">
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        marginBottom: 16,
-                      }}
-                    >
-                      <div>
-                        <div
-                          style={{
-                            fontWeight: 700,
-                            fontSize: '1rem',
-                            marginBottom: 4,
-                          }}
-                        >
-                          {fee.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: '0.875rem',
-                            color: 'var(--clr-text-3)',
-                          }}
-                        >
-                          {fee.term} • {fee.academicYear}
-                        </div>
-                      </div>
-                      {paid ? (
-                        <span className="badge badge--success">
-                          <CheckCircle size={12} /> Paid
-                        </span>
-                      ) : (
-                        <span className="badge badge--warning">Unpaid</span>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-display)',
-                        fontSize: '1.75rem',
-                        fontWeight: 800,
-                        color: 'var(--clr-text-1)',
-                        marginBottom: 16,
-                      }}
-                    >
-                      ₦{fee.totalAmount.toLocaleString()}
-                    </div>
-                    {fee.items?.map((item) => (
-                      <div
-                        key={item.label}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '0.8125rem',
-                          color: 'var(--clr-text-3)',
-                          marginBottom: 4,
-                        }}
-                      >
-                        <span>{item.label}</span>
-                        <span>₦{item.amount.toLocaleString()}</span>
-                      </div>
-                    ))}
-                    {!paid && (
-                      <button
-                        className="btn btn--primary btn--full"
-                        style={{ marginTop: 16 }}
-                        onClick={() => handlePaystack(fee)}
-                        disabled={paying === fee._id}
-                      >
-                        <CreditCard size={15} />{' '}
-                        {paying === fee._id
-                          ? 'Processing...'
-                          : 'Pay with Paystack'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {balances.map((balance) => (
+              <FeeBalanceCard
+                key={balance.feeStructure._id}
+                balance={balance}
+                paying={paying === balance.feeStructure._id}
+                onPay={(amount) => handlePaystack(balance.feeStructure, amount)}
+              />
+            ))}
           </div>
         </div>
       )}

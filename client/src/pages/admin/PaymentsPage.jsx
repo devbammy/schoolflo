@@ -72,6 +72,7 @@ export default function PaymentsPage() {
     notes: '',
   });
   const [saving, setSaving] = useState(false);
+  const [manualBalance, setManualBalance] = useState(null);
 
   const loadReport = useCallback(async () => {
     try {
@@ -112,6 +113,36 @@ export default function PaymentsPage() {
     });
   }, [filters]);
 
+  // Once a student and a fee are chosen, show what that fee still owes —
+  // online payments included. Cash cannot be recorded beyond it, and the
+  // clerk should see the figure before taking the money, not after.
+  useEffect(() => {
+    const { studentId, feeStructureId } = manualForm;
+    if (!studentId || !feeStructureId) {
+      setManualBalance(null);
+      return;
+    }
+
+    let stale = false;
+    paymentService
+      .getBalances(studentId, { feeStructureId })
+      .then((res) => {
+        if (stale) return;
+        const balance = res.data.data?.balances?.[0] || null;
+        setManualBalance(balance);
+        setManualForm((f) =>
+          f.amountPaid ? f : { ...f, amountPaid: String(balance?.outstanding ?? '') },
+        );
+      })
+      .catch(() => {
+        if (!stale) setManualBalance(null);
+      });
+
+    return () => {
+      stale = true;
+    };
+  }, [manualForm.studentId, manualForm.feeStructureId]);
+
   const overview = report?.overview || {};
   const byStatus = report?.byStatus || [];
   const byGateway = report?.byGateway || [];
@@ -140,15 +171,27 @@ export default function PaymentsPage() {
     }
     setSaving(true);
     try {
-      await paymentService.recordManual({
+      const res = await paymentService.recordManual({
         studentId: manualForm.studentId,
         feeStructureId: manualForm.feeStructureId,
         amountPaid: parseFloat(manualForm.amountPaid),
         gateway: manualForm.gateway,
         notes: manualForm.notes,
       });
-      toast.success('Payment recorded successfully');
+      toast.success(
+        res.data.data?.outstanding > 0
+          ? `Payment recorded — ₦${res.data.data.outstanding.toLocaleString()} still outstanding`
+          : 'Payment recorded — this fee is now fully paid',
+      );
       setModal(null);
+      setManualForm({
+        studentId: '',
+        feeStructureId: '',
+        amountPaid: '',
+        gateway: 'Cash',
+        notes: '',
+      });
+      setManualBalance(null);
       loadPayments();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed');
@@ -156,6 +199,10 @@ export default function PaymentsPage() {
       setSaving(false);
     }
   };
+
+  const overAmount =
+    manualBalance &&
+    Number(manualForm.amountPaid) > (manualBalance.outstanding || 0);
 
   const collectionRate =
     overview.totalExpected > 0
@@ -497,7 +544,7 @@ export default function PaymentsPage() {
             </button>
             <button
               className="btn btn--primary"
-              disabled={saving}
+              disabled={saving || overAmount}
               onClick={handleManualSave}
             >
               {saving ? 'Saving...' : 'Record Payment'}
@@ -547,6 +594,51 @@ export default function PaymentsPage() {
                 ))}
               </select>
             </div>
+            {manualBalance && (
+              <div
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--clr-surface-2, #f6f8fc)',
+                  border: '1px solid var(--clr-border)',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 18,
+                  fontSize: '0.8125rem',
+                }}
+              >
+                {[
+                  ['Fee total', manualBalance.totalAmount, 'var(--clr-text-1)'],
+                  ['Paid online', manualBalance.paidOnline, 'var(--clr-primary)'],
+                  [
+                    'Paid at school',
+                    manualBalance.paidOffline,
+                    'var(--clr-success)',
+                  ],
+                  [
+                    'Still owed',
+                    manualBalance.outstanding,
+                    'var(--clr-warning)',
+                  ],
+                ].map(([label, value, color]) => (
+                  <div key={label}>
+                    <div
+                      style={{
+                        color: 'var(--clr-text-3)',
+                        textTransform: 'uppercase',
+                        fontSize: '0.6875rem',
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      {label}
+                    </div>
+                    <div style={{ fontWeight: 700, color }}>
+                      ₦{(value || 0).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div
               style={{
                 display: 'grid',
@@ -559,6 +651,7 @@ export default function PaymentsPage() {
                 <input
                   type="number"
                   min={1}
+                  max={manualBalance?.outstanding || undefined}
                   className="form-control"
                   required
                   value={manualForm.amountPaid}
@@ -567,6 +660,17 @@ export default function PaymentsPage() {
                   }
                   placeholder="0"
                 />
+                {overAmount && (
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--clr-danger)',
+                    }}
+                  >
+                    Only ₦{manualBalance.outstanding.toLocaleString()} is still
+                    owed on this fee.
+                  </span>
+                )}
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label>Payment Method *</label>

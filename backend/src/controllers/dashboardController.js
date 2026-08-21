@@ -6,6 +6,7 @@ const { Payment } = require('../models/Fees');
 const { Assignment, Submission } = require('../models/Assignment');
 const Announcement = require('../models/Announcement');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
+const { getFeeBalances } = require('../services/paymentService');
 
 // @desc    Admin master dashboard
 // @route   GET /api/v1/dashboard/admin
@@ -269,8 +270,16 @@ const getStudentDashboard = async (req, res) => {
 
     Payment.findOne({ student: studentId })
       .sort({ createdAt: -1 })
-      .populate('feeStructure', 'title term totalAmount'),
+      .populate('feeStructure', 'title term totalAmount dueDate'),
   ]);
+
+  // The latest payment record describes one instalment, and a settled
+  // instalment looks fully paid however much of the fee is left. The standing
+  // of the fee itself — everything received across both channels — is what
+  // belongs on a dashboard.
+  const [feeBalance] = recentPayment?.feeStructure
+    ? await getFeeBalances(studentId, [recentPayment.feeStructure])
+    : [];
 
   const avgScore = results.length
     ? (results.reduce((s, r) => s + r.totalScore, 0) / results.length).toFixed(
@@ -290,6 +299,7 @@ const getStudentDashboard = async (req, res) => {
     pendingAssignments,
     announcements,
     recentPayment,
+    feeBalance: feeBalance || null,
   });
 };
 

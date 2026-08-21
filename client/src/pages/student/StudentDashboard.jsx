@@ -37,7 +37,7 @@ export default function StudentDashboard() {
     recentResults,
     pendingAssignments,
     announcements,
-    recentPayment,
+    feeBalance,
   } = data || {};
   const attendance = stats.attendance || {};
   const attendancePct = attendance.percentage || 0;
@@ -239,7 +239,7 @@ export default function StudentDashboard() {
           </div>
 
           {/* Fee Status */}
-          {recentPayment && (
+          {feeBalance && (
             <div className="card">
               <div className="card__header">
                 <span className="card__title">Fee Status</span>
@@ -253,7 +253,7 @@ export default function StudentDashboard() {
                       marginBottom: 4,
                     }}
                   >
-                    {recentPayment.feeStructure?.title}
+                    {feeBalance.feeStructure?.title}
                   </div>
                   <div
                     style={{
@@ -262,7 +262,7 @@ export default function StudentDashboard() {
                       fontWeight: 700,
                     }}
                   >
-                    ₦{(recentPayment.amountPaid || 0).toLocaleString()}
+                    ₦{(feeBalance.paidTotal || 0).toLocaleString()}
                     <span
                       style={{
                         fontSize: '0.875rem',
@@ -271,7 +271,7 @@ export default function StudentDashboard() {
                       }}
                     >
                       {' '}
-                      / ₦{(recentPayment.amountDue || 0).toLocaleString()}
+                      / ₦{(feeBalance.totalAmount || 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -287,18 +287,20 @@ export default function StudentDashboard() {
                     style={{
                       height: '100%',
                       borderRadius: 4,
-                      width: `${Math.min(100, (recentPayment.amountPaid / recentPayment.amountDue) * 100 || 0)}%`,
+                      width: `${feeBalance.percentPaid || 0}%`,
                       background:
-                        recentPayment.status === 'Paid'
+                        feeBalance.status === 'Paid'
                           ? 'var(--clr-success)'
                           : 'var(--clr-warning)',
                     }}
                   />
                 </div>
                 <span
-                  className={`badge badge--${recentPayment.status === 'Paid' ? 'success' : 'warning'}`}
+                  className={`badge badge--${feeBalance.status === 'Paid' ? 'success' : 'warning'}`}
                 >
-                  {recentPayment.status}
+                  {feeBalance.status}
+                  {feeBalance.outstanding > 0 &&
+                    ` — ₦${feeBalance.outstanding.toLocaleString()} left`}
                 </span>
               </div>
             </div>

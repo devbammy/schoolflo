@@ -14,6 +14,7 @@ const {
   generateReceiptNumber,
   getFinancialSummary,
   resolvePayableAmount,
+  getFeeBalances,
   settlePayment,
   sendReceiptEmail,
 } = require('../services/paymentService');
@@ -63,23 +64,77 @@ const getFeeStructures = async (req, res) => {
  * Who is allowed to act on a given student's fees.
  * Returns an error message, or null when the request is permitted.
  */
-const checkStudentAccess = (user, studentId) => {
+const checkStudentAccess = (user, studentId, action = 'act on') => {
   if (user.role === 'Admin') return null;
 
   if (user.role === 'Student') {
     return String(user._id) === String(studentId)
       ? null
-      : 'You can only act on your own fees.';
+      : `You can only ${action} your own fees.`;
   }
 
   if (user.role === 'Parent') {
     const childIds = user.parentProfile?.children?.map(String) || [];
     return childIds.includes(String(studentId))
       ? null
-      : "You can only act on your own children's fees.";
+      : `You can only ${action} your own children's fees.`;
   }
 
   return 'You are not permitted to make payments.';
+};
+
+// @desc    Outstanding balance per fee, split by how the money arrived
+// @route   GET /api/v1/payments/balance/:studentId
+// @access  Admin, Student (own), Parent (own child)
+//
+// The authority on what a student still owes. A fee may be settled in
+// instalments — part online, the rest in cash at the office — so no single
+// payment document answers it: a ₦20,000 part-payment is a fully settled
+// document of its own against a fee that is still ₦25,000 short.
+const getStudentFeeBalances = async (req, res) => {
+  const { studentId } = req.params;
+  const { term, academicYear } = req.query;
+
+  const denied = checkStudentAccess(req.user, studentId, 'view');
+  if (denied) return sendError(res, 403, denied);
+
+  const student = await User.findById(studentId).select('studentProfile.class');
+  if (!student) return sendError(res, 404, 'Student not found');
+
+  // Asking about one named fee answers it directly. The office records cash
+  // against whichever fee is in front of them, which is not always one of the
+  // student's current class/term ones.
+  const filter = { isActive: true };
+  if (req.query.feeStructureId) {
+    filter._id = req.query.feeStructureId;
+  } else {
+    if (term) filter.term = term;
+    if (academicYear) filter.academicYear = academicYear;
+    if (student.studentProfile?.class)
+      filter.class = student.studentProfile.class;
+  }
+
+  const fees = await Fees.find(filter).sort({ dueDate: 1 });
+  const balances = await getFeeBalances(studentId, fees);
+
+  const totals = balances.reduce(
+    (acc, b) => ({
+      totalAmount: acc.totalAmount + b.totalAmount,
+      paidOnline: acc.paidOnline + b.paidOnline,
+      paidOffline: acc.paidOffline + b.paidOffline,
+      paidTotal: acc.paidTotal + b.paidTotal,
+      outstanding: acc.outstanding + b.outstanding,
+    }),
+    {
+      totalAmount: 0,
+      paidOnline: 0,
+      paidOffline: 0,
+      paidTotal: 0,
+      outstanding: 0,
+    },
+  );
+
+  return sendSuccess(res, 200, 'Fee balances fetched', { balances, totals });
 };
 
 // @desc    Initialize payment via Paystack
@@ -256,10 +311,19 @@ const recordManualPayment = async (req, res) => {
   const feeStructure = await Fees.findById(feeStructureId);
   if (!feeStructure) return sendError(res, 404, 'Fee structure not found');
 
-  const amount = Math.round(Number(amountPaid));
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return sendError(res, 400, 'Amount paid must be a positive number.');
-  }
+  // The office may only take what is still owed *after everything already
+  // received*, online included. Without this, a parent who had paid ₦20,000
+  // by card could hand over the full ₦45,000 in cash and nothing in the
+  // system would show the school had been overpaid. The gateway floor does
+  // not apply to money crossing a counter.
+  const { amount, outstanding } = await resolvePayableAmount({
+    studentId,
+    feeStructure,
+    requestedAmount: amountPaid,
+    enforceMinimum: false,
+  });
+
+  const remainingAfter = outstanding - amount;
 
   // Only ever accumulate onto another over-the-counter record. Matching any
   // payment for this student and fee would let a cash entry attach itself to
@@ -271,9 +335,14 @@ const recordManualPayment = async (req, res) => {
     gateway: { $in: ['Cash', 'Bank Transfer'] },
   });
 
+  // What this record is answerable for: the cash it has taken, plus whatever
+  // of the fee is still unpaid. Charging it the whole fee would double-count
+  // the part already settled online — and leave it stuck on Partial even
+  // after the family had paid everything.
   let payment;
   if (existing) {
     existing.amountPaid += amount;
+    existing.amountDue = existing.amountPaid + remainingAfter;
     existing.notes = notes;
     existing.processedBy = req.user._id;
     existing.receiptNumber =
@@ -286,7 +355,7 @@ const recordManualPayment = async (req, res) => {
       term: feeStructure.term,
       academicYear: feeStructure.academicYear,
       amountPaid: amount,
-      amountDue: feeStructure.totalAmount,
+      amountDue: amount + remainingAfter,
       gateway: gateway || 'Cash',
       receiptNumber: await generateReceiptNumber(),
       processedBy: req.user._id,
@@ -299,7 +368,7 @@ const recordManualPayment = async (req, res) => {
     { path: 'feeStructure', select: 'title term' },
   ]);
 
-  await sendReceiptEmail(payment);
+  await sendReceiptEmail(payment, { amount, outstanding: remainingAfter });
 
   await audit.record(req, {
     action: 'payment.manual',
@@ -313,11 +382,15 @@ const recordManualPayment = async (req, res) => {
       status: payment.status,
       balance: payment.balance,
       feeStructure: feeStructureId,
+      outstanding: remainingAfter,
       notes,
     },
   });
 
-  return sendSuccess(res, 201, 'Payment recorded', { payment });
+  return sendSuccess(res, 201, 'Payment recorded', {
+    payment,
+    outstanding: remainingAfter,
+  });
 };
 
 // @desc    Get payment history for a student
@@ -443,5 +516,6 @@ module.exports = {
   initFlutterwave,
   recordManualPayment,
   getStudentPayments,
+  getStudentFeeBalances,
   getFinancialReport,
 };

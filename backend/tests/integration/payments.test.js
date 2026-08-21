@@ -170,7 +170,7 @@ describe('resolvePayableAmount', () => {
         feeStructure,
         requestedAmount: 5,
       }),
-    ).rejects.toThrow(/minimum payment/i);
+    ).rejects.toThrow(/minimum part-payment/i);
   });
 
   it('refuses payment on a fee that is already settled', async () => {

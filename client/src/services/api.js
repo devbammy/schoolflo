@@ -191,6 +191,10 @@ export const paymentService = {
   recordManual: (data) => api.post('/payments/manual', data),
   getStudentPayments: (studentId, params) =>
     api.get(`/payments/student/${studentId}`, { params }),
+  // What each fee still owes, split by how the money arrived. The authority
+  // on whether a fee is settled — an individual part-payment record is not.
+  getBalances: (studentId, params) =>
+    api.get(`/payments/balance/${studentId}`, { params }),
   getReport: (params) => api.get('/payments/report', { params }),
 };
 

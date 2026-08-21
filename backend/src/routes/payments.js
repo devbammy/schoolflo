@@ -9,6 +9,7 @@ const {
   initFlutterwave,
   recordManualPayment,
   getStudentPayments,
+  getStudentFeeBalances,
   getFinancialReport,
 } = require('../controllers/paymentController');
 const {
@@ -44,6 +45,12 @@ router.post(
   recordManualPayment,
 );
 router.get('/report', protect, authorize('Admin'), getFinancialReport);
+router.get(
+  '/balance/:studentId',
+  protect,
+  validate([objectIdParam('studentId', 'Student id')]),
+  getStudentFeeBalances,
+);
 router.get(
   '/student/:studentId',
   protect,
