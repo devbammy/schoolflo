@@ -40,11 +40,11 @@ const MB = 1024 * 1024;
 // Per-purpose size caps. A single global 500KB limit rejected any real phone
 // photo or scanned PDF with an opaque multer error.
 const UPLOAD_LIMITS = {
-  avatar: 5 * MB,
-  assignment: 10 * MB,
-  submission: 10 * MB,
-  announcement: 10 * MB,
-  default: 10 * MB,
+  avatar: 1 * MB,
+  assignment: 2 * MB,
+  submission: 2 * MB,
+  announcement: 2 * MB,
+  default: 1 * MB,
 };
 
 const makeUploader = (limitKey = 'default') =>
