@@ -21,6 +21,9 @@ import './styles/viewresult.scss';
 const ViewResults = () => {
   const { user } = useAuthStore();
   const [results, setResults] = useState([]);
+  // Second and Third Term report cards carry the earlier terms with them;
+  // First Term comes back null and the section is skipped.
+  const [cumulative, setCumulative] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedTerm, setSelectedTerm] = useState('First Term');
   const [selectedYear, setSelectedYear] = useState(getCurrentAcademicYear());
@@ -76,6 +79,7 @@ const ViewResults = () => {
       });
 
       setResults(response?.data?.data?.results || []);
+      setCumulative(response?.data?.data?.cumulative || null);
     } catch (error) {
       // Handle empty result gracefully
       if (
@@ -84,6 +88,7 @@ const ViewResults = () => {
         error?.response?.data?.message?.toLowerCase().includes('no result')
       ) {
         setResults([]);
+        setCumulative(null);
         return;
       }
 
@@ -230,9 +235,7 @@ const ViewResults = () => {
                         <td className="text-center">
                           {result.scores.classWork}
                         </td>
-                        <td className="text-center">
-                          {result.scores.project}
-                        </td>
+                        <td className="text-center">{result.scores.project}</td>
                         <td className="text-center">{result.scores.exam}</td>
                         <td className="text-center font-bold text-primary">
                           {result.totalScore}
@@ -253,6 +256,65 @@ const ViewResults = () => {
                 </table>
               </div>
             )}
+
+            {cumulative && (
+              <div className="cumulative-block">
+                <h3 className="cumulative-title">
+                  Cumulative — {cumulative.terms.join(' + ')}
+                </h3>
+                <div className="table-responsive">
+                  <table className="results-table">
+                    <thead>
+                      <tr>
+                        <th>Subject</th>
+                        {cumulative.terms.map((t) => (
+                          <th key={t} className="text-center">
+                            {t}
+                          </th>
+                        ))}
+                        <th className="text-center">Cumulative</th>
+                        <th className="text-center">Grade</th>
+                        <th className="text-center">Remark</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cumulative.subjects.map((entry) => (
+                        <tr key={entry.subject?._id || entry.subject}>
+                          <td className="subject-col">{entry.subject?.name}</td>
+                          {cumulative.terms.map((t) => (
+                            <td key={t} className="text-center">
+                              {entry.termScores[t] === undefined
+                                ? '—'
+                                : entry.termScores[t]}
+                            </td>
+                          ))}
+                          <td className="text-center font-bold text-primary">
+                            {entry.cumulativeScore}
+                          </td>
+                          <td className="text-center">
+                            <span
+                              className={`grade-tag grade-${entry.grade?.toLowerCase()}`}
+                            >
+                              {entry.grade}
+                            </span>
+                          </td>
+                          <td className="text-center italic text-sm text-gray">
+                            {entry.remark}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="cumulative-summary">
+                  Cumulative average{' '}
+                  <strong>{cumulative.summary.average}%</strong> (
+                  {cumulative.summary.grade}) · Position{' '}
+                  <strong>{cumulative.summary.position || '—'}</strong> of{' '}
+                  {cumulative.summary.totalStudentsInClass}
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="print-section-wrapper anim-fade-in">
@@ -261,6 +323,7 @@ const ViewResults = () => {
               results={results}
               term={selectedTerm}
               academicYear={selectedYear}
+              cumulative={cumulative}
             />
           </div>
         )}

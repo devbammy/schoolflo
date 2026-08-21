@@ -110,6 +110,27 @@
     }
   }
 
+  /* Cumulative section — only rendered from Second Term onwards */
+  .cumulative-block {
+    border-top: 1px solid #e2e8f0;
+
+    .cumulative-title {
+      padding: 20px 16px 12px;
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #1e293b;
+    }
+
+    .cumulative-summary {
+      margin: 0;
+      padding: 16px;
+      background: #f8fafc;
+      font-size: 0.9rem;
+      color: #475569;
+    }
+  }
+
   /* Grade Tags */
   .grade-tag {
     padding: 4px 12px;

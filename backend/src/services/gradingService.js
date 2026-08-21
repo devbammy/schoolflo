@@ -1,4 +1,26 @@
 const { Result, calculateGrade } = require('../models/Exam');
+const { TERMS } = require('../config/constants');
+
+// Terms in the order a session runs them. Cumulative reporting walks this list
+// from the first term up to the one being reported on.
+const TERM_ORDER = [TERMS.FIRST, TERMS.SECOND, TERMS.THIRD];
+
+const round2 = (value) => parseFloat((Number(value) || 0).toFixed(2));
+
+const mean = (numbers) =>
+  numbers.length ? numbers.reduce((a, b) => a + b, 0) / numbers.length : 0;
+
+/**
+ * Every term from the start of the session up to and including that term.
+ *
+ * A Second Term report carries First Term with it; a Third Term report carries
+ * both. First Term has nothing behind it, so callers treat a single-entry list
+ * as 'no cumulative section to print'.
+ */
+const termsUpTo = (term) => {
+  const index = TERM_ORDER.indexOf(term);
+  return index < 0 ? [] : TERM_ORDER.slice(0, index + 1);
+};
 
 /**
  * Assign competition ranking ("1224") to a list already sorted descending.
@@ -166,8 +188,18 @@ const generateReportCard = async (studentId, term, academicYear) => {
   const self = ranked.find((r) => r.studentId === String(studentId));
   const overallPosition = self ? positions.get(self) : null;
 
+  // Second and Third Term cards carry the terms before them; First Term gets
+  // null and renderers drop the section.
+  const cumulative = await computeCumulative(
+    studentId,
+    classId,
+    term,
+    academicYear,
+  );
+
   return {
     results,
+    cumulative,
     summary: {
       totalSubjects: results.length,
       totalScore: parseFloat(totalScore.toFixed(2)),
@@ -183,6 +215,149 @@ const generateReportCard = async (studentId, term, academicYear) => {
   };
 };
 
+/**
+ * Fold a student's result rows across several terms into one row per subject.
+ *
+ * The cumulative score is the mean of the term scores actually present, so a
+ * subject a student picked up in Second Term is averaged over the terms it was
+ * taken rather than being punished with a zero for First Term.
+ *
+ * @param {Array} rows      result rows for ONE student: { subject, term, totalScore }
+ * @param {string[]} terms  terms to fold, in session order
+ */
+const buildSubjectCumulatives = (rows, terms) => {
+  const bySubject = new Map();
+
+  rows.forEach((row) => {
+    const subject = row.subject;
+    const id = String(subject?._id || subject);
+    if (!bySubject.has(id)) bySubject.set(id, { subject, termScores: {} });
+    // Terms outside the reporting window never reach the cumulative column.
+    if (terms.includes(row.term)) {
+      bySubject.get(id).termScores[row.term] = row.totalScore || 0;
+    }
+  });
+
+  return [...bySubject.values()]
+    .map((entry) => {
+      const scored = terms.filter((t) => entry.termScores[t] !== undefined);
+      const cumulativeScore = round2(
+        mean(scored.map((t) => entry.termScores[t])),
+      );
+      const grading = calculateGrade(cumulativeScore);
+
+      return {
+        subject: entry.subject,
+        termScores: entry.termScores,
+        termsCounted: scored.length,
+        cumulativeScore,
+        grade: grading.grade,
+        remark: grading.remark,
+        gradePoint: grading.gradePoint,
+      };
+    })
+    .filter((entry) => entry.termsCounted > 0)
+    .sort((a, b) =>
+      String(a.subject?.name || '').localeCompare(
+        String(b.subject?.name || ''),
+      ),
+    );
+};
+
+/**
+ * Cumulative standing for one student, plus the class ranking it sits in.
+ *
+ * A student's cumulative average is the mean of their per-subject cumulative
+ * scores — not the mean of every row — so subjects with different term
+ * coverage still weigh equally, exactly as they do on the termly card.
+ *
+ * @param {Array} classRows   result rows for the WHOLE class across the terms
+ * @param {string} studentId
+ * @param {string[]} terms
+ */
+const summariseCumulative = (classRows, studentId, terms) => {
+  const byStudent = new Map();
+  classRows.forEach((row) => {
+    const sid = String(row.student);
+    if (!byStudent.has(sid)) byStudent.set(sid, []);
+    byStudent.get(sid).push(row);
+  });
+
+  const averageFor = (rows) =>
+    round2(
+      mean(buildSubjectCumulatives(rows, terms).map((s) => s.cumulativeScore)),
+    );
+
+  const ranked = [...byStudent.entries()]
+    .map(([sid, rows]) => ({ studentId: sid, avg: averageFor(rows) }))
+    .sort((a, b) => b.avg - a.avg);
+
+  const positions = assignCompetitionRanks(ranked, (r) => r.avg);
+  const self = ranked.find((r) => r.studentId === String(studentId));
+
+  const subjects = buildSubjectCumulatives(
+    byStudent.get(String(studentId)) || [],
+    terms,
+  );
+
+  if (!subjects.length) return null;
+
+  const average = round2(mean(subjects.map((s) => s.cumulativeScore)));
+
+  // The same credit-weighted GPA the termly summary uses, over cumulative grades.
+  const { weightedPoints, totalCredits } = subjects.reduce(
+    (acc, s) => {
+      const credits = Number(s.subject?.creditUnit) || 1;
+      acc.weightedPoints += (s.gradePoint || 0) * credits;
+      acc.totalCredits += credits;
+      return acc;
+    },
+    { weightedPoints: 0, totalCredits: 0 },
+  );
+
+  return {
+    terms,
+    subjects,
+    summary: {
+      totalSubjects: subjects.length,
+      average,
+      gpa: totalCredits > 0 ? round2(weightedPoints / totalCredits) : 0,
+      totalCredits,
+      grade: calculateGrade(average).grade,
+      remark: calculateGrade(average).remark,
+      position: self ? positions.get(self) : null,
+      totalStudentsInClass: ranked.length,
+      principalComment: getPrincipalComment(average),
+    },
+  };
+};
+
+/**
+ * Cumulative record for a student as of a given term.
+ *
+ * Second Term folds in First Term; Third Term folds in First and Second. First
+ * Term has nothing to accumulate, so this returns null and every renderer
+ * simply omits the cumulative section.
+ */
+const computeCumulative = async (studentId, classId, term, academicYear) => {
+  const terms = termsUpTo(term);
+  if (terms.length < 2) return null;
+
+  const classRows = await Result.find({
+    class: classId,
+    academicYear,
+    term: { $in: terms },
+    isPublished: true,
+  })
+    .select('student subject term totalScore')
+    .populate('subject', 'name code creditUnit')
+    .lean();
+
+  if (!classRows.length) return null;
+
+  return summariseCumulative(classRows, studentId, terms);
+};
+
 const getPrincipalComment = (average) => {
   if (average >= 70)
     return 'Excellent performance. Keep up the outstanding work!';
@@ -195,6 +370,11 @@ const getPrincipalComment = (average) => {
 
 module.exports = {
   computeClassStatistics,
+  termsUpTo,
+  buildSubjectCumulatives,
+  summariseCumulative,
+  computeCumulative,
+  TERM_ORDER,
   generateReportCard,
   getPrincipalComment,
   assignCompetitionRanks,

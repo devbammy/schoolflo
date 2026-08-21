@@ -261,6 +261,30 @@ next position skips accordingly (82, 82, 79 → 1, 1, 3). Overall averages are
 rounded to 2dp before ranking, so two students separated only by floating-point
 noise are treated as the tie they are.
 
+### Cumulative results
+
+Report cards accumulate down the session: a **Second Term** card carries First
+Term with it, and a **Third Term** card carries First and Second. First Term
+has nothing behind it, so `generateReportCard` returns `cumulative: null` there
+and every renderer omits the section.
+
+```
+subject cumulative = mean of that subject's term scores present in the window
+student cumulative = mean of that student's subject cumulatives
+```
+
+Averaging over the terms actually present (rather than treating a missing term
+as a zero) means a subject picked up mid-session is not punished for the terms
+it was not offered in. Because the cumulative stays on a 0–100 scale, the same
+`GRADE_SCALE` bands, remarks and grade points apply to it, and cumulative
+position uses the same competition ranking as the termly position.
+
+`computeCumulative` (`services/gradingService.js`) reads only **published**
+results, so an unpublished term never leaks into a parent-facing card. It is
+surfaced by `GET /results/report-card/:studentId` as `cumulative`, printed as a
+second table on the PDF, and rendered in `PrintableReportCard`, `ViewResults`
+and the admin report-card modal.
+
 ### GPA
 
 ```

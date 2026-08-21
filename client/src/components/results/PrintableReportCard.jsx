@@ -2,7 +2,13 @@ import React, { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import './PrintableReportCard.scss';
 
-const PrintableReportCard = ({ student, results, term, academicYear }) => {
+const PrintableReportCard = ({
+  student,
+  results,
+  term,
+  academicYear,
+  cumulative,
+}) => {
   const componentRef = useRef(null);
 
   const handlePrint = useReactToPrint({
@@ -122,6 +128,70 @@ const PrintableReportCard = ({ student, results, term, academicYear }) => {
             ))}
           </tbody>
         </table>
+
+        {/* Cumulative Performance — present from Second Term onwards */}
+        {cumulative && (
+          <>
+            <h3 className="section-title">
+              Cumulative Performance ({cumulative.terms.join(' + ')})
+            </h3>
+            <table className="results-table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  {cumulative.terms.map((t) => (
+                    <th key={t}>{t}</th>
+                  ))}
+                  <th>Cumulative</th>
+                  <th>Grade</th>
+                  <th>Remark</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cumulative.subjects.map((entry) => (
+                  <tr key={entry.subject?._id || entry.subject}>
+                    <td>{entry.subject?.name}</td>
+                    {cumulative.terms.map((t) => (
+                      <td key={t}>
+                        {entry.termScores[t] === undefined
+                          ? '—'
+                          : entry.termScores[t]}
+                      </td>
+                    ))}
+                    <td>
+                      <strong>{entry.cumulativeScore}</strong>
+                    </td>
+                    <td>
+                      <strong>{entry.grade}</strong>
+                    </td>
+                    <td>{entry.remark}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="summary-section">
+              <h3>Cumulative Summary</h3>
+              <div className="summary-grid">
+                <div className="summary-item">
+                  <label>Cumulative Average:</label>
+                  <span>{cumulative.summary.average}%</span>
+                </div>
+                <div className="summary-item">
+                  <label>Cumulative Grade:</label>
+                  <span>{cumulative.summary.grade}</span>
+                </div>
+                <div className="summary-item">
+                  <label>Cumulative Position:</label>
+                  <span>
+                    {cumulative.summary.position || '—'} of{' '}
+                    {cumulative.summary.totalStudentsInClass}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Summary */}
         <div className="summary-section">

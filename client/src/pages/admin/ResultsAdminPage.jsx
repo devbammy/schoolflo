@@ -763,6 +763,78 @@ export default function ResultsAdminPage() {
                 </tbody>
               </table>
             </div>
+            {/* Cumulative — present from Second Term onwards */}
+            {reportCard.cumulative && (
+              <div style={{ marginTop: 20 }}>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    marginBottom: 8,
+                  }}
+                >
+                  Cumulative — {reportCard.cumulative.terms.join(' + ')}
+                  <span
+                    style={{
+                      fontWeight: 500,
+                      color: 'var(--clr-text-3)',
+                      marginLeft: 8,
+                    }}
+                  >
+                    avg {reportCard.cumulative.summary.average}% (
+                    {reportCard.cumulative.summary.grade}) · pos{' '}
+                    {reportCard.cumulative.summary.position || '—'}/
+                    {reportCard.cumulative.summary.totalStudentsInClass}
+                  </span>
+                </div>
+                <div className="table-wrapper">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Subject</th>
+                        {reportCard.cumulative.terms.map((t) => (
+                          <th key={t} style={{ textAlign: 'center' }}>
+                            {t.replace(' Term', '')}
+                          </th>
+                        ))}
+                        <th style={{ textAlign: 'center' }}>Cum.</th>
+                        <th style={{ textAlign: 'center' }}>Grade</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportCard.cumulative.subjects.map((entry) => (
+                        <tr key={entry.subject?._id || entry.subject}>
+                          <td style={{ fontWeight: 600 }}>
+                            {entry.subject?.name}
+                          </td>
+                          {reportCard.cumulative.terms.map((t) => (
+                            <td key={t} style={{ textAlign: 'center' }}>
+                              {entry.termScores[t] === undefined
+                                ? '—'
+                                : entry.termScores[t]}
+                            </td>
+                          ))}
+                          <td
+                            style={{
+                              textAlign: 'center',
+                              fontWeight: 700,
+                              fontFamily: 'var(--font-display)',
+                            }}
+                          >
+                            {entry.cumulativeScore}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className={`grade grade-${entry.grade}`}>
+                              {entry.grade}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             <div
               style={{
                 marginTop: 16,

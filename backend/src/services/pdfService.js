@@ -13,6 +13,7 @@ const streamifier = require('streamifier');
 const { Result } = require('../models/Exam');
 const User = require('../models/User');
 const { GRADE_SCALE } = require('../config/constants');
+const { computeCumulative } = require('./gradingService');
 
 // Rendered from GRADE_SCALE so the legend printed on a report card can never
 // disagree with the grades printed above it.
@@ -230,6 +231,123 @@ class PDFService {
 
         doc.moveTo(50, rowY).lineTo(545, rowY).stroke();
         rowY += 10;
+
+        // Cumulative Performance — Second Term folds in First Term, Third Term
+        // folds in both. computeCumulative returns null for First Term, so the
+        // section simply does not print then.
+        const cumulative = await computeCumulative(
+          student._id,
+          student.studentProfile.class._id || student.studentProfile.class,
+          term,
+          academicYear,
+        );
+
+        if (cumulative) {
+          if (rowY > 600) {
+            doc.addPage();
+            rowY = 50;
+          }
+
+          doc
+            .fontSize(11)
+            .font('Helvetica-Bold')
+            .text('CUMULATIVE PERFORMANCE', 50, rowY, {
+              align: 'center',
+              width: 495,
+            });
+          doc
+            .fontSize(8)
+            .font('Helvetica')
+            .text(
+              `Average of ${cumulative.terms.join(', ')} scores`,
+              50,
+              rowY + 15,
+              { align: 'center', width: 495 },
+            );
+
+          const cumTop = rowY + 32;
+          // One column per term in the window, then the cumulative and grade.
+          const termColumns = cumulative.terms.map((t, i) => ({
+            term: t,
+            x: 240 + i * 70,
+          }));
+          const cumX = 240 + termColumns.length * 70;
+          const cumGradeX = cumX + 70;
+
+          doc.fontSize(9).font('Helvetica-Bold').text('Subject', col1X, cumTop);
+          termColumns.forEach(({ term: t, x }) =>
+            doc.text(t.replace(' Term', ''), x, cumTop, {
+              width: 65,
+              align: 'center',
+            }),
+          );
+          doc
+            .text('Cum.', cumX, cumTop, { width: 65, align: 'center' })
+            .text('Grade', cumGradeX, cumTop, { width: 55, align: 'center' });
+
+          doc
+            .moveTo(50, cumTop + 15)
+            .lineTo(545, cumTop + 15)
+            .stroke();
+
+          rowY = cumTop + 20;
+          doc.font('Helvetica').fontSize(9);
+
+          cumulative.subjects.forEach((entry) => {
+            if (rowY > 700) {
+              doc.addPage();
+              rowY = 50;
+            }
+
+            doc.text(entry.subject?.name || '', col1X, rowY, { width: 180 });
+            termColumns.forEach(({ term: t, x }) => {
+              const score = entry.termScores[t];
+              doc.text(score === undefined ? '-' : score, x, rowY, {
+                width: 65,
+                align: 'center',
+              });
+            });
+            doc
+              .font('Helvetica-Bold')
+              .text(entry.cumulativeScore, cumX, rowY, {
+                width: 65,
+                align: 'center',
+              })
+              .text(entry.grade, cumGradeX, rowY, {
+                width: 55,
+                align: 'center',
+              })
+              .font('Helvetica');
+
+            rowY += 20;
+          });
+
+          doc.moveTo(50, rowY).lineTo(545, rowY).stroke();
+          rowY += 10;
+
+          const cumSummary = cumulative.summary;
+          doc
+            .fontSize(9)
+            .font('Helvetica-Bold')
+            .text(
+              `Cumulative Average: ${cumSummary.average}% (${cumSummary.grade})   ` +
+                `Cumulative Position: ${cumSummary.position || '-'} of ${cumSummary.totalStudentsInClass}   ` +
+                `Cumulative GPA: ${cumSummary.gpa}/5.0`,
+              50,
+              rowY,
+              { width: 495 },
+            )
+            .font('Helvetica');
+
+          rowY += 25;
+        }
+
+        // Everything below writes at fixed offsets from rowY down to
+        // rowY + 200, so start a fresh page rather than run off this one.
+        if (rowY > 540) {
+          doc.addPage();
+          rowY = 50;
+        }
 
         // Summary Statistics
         doc
