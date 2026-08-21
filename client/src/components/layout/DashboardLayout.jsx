@@ -25,6 +25,8 @@ import {
   BookCheck,
   ScrollText,
   CheckSquare,
+  UserRoundCheck,
+  Timer,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import GlobalSearch from '../common/GlobalSearch';
@@ -92,6 +94,11 @@ const NAV_CONFIG = {
       section: 'Oversight',
       items: [
         { to: '/admin/tasks', icon: CheckSquare, label: 'Tasks & Approvals' },
+        {
+          to: '/admin/staff-attendance',
+          icon: UserRoundCheck,
+          label: 'Staff Attendance',
+        },
         { to: '/admin/audit', icon: ScrollText, label: 'Audit Log' },
       ],
     },
@@ -132,6 +139,7 @@ const NAV_CONFIG = {
         },
         { to: '/teacher/library', icon: BookMarked, label: 'Library' },
         { to: '/teacher/tasks', icon: CheckSquare, label: 'My Tasks' },
+        { to: '/teacher/clock', icon: Timer, label: 'Clock In / Out' },
       ],
     },
     {

@@ -573,6 +573,54 @@ every review decision are written to the audit log (`task.assign`,
 UI: `/admin/tasks` (Oversight → Tasks & Approvals) to assign and review;
 `/teacher/tasks` (Classroom → My Tasks) to start, submit and resubmit.
 
+### Staff attendance — `/staff-attendance` (10 routes, staff only)
+
+| Method | Endpoint      | Who   | Does                                          |
+| ------ | ------------- | ----- | --------------------------------------------- |
+| GET    | `/today`      | Staff | Own clock state, and which button is live     |
+| POST   | `/clock-in`   | Staff | Record arrival, with an optional note         |
+| POST   | `/clock-out`  | Staff | Record departure and the time on site         |
+| GET    | `/me`         | Staff | Own history over a date range, plus a summary |
+| GET    | `/daily`      | Admin | One day's roster — every active staff member  |
+| GET    | `/summary`    | Admin | Per-staff totals and attendance rate          |
+| GET    | `/`           | Admin | Paginated records, filtered                   |
+| POST   | `/mark`       | Admin | Record or correct one person's day            |
+| PATCH  | `/:id`        | Admin | Correct a record's status or times            |
+| DELETE | `/:id`        | Admin | Delete a record entered in error              |
+
+One document per staff member per day, enforced by a unique
+`{staff, date}` index — two taps on the button race each other into that index
+rather than into two records. None of the clock routes take a staff id: they
+always act on the caller, which is the point of a clock.
+
+**The absence of a record is meaningful.** `/daily` lists every active staff
+member and reports those with no record as `Absent` with `recorded: false`, so
+"the office marked them absent" stays distinguishable from "nobody accounted
+for them". Nothing writes an Absent row overnight — a nightly job that quietly
+stops running is worse than a gap computed on request.
+
+**Time is the school's wall clock, not the server's.** `utils/schoolTime.js`
+shifts an instant by a configured offset (WAT, UTC+1) and reads its UTC fields,
+so which day a record belongs to and whether 08:12 counts as late read the same
+on every machine. `date` is a day *key* — UTC midnight standing for a local
+calendar day — never an instant. The offset is sent to the client with every
+clock payload so a phone left on another timezone still shows school time.
+
+An arrival inside `DAY_START` plus `LATE_GRACE_MINUTES` is `Present`, past it
+`Late`; `minutesLate` is stored rather than re-derived, so a later change to
+the school day does not silently rewrite history. Marking someone `Absent` or
+`Excused` clears any clock times that contradict it, and a day recorded as
+excused leave refuses a clock-in until an admin changes it — an admin's
+decision outranks the button. Clock-ins, clock-outs and every admin correction
+are written to the audit log.
+
+Configured through the environment: `SCHOOL_DAY_START`, `SCHOOL_DAY_END`,
+`SCHOOL_LATE_GRACE_MINUTES`, `SCHOOL_UTC_OFFSET_MINUTES`.
+
+UI: `/admin/staff-attendance` (Oversight → Staff Attendance) for the daily
+roster and per-staff summary; `/teacher/clock` (Classroom → Clock In / Out)
+for the clock itself and a teacher's own history.
+
 ### Search — `/search` (2 routes)
 
 | Method | Endpoint   | Returns                                          |
@@ -692,6 +740,8 @@ matter of opinion.
 | `task.submit`                                 | Attempt number, whether it was late  |
 | `task.approve` / `task.reject`                | Decision and the reason given        |
 | `task.cancel` / `task.delete`                 | Task, assignee, status at the time   |
+| `staff-attendance.clock-in` / `clock-out`     | Time, status, minutes late or worked |
+| `staff-attendance.mark` / `update` / `delete` | Staff member, date, status change    |
 
 Failed attempts are recorded as well as successful ones — a run of failed
 logins is exactly the signal worth keeping.
@@ -815,7 +865,7 @@ three ways it actually gets read.
 `Assignment` / `Submission` (unique `{assignment, student}`), `Announcement`,
 `AcademicCalendar`, `Timetable`, `Library` (Book + BorrowRecord), `CATracker`,
 `Certificate`, `ExamSchedule`, `Promotion`, `Counter`, `Task` (one per
-assignee, grouped by `batchId`).
+assignee, grouped by `batchId`), `StaffAttendance` (unique `{staff, date}`).
 
 ---
 
@@ -880,6 +930,11 @@ JWT_REFRESH_SECRET=          # different from JWT_SECRET
 JWT_REFRESH_EXPIRE=30d
 
 CLIENT_URL=https://yourschool.ng   # exact origin; comma-separate for several
+
+SCHOOL_DAY_START=08:00             # staff clock-in: school-local wall clock
+SCHOOL_DAY_END=15:30
+SCHOOL_LATE_GRACE_MINUTES=10       # arrivals inside this still count Present
+SCHOOL_UTC_OFFSET_MINUTES=60       # WAT; decides the day a record belongs to
 
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=

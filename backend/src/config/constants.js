@@ -78,6 +78,32 @@ module.exports = {
     OTHER: 'Other',
   },
 
+  // Staff clock-in / clock-out.
+  //
+  // The school runs on West Africa Time, which has no daylight saving, so a
+  // fixed offset is enough to turn an instant into the school's wall clock —
+  // and the wall clock is what decides both which day a record belongs to and
+  // whether an arrival counts as late. Comparing a UTC timestamp against a
+  // local start time would mark an 08:00 arrival late by exactly the offset.
+  STAFF_ATTENDANCE: {
+    // Minutes east of UTC. WAT is UTC+1.
+    TIMEZONE_OFFSET_MINUTES: Number(
+      process.env.SCHOOL_UTC_OFFSET_MINUTES ?? 60,
+    ),
+
+    // School-local wall-clock times, 24h.
+    DAY_START: process.env.SCHOOL_DAY_START || '08:00',
+    DAY_END: process.env.SCHOOL_DAY_END || '15:30',
+
+    // Arriving inside the grace window still counts as Present. Traffic is
+    // not a disciplinary matter.
+    LATE_GRACE_MINUTES: Number(process.env.SCHOOL_LATE_GRACE_MINUTES ?? 10),
+
+    // 0 = Sunday. Used only to label a day as a non-working one; staff who
+    // come in on a Saturday are never stopped from clocking in.
+    WORKING_DAYS: [1, 2, 3, 4, 5],
+  },
+
   ANNOUNCEMENT_TARGET: {
     ALL: 'All',
     ADMIN: 'Admin',

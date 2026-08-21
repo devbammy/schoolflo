@@ -427,6 +427,23 @@ export const taskService = {
   getStats: () => api.get('/tasks/stats'),
 };
 
+export const staffAttendanceService = {
+  // The caller's own clock. There is no endpoint that clocks somebody else
+  // in — that is the point of a clock — so none of these take a staff id.
+  getToday: () => api.get('/staff-attendance/today'),
+  clockIn: (data) => api.post('/staff-attendance/clock-in', data),
+  clockOut: (data) => api.post('/staff-attendance/clock-out', data),
+  getMine: (params) => api.get('/staff-attendance/me', { params }),
+
+  // Admin oversight.
+  getDaily: (params) => api.get('/staff-attendance/daily', { params }),
+  getSummary: (params) => api.get('/staff-attendance/summary', { params }),
+  getAll: (params) => api.get('/staff-attendance', { params }),
+  mark: (data) => api.post('/staff-attendance/mark', data),
+  update: (id, data) => api.patch(`/staff-attendance/${id}`, data),
+  delete: (id) => api.delete(`/staff-attendance/${id}`),
+};
+
 export const searchService = {
   query: (q, params, config) =>
     api.get('/search', { params: { q, ...params }, ...config }),
