@@ -20,6 +20,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from 'react-hot-toast';
 import { format, isPast } from 'date-fns';
 import { getCurrentAcademicYear } from '../../utils/academicYear';
+import useQuickAction from '../../utils/useQuickAction';
 import './styles/assignment.scss';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
@@ -130,6 +131,7 @@ export default function AssignmentsPage() {
     setFiles([]);
     setModal('create');
   };
+  useQuickAction('assignment', openCreate);
 
   const openSubmissions = async (assignment) => {
     setSelected(assignment);

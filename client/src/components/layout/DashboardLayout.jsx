@@ -436,12 +436,13 @@ export default function DashboardLayout() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {user?.role === 'Admin' && (
+            {user?.role && (
               <button
                 className="btn btn--primary btn--sm"
                 onClick={() => setQuickActionsOpen(true)}
               >
-                <Zap size={15} /> Quick Actions
+                <Zap size={15} />{' '}
+                <span className="hidden-mobile">Quick Actions</span>
               </button>
             )}
             <span
@@ -475,12 +476,11 @@ export default function DashboardLayout() {
         </div>
       </div>
 
-      {user?.role === 'Admin' && (
-        <QuickActionsModal
-          open={quickActionsOpen}
-          onClose={() => setQuickActionsOpen(false)}
-        />
-      )}
+      <QuickActionsModal
+        open={quickActionsOpen}
+        onClose={() => setQuickActionsOpen(false)}
+        role={user?.role}
+      />
     </div>
   );
 }
