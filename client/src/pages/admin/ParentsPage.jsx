@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Edit2,
@@ -11,6 +12,7 @@ import {
   Users,
   ChevronDown,
   ChevronUp,
+  Eye,
 } from 'lucide-react';
 import { parentService, userService } from '../../services/api';
 import Modal from '../../components/common/Modal';
@@ -67,6 +69,7 @@ function Avatar({ user, size = 32, color = '#059669', bg = '#d1fae5' }) {
 }
 
 export default function ParentsPage() {
+  const navigate = useNavigate();
   const [parents, setParents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -403,7 +406,13 @@ export default function ParentsPage() {
                   return (
                     <React.Fragment key={parent._id}>
                       <tr>
-                        <td>
+                        <td
+                          onClick={() =>
+                            navigate(`/admin/users/${parent._id}`)
+                          }
+                          style={{ cursor: 'pointer' }}
+                          title="View full profile"
+                        >
                           <div
                             style={{
                               display: 'flex',
@@ -522,6 +531,15 @@ export default function ParentsPage() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 4 }}>
+                            <button
+                              className="btn btn--ghost btn--sm btn--icon"
+                              onClick={() =>
+                                navigate(`/admin/users/${parent._id}`)
+                              }
+                              title="View profile"
+                            >
+                              <Eye size={13} />
+                            </button>
                             <button
                               className="btn btn--ghost btn--sm"
                               onClick={() => setLinkModal(parent)}

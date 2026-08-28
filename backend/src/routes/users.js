@@ -7,6 +7,7 @@ const { uploadAvatar, handleUploadErrors } = require('../services/fileService');
 const {
   getUsers,
   getUserById,
+  getUserProfile,
   updateUser,
   toggleUserStatus,
   deleteUser,
@@ -35,6 +36,14 @@ router.get(
   authorize('Admin'),
   validate(paginationQuery()),
   getUsers,
+);
+
+router.get(
+  '/:id/profile',
+  protect,
+  authorize('Admin'),
+  validate(idParam),
+  getUserProfile,
 );
 
 router.get(

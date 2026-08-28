@@ -334,8 +334,50 @@ export default function AdminDashboard() {
         )}
       </section>
 
-      {/* ── What is happening ───────────────────────────────────────────── */}
-      <div className="pulse-grid">
+      {/* ── Roster: the size of the school, one glance ─────────────────── */}
+      <section className="dash-section">
+        <h2 className="section-title">Roster</h2>
+        <div className="overview-strip">
+          <button
+            type="button"
+            className="overview-stat overview-stat--link"
+            onClick={() => navigate('/admin/students')}
+          >
+            <span className="overview-stat__value">
+              {(stats.totalStudents || 0).toLocaleString()}
+            </span>
+            <span className="overview-stat__label">Students</span>
+            <span className="overview-stat__sub">
+              {(stats.activeStudents || 0).toLocaleString()} active
+            </span>
+          </button>
+          <button
+            type="button"
+            className="overview-stat overview-stat--link"
+            onClick={() => navigate('/admin/teachers')}
+          >
+            <span className="overview-stat__value">
+              {(stats.totalTeachers || 0).toLocaleString()}
+            </span>
+            <span className="overview-stat__label">Teachers</span>
+          </button>
+          <button
+            type="button"
+            className="overview-stat overview-stat--link"
+            onClick={() => navigate('/admin/parents')}
+          >
+            <span className="overview-stat__value">
+              {(stats.totalParents || 0).toLocaleString()}
+            </span>
+            <span className="overview-stat__label">Parents</span>
+          </button>
+        </div>
+      </section>
+
+      {/* ── Today: what is happening right now ─────────────────────────── */}
+      <section className="dash-section">
+        <h2 className="section-title">Today</h2>
+        <div className="pulse-grid">
         <PulseTile
           label="Attendance today"
           value={
@@ -395,13 +437,13 @@ export default function AdminDashboard() {
           }
           onClick={() => navigate('/admin/payments')}
         />
-      </div>
+        </div>
+      </section>
 
-      {/* ── What is coming, and the detail behind the numbers ───────────── */}
-      <div
-        className="dashboard-grid"
-        style={{ marginBottom: 'var(--space-6)' }}
-      >
+      {/* ── Trends & schedule ─────────────────────────────────────────── */}
+      <section className="dash-section">
+        <h2 className="section-title">Trends &amp; schedule</h2>
+        <div className="dashboard-grid">
         <div className="card">
           <div className="card__header">
             <span className="card__title">Enrollment trend (6 months)</span>
@@ -467,9 +509,13 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
-      </div>
+        </div>
+      </section>
 
-      <div className="dashboard-grid">
+      {/* ── Recent activity ──────────────────────────────────────────── */}
+      <section className="dash-section">
+        <h2 className="section-title">Recent activity</h2>
+        <div className="dashboard-grid">
         {/* Recent Payments */}
         <div className="card">
           <div className="card__header">
@@ -647,7 +693,8 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      </section>
     </>
   );
 }

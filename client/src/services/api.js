@@ -122,6 +122,7 @@ export const authService = {
 export const userService = {
   getAll: (params) => api.get('/users', { params }),
   getById: (id) => api.get(`/users/${id}`),
+  getProfile: (id) => api.get(`/users/${id}/profile`),
   create: (data) => api.post('/auth/register', data),
   update: (id, data) => api.put(`/users/${id}`, data),
   toggleStatus: (id) => api.patch(`/users/${id}/toggle-status`),

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Plus,
@@ -10,11 +11,32 @@ import {
   ChevronRight,
   UserCheck,
   UserX,
+  Eye,
 } from 'lucide-react';
 import { userService, classService } from '../../services/api';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
 import useQuickAction from '../../utils/useQuickAction';
+
+// How each fee-status value from the API renders in the table.
+const FEE_STATUS = {
+  cleared: { label: 'Cleared', tone: 'success', title: 'Term fees paid in full' },
+  partial: {
+    label: 'Part-paid',
+    tone: 'warning',
+    title: 'Some paid, balance outstanding',
+  },
+  overdue: {
+    label: 'Overdue',
+    tone: 'danger',
+    title: 'Unpaid and past the due date',
+  },
+  owing: { label: 'Owing', tone: 'danger', title: 'No payment recorded yet' },
+  none: {
+    label: 'No fee set',
+    tone: 'neutral',
+    title: 'No fee structure for this class this term',
+  },
+};
 
 const EMPTY_FORM = {
   firstName: '',
@@ -36,6 +58,7 @@ const EMPTY_FORM = {
 };
 
 export default function StudentsPage() {
+  const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,11 +71,42 @@ export default function StudentsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [stats, setStats] = useState(null);
+
+  // The overview is school-wide, so it is fetched independently of the table's
+  // search / class / page filters. `limit: 1` — we only want the counts.
+  const loadStats = useCallback(async () => {
+    try {
+      const base = { role: 'Student', limit: 1 };
+      const [all, active, male, female] = await Promise.all([
+        userService.getAll(base),
+        userService.getAll({ ...base, isActive: 'true' }),
+        userService.getAll({ ...base, gender: 'Male' }),
+        userService.getAll({ ...base, gender: 'Female' }),
+      ]);
+      const total = all.data.meta?.total || 0;
+      const activeCount = active.data.meta?.total || 0;
+      setStats({
+        total,
+        active: activeCount,
+        inactive: Math.max(total - activeCount, 0),
+        male: male.data.meta?.total || 0,
+        female: female.data.meta?.total || 0,
+      });
+    } catch {
+      // Non-critical: the strip simply stays in its loading state.
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { role: 'Student', page, limit: 15 };
+      const params = {
+        role: 'Student',
+        page,
+        limit: 15,
+        withFeeStatus: true,
+      };
       if (search) params.search = search;
       if (classFilter) params.class = classFilter;
       const res = await userService.getAll(params);
@@ -68,6 +122,9 @@ export default function StudentsPage() {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
   useEffect(() => {
     classService.getAll().then((r) => setClasses(r.data.data.classes || []));
   }, []);
@@ -115,6 +172,7 @@ export default function StudentsPage() {
       }
       setModal(null);
       load();
+      loadStats();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Operation failed');
     } finally {
@@ -127,6 +185,7 @@ export default function StudentsPage() {
       const res = await userService.toggleStatus(id);
       toast.success(res.data.message);
       load();
+      loadStats();
     } catch {
       toast.error('Failed to update status');
     }
@@ -138,6 +197,7 @@ export default function StudentsPage() {
       toast.success('Student deleted');
       setDeleteConfirm(null);
       load();
+      loadStats();
     } catch {
       toast.error('Delete failed');
     }
@@ -157,11 +217,31 @@ export default function StudentsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-header__title">Students</h1>
-          <p className="page-header__subtitle">{meta.total} total students</p>
+          <p className="page-header__subtitle">
+            Manage enrolment, classes and student records
+          </p>
         </div>
         <button className="btn btn--primary" onClick={openCreate}>
           <Plus size={16} /> Add Student
         </button>
+      </div>
+
+      {/* Compact overview — school-wide, independent of the table filters */}
+      <div className="overview-strip">
+        {[
+          { label: 'Total Students', value: stats?.total },
+          { label: 'Active', value: stats?.active },
+          { label: 'Inactive', value: stats?.inactive },
+          { label: 'Boys', value: stats?.male },
+          { label: 'Girls', value: stats?.female },
+        ].map((s) => (
+          <div className="overview-stat" key={s.label}>
+            <span className="overview-stat__value">
+              {s.value === undefined ? '—' : s.value.toLocaleString()}
+            </span>
+            <span className="overview-stat__label">{s.label}</span>
+          </div>
+        ))}
       </div>
 
       {/* Filters */}
@@ -223,23 +303,23 @@ export default function StudentsPage() {
                 <th>Admission No.</th>
                 <th>Class</th>
                 <th>Gender</th>
-                <th>Bld Grp</th>
+                <th>Parent / Guardian</th>
                 <th>Status</th>
-                <th>Joined</th>
+                <th>Fees</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: 48 }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: 48 }}>
                     <div className="spinner" style={{ margin: '0 auto' }} />
                   </td>
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     style={{
                       textAlign: 'center',
                       padding: 48,
@@ -252,7 +332,11 @@ export default function StudentsPage() {
               ) : (
                 students.map((s) => (
                   <tr key={s._id}>
-                    <td>
+                    <td
+                      onClick={() => navigate(`/admin/users/${s._id}`)}
+                      style={{ cursor: 'pointer' }}
+                      title="View full profile"
+                    >
                       <div
                         style={{
                           display: 'flex',
@@ -315,7 +399,32 @@ export default function StudentsPage() {
                     </td>
                     <td>{s.studentProfile?.class?.name || '—'}</td>
                     <td>{s.studentProfile?.gender || '—'}</td>
-                    <td>{s.studentProfile?.bloodGroup || '—'}</td>
+                    <td>
+                      {s.studentProfile?.parentId ? (
+                        <div>
+                          <div style={{ fontWeight: 600 }}>
+                            {s.studentProfile.parentId.firstName}{' '}
+                            {s.studentProfile.parentId.lastName}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.8125rem',
+                              color: 'var(--clr-text-3)',
+                            }}
+                          >
+                            {s.studentProfile.parentId.parentProfile
+                              ?.relationship || 'Guardian'}
+                            {s.studentProfile.parentId.phone
+                              ? ` • ${s.studentProfile.parentId.phone}`
+                              : ''}
+                          </div>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--clr-text-3)' }}>
+                          Not linked
+                        </span>
+                      )}
+                    </td>
                     <td>
                       <span
                         className={`badge badge--${s.isActive ? 'success' : 'danger'}`}
@@ -323,16 +432,28 @@ export default function StudentsPage() {
                         {s.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td
-                      style={{
-                        color: 'var(--clr-text-3)',
-                        fontSize: '0.875rem',
-                      }}
-                    >
-                      {format(new Date(s.createdAt), 'dd MMM yyyy')}
+                    <td>
+                      {(() => {
+                        const fs = FEE_STATUS[s.feeStatus] || FEE_STATUS.none;
+                        return (
+                          <span
+                            className={`badge badge--${fs.tone}`}
+                            title={fs.title}
+                          >
+                            {fs.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
+                        <button
+                          className="btn btn--ghost btn--sm btn--icon"
+                          onClick={() => navigate(`/admin/users/${s._id}`)}
+                          title="View profile"
+                        >
+                          <Eye size={14} />
+                        </button>
                         <button
                           className="btn btn--ghost btn--sm btn--icon"
                           onClick={() => openEdit(s)}

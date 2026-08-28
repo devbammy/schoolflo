@@ -23,6 +23,7 @@ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const StudentsPage = lazy(() => import('./pages/admin/StudentsPage'));
 const TeachersPage = lazy(() => import('./pages/admin/TeachersPage'));
 const ParentsPage = lazy(() => import('./pages/admin/ParentsPage'));
+const UserProfilePage = lazy(() => import('./pages/admin/UserProfilePage'));
 const ClassesPage = lazy(() => import('./pages/admin/ClassesPage'));
 const SubjectsPage = lazy(() => import('./pages/admin/SubjectsPage'));
 const FeesPage = lazy(() => import('./pages/admin/FeesPage'));
@@ -182,6 +183,7 @@ export default function App() {
               <Route path="students" element={<StudentsPage />} />
               <Route path="teachers" element={<TeachersPage />} />
               <Route path="parents" element={<ParentsPage />} />
+              <Route path="users/:id" element={<UserProfilePage />} />
               <Route path="classes" element={<ClassesPage />} />
               <Route path="subjects" element={<SubjectsPage />} />
               <Route path="fees" element={<FeesPage />} />

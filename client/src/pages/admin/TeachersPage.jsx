@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Edit2,
@@ -7,6 +8,7 @@ import {
   UserCheck,
   UserX,
   BookOpen,
+  Eye,
 } from 'lucide-react';
 import { userService, classService, subjectService } from '../../services/api';
 import Modal from '../../components/common/Modal';
@@ -34,6 +36,7 @@ const EMPTY_FORM = {
 };
 
 export default function TeachersPage() {
+  const navigate = useNavigate();
   const [teachers, setTeachers] = useState([]);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -247,7 +250,11 @@ export default function TeachersPage() {
               ) : (
                 teachers.map((t) => (
                   <tr key={t._id}>
-                    <td>
+                    <td
+                      onClick={() => navigate(`/admin/users/${t._id}`)}
+                      style={{ cursor: 'pointer' }}
+                      title="View full profile"
+                    >
                       <div
                         style={{
                           display: 'flex',
@@ -363,6 +370,13 @@ export default function TeachersPage() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
+                        <button
+                          className="btn btn--ghost btn--sm btn--icon"
+                          onClick={() => navigate(`/admin/users/${t._id}`)}
+                          title="View profile"
+                        >
+                          <Eye size={14} />
+                        </button>
                         <button
                           className="btn btn--ghost btn--sm btn--icon"
                           onClick={() => openEdit(t)}

@@ -1,5 +1,14 @@
 const User = require('../models/User');
 const Session = require('../models/Session');
+const { Fees, Payment } = require('../models/Fees');
+const AcademicCalendar = require('../models/AcademicCalendar');
+const Attendance = require('../models/Attendance');
+const { Result } = require('../models/Exam');
+const { BorrowRecord } = require('../models/Library');
+const Task = require('../models/Task');
+const StaffAttendance = require('../models/StaffAttendance');
+const Class = require('../models/Class');
+const { getCurrentPeriod } = require('../utils/academicPeriod');
 const {
   sendSuccess,
   sendPaginated,
@@ -17,17 +26,89 @@ const {
 const escapeRegex = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Tag each student on a page with where they stand on this term's fees:
+//   cleared  — paid the class fee in full
+//   partial  — paid something, still owes
+//   overdue  — nothing paid and the due date has passed
+//   owing    — nothing paid, not yet overdue
+//   none     — no active fee structure for their class this term
+//
+// The academic calendar is the authority on which term/year we are billing.
+// One calendar read + one Fees query + one Payment aggregation for the whole
+// page, so the cost does not scale with the number of students shown.
+const attachFeeStatus = async (students) => {
+  if (!students.length) return students;
+
+  const calendar = await AcademicCalendar.findOne({ isActive: true });
+  const term = calendar?.currentTerm?.name || calendar?.terms?.[0]?.name;
+  const academicYear = calendar?.academicYear;
+  if (!term || !academicYear) {
+    return students.map((s) => ({ ...s, feeStatus: 'none' }));
+  }
+
+  const classIdOf = (s) =>
+    s.studentProfile?.class?._id || s.studentProfile?.class || null;
+
+  const classIds = [
+    ...new Set(students.map(classIdOf).filter(Boolean).map(String)),
+  ];
+
+  const fees = await Fees.find({
+    term,
+    academicYear,
+    isActive: true,
+    class: { $in: classIds },
+  })
+    .select('class totalAmount dueDate')
+    .lean();
+
+  const feeByClass = new Map(fees.map((f) => [String(f.class), f]));
+  const feeIds = fees.map((f) => f._id);
+
+  const paidRows = feeIds.length
+    ? await Payment.aggregate([
+        {
+          $match: {
+            student: { $in: students.map((s) => s._id) },
+            feeStructure: { $in: feeIds },
+          },
+        },
+        { $group: { _id: '$student', paid: { $sum: '$amountPaid' } } },
+      ])
+    : [];
+  const paidByStudent = new Map(
+    paidRows.map((r) => [String(r._id), Number(r.paid) || 0]),
+  );
+
+  const now = new Date();
+  return students.map((s) => {
+    const fee = feeByClass.get(String(classIdOf(s) || ''));
+    if (!fee || !(fee.totalAmount > 0)) return { ...s, feeStatus: 'none' };
+
+    const paid = paidByStudent.get(String(s._id)) || 0;
+    const total = Math.round(fee.totalAmount);
+    let feeStatus;
+    if (paid >= total) feeStatus = 'cleared';
+    else if (paid > 0) feeStatus = 'partial';
+    else if (fee.dueDate && new Date(fee.dueDate) < now) feeStatus = 'overdue';
+    else feeStatus = 'owing';
+    return { ...s, feeStatus };
+  });
+};
+
 // @desc    List users, filtered and paginated
 // @route   GET /api/v1/users
 // @access  Admin
 const getUsers = async (req, res) => {
-  const { role, search, isActive, class: classId } = req.query;
+  const { role, search, isActive, class: classId, gender, withFeeStatus } =
+    req.query;
   const { page, limit, skip } = getPaginationParams(req.query);
 
   const filter = {};
   if (role) filter.role = role;
   if (isActive !== undefined) filter.isActive = isActive === 'true';
   if (classId) filter['studentProfile.class'] = classId;
+  if (gender) filter['studentProfile.gender'] = gender;
 
   if (search) {
     const pattern = new RegExp(escapeRegex(search), 'i');
@@ -43,6 +124,10 @@ const getUsers = async (req, res) => {
   const [users, total] = await Promise.all([
     User.find(filter)
       .populate('studentProfile.class', 'name level')
+      .populate(
+        'studentProfile.parentId',
+        'firstName lastName phone parentProfile.relationship',
+      )
       .select('-password')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -50,7 +135,14 @@ const getUsers = async (req, res) => {
     User.countDocuments(filter),
   ]);
 
-  return sendPaginated(res, users, total, page, limit);
+  let data = users;
+  if (role === 'Student' && withFeeStatus === 'true' && users.length) {
+    data = await attachFeeStatus(
+      users.map((u) => u.toObject({ virtuals: true })),
+    );
+  }
+
+  return sendPaginated(res, data, total, page, limit);
 };
 
 // @desc    Get one user
@@ -59,6 +151,10 @@ const getUsers = async (req, res) => {
 const getUserById = async (req, res) => {
   const user = await User.findById(req.params.id)
     .populate('studentProfile.class', 'name level')
+    .populate(
+      'studentProfile.parentId',
+      'firstName lastName phone parentProfile.relationship',
+    )
     .populate('teacherProfile.classTeacherOf', 'name')
     .populate('teacherProfile.subjectsTaught', 'name code')
     .select('-password');
@@ -66,6 +162,173 @@ const getUserById = async (req, res) => {
   if (!user) throw AppError.notFound('User not found');
 
   return sendSuccess(res, 200, 'User fetched', { user });
+};
+
+// @desc    One user's full profile plus the role-specific records an admin
+//          would otherwise have to visit four other pages to piece together.
+// @route   GET /api/v1/users/:id/profile
+// @access  Admin
+const getUserProfile = async (req, res) => {
+  const user = await User.findById(req.params.id)
+    .populate('studentProfile.class', 'name level sections')
+    .populate(
+      'studentProfile.parentId',
+      'firstName lastName email phone avatar parentProfile.relationship parentProfile.occupation',
+    )
+    .populate('teacherProfile.classTeacherOf', 'name level')
+    .populate('teacherProfile.subjectsTaught', 'name code')
+    .populate({
+      path: 'parentProfile.children',
+      select:
+        'firstName lastName email phone avatar isActive studentProfile.admissionNumber studentProfile.gender studentProfile.class',
+      populate: { path: 'studentProfile.class', select: 'name level' },
+    })
+    .select('-password');
+
+  if (!user) throw AppError.notFound('User not found');
+
+  const { term, academicYear } = await getCurrentPeriod();
+  const related = { period: { term, academicYear } };
+
+  if (user.role === 'Student') {
+    const studentId = user._id;
+    const classId = user.studentProfile?.class?._id || null;
+
+    const [attendance, results, library, feeStructures] = await Promise.all([
+      Attendance.getSummary(studentId, term, academicYear),
+      Result.find({ student: studentId })
+        .populate('subject', 'name code')
+        .populate('class', 'name')
+        .sort({ academicYear: -1, term: -1, updatedAt: -1 })
+        .limit(60)
+        .lean(),
+      BorrowRecord.find({ borrower: studentId })
+        .populate('book', 'title author isbn')
+        .sort({ issueDate: -1 })
+        .limit(20)
+        .lean(),
+      classId
+        ? Fees.find({ class: classId, isActive: true })
+            .sort({ academicYear: -1 })
+            .lean()
+        : Promise.resolve([]),
+    ]);
+
+    const payments = await Payment.find({ student: studentId })
+      .populate('feeStructure', 'title term academicYear totalAmount')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const currentFee = feeStructures.find(
+      (f) => f.term === term && f.academicYear === academicYear,
+    );
+    const currentPaid = currentFee
+      ? payments
+          .filter(
+            (p) => String(p.feeStructure?._id) === String(currentFee._id),
+          )
+          .reduce((sum, p) => sum + (p.amountPaid || 0), 0)
+      : 0;
+
+    let feeStatus = 'none';
+    if (currentFee && currentFee.totalAmount > 0) {
+      if (currentPaid >= currentFee.totalAmount) feeStatus = 'cleared';
+      else if (currentPaid > 0) feeStatus = 'partial';
+      else if (currentFee.dueDate && new Date(currentFee.dueDate) < new Date())
+        feeStatus = 'overdue';
+      else feeStatus = 'owing';
+    }
+
+    related.attendance = attendance;
+    related.results = results;
+    related.library = library;
+    related.fees = {
+      currentTerm: currentFee
+        ? {
+            title: currentFee.title,
+            totalAmount: currentFee.totalAmount,
+            paid: currentPaid,
+            balance: Math.max(currentFee.totalAmount - currentPaid, 0),
+            dueDate: currentFee.dueDate,
+            status: feeStatus,
+          }
+        : null,
+      totalPaidAllTime: payments.reduce(
+        (sum, p) => sum + (p.amountPaid || 0),
+        0,
+      ),
+      payments: payments.slice(0, 20),
+    };
+
+    if (user.studentProfile?.parentId) {
+      related.siblings = await User.find({
+        role: 'Student',
+        _id: { $ne: studentId },
+        'studentProfile.parentId': user.studentProfile.parentId._id,
+      })
+        .select('firstName lastName avatar studentProfile.admissionNumber')
+        .populate('studentProfile.class', 'name')
+        .lean();
+    }
+  }
+
+  if (user.role === 'Teacher') {
+    const teacherId = user._id;
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+
+    const [taskStats, recentTasks, staffSummary, recentAttendance, sectionsOf] =
+      await Promise.all([
+        Task.getStats({ assignedTo: teacherId }),
+        Task.find({ assignedTo: teacherId })
+          .populate('relatedClass', 'name')
+          .populate('relatedSubject', 'name')
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .lean(),
+        StaffAttendance.getSummary({
+          staff: teacherId,
+          date: { $gte: since },
+        }),
+        StaffAttendance.find({ staff: teacherId })
+          .sort({ date: -1 })
+          .limit(14)
+          .lean(),
+        Class.find({ 'sections.classTeacher': teacherId })
+          .select('name level sections')
+          .lean(),
+      ]);
+
+    related.tasks = { stats: taskStats, recent: recentTasks };
+    related.staffAttendance = {
+      summaryLast30Days: staffSummary,
+      recent: recentAttendance,
+    };
+    related.classesTeaching = sectionsOf.map((c) => ({
+      _id: c._id,
+      name: c.name,
+      level: c.level,
+      sections: (c.sections || [])
+        .filter((s) => String(s.classTeacher) === String(teacherId))
+        .map((s) => s.name),
+    }));
+  }
+
+  if (user.role === 'Parent') {
+    const kids = user.parentProfile?.children || [];
+    related.children = await Promise.all(
+      kids.map(async (child) => {
+        const summary = await Attendance.getSummary(
+          child._id,
+          term,
+          academicYear,
+        ).catch(() => null);
+        return { ...child.toObject(), attendance: summary };
+      }),
+    );
+  }
+
+  return sendSuccess(res, 200, 'Profile fetched', { user, related });
 };
 
 // @desc    Update a user's profile
@@ -211,6 +474,7 @@ const getStudentsInClass = async (req, res) => {
 module.exports = {
   getUsers,
   getUserById,
+  getUserProfile,
   updateUser,
   toggleUserStatus,
   deleteUser,
