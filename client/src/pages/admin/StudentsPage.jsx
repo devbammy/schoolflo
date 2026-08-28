@@ -14,6 +14,7 @@ import {
 import { userService, classService } from '../../services/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import useQuickAction from '../../utils/useQuickAction';
 
 const EMPTY_FORM = {
   firstName: '',
@@ -76,6 +77,7 @@ export default function StudentsPage() {
     setSelected(null);
     setModal('create');
   };
+  useQuickAction('student', openCreate);
   const openEdit = (s) => {
     setSelected(s);
     setForm({

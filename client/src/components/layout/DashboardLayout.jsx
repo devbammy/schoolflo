@@ -27,9 +27,11 @@ import {
   CheckSquare,
   UserRoundCheck,
   Timer,
+  Zap,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import GlobalSearch from '../common/GlobalSearch';
+import QuickActionsModal from '../common/QuickActionsModal';
 
 const NAV_CONFIG = {
   Admin: [
@@ -271,6 +273,7 @@ const ROLE_COLORS = {
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
@@ -433,6 +436,14 @@ export default function DashboardLayout() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {user?.role === 'Admin' && (
+              <button
+                className="btn btn--primary btn--sm"
+                onClick={() => setQuickActionsOpen(true)}
+              >
+                <Zap size={15} /> Quick Actions
+              </button>
+            )}
             <span
               className="badge"
               style={{
@@ -463,6 +474,13 @@ export default function DashboardLayout() {
           </main>
         </div>
       </div>
+
+      {user?.role === 'Admin' && (
+        <QuickActionsModal
+          open={quickActionsOpen}
+          onClose={() => setQuickActionsOpen(false)}
+        />
+      )}
     </div>
   );
 }

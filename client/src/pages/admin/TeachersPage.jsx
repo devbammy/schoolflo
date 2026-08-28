@@ -14,6 +14,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import useQuickAction from '../../utils/useQuickAction';
 
 const EMPTY_FORM = {
   firstName: '',
@@ -81,6 +82,7 @@ export default function TeachersPage() {
     setSelected(null);
     setModal('form');
   };
+  useQuickAction('teacher', openCreate);
   const openEdit = (t) => {
     setSelected(t);
     setForm({

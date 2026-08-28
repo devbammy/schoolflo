@@ -27,6 +27,7 @@ import {
   generateAcademicYearOptions,
   getCurrentAcademicYear,
 } from '../../utils/academicYear';
+import useQuickAction from '../../utils/useQuickAction';
 
 ChartJS.register(
   CategoryScale,
@@ -73,6 +74,8 @@ export default function PaymentsPage() {
   });
   const [saving, setSaving] = useState(false);
   const [manualBalance, setManualBalance] = useState(null);
+
+  useQuickAction('payment', () => setModal('manual'));
 
   const loadReport = useCallback(async () => {
     try {

@@ -18,6 +18,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import useQuickAction from '../../utils/useQuickAction';
 
 const RELATIONSHIPS = ['Father', 'Mother', 'Guardian', 'Other'];
 
@@ -135,6 +136,7 @@ export default function ParentsPage() {
     setModal('form');
     searchUnlinked('');
   };
+  useQuickAction('parent', openCreate);
 
   // ── Open Edit ─────────────────────────────────────────────────────────────
   const openEdit = (p) => {

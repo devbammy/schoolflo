@@ -21,6 +21,7 @@ import {
   classService,
   subjectService,
 } from '../../services/api';
+import useQuickAction from '../../utils/useQuickAction';
 
 const STATUSES = [
   'Pending',
@@ -115,6 +116,8 @@ export default function TasksPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+
+  useQuickAction('task', () => setFormOpen(true));
 
   const [reviewing, setReviewing] = useState(null);
   const [reviewComment, setReviewComment] = useState('');

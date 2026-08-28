@@ -17,6 +17,7 @@ import {
   generateAcademicYearOptions,
   getCurrentAcademicYear,
 } from '../../utils/academicYear';
+import useQuickAction from '../../utils/useQuickAction';
 
 const LEVELS = ['JSS', 'SS', 'Primary', 'College'];
 const EMPTY_FORM = {
@@ -80,6 +81,7 @@ export default function ClassesPage() {
     setSelected(null);
     setModal('form');
   };
+  useQuickAction('class', openCreate);
 
   const openEdit = (cls) => {
     setSelected(cls);

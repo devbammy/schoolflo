@@ -35,6 +35,7 @@ import {
   generateAcademicYearOptions,
   getCurrentAcademicYear,
 } from '../../utils/academicYear';
+import useQuickAction from '../../utils/useQuickAction';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const EVENT_TYPES = [
@@ -312,6 +313,7 @@ export default function AcademicCalendarPage() {
     setEditEventId(null);
     setEventModal('create');
   };
+  useQuickAction('event', openAddEvent);
 
   const openEditEvent = (ev) => {
     setEventForm({

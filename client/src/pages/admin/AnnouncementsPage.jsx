@@ -4,6 +4,7 @@ import { announcementService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import useQuickAction from '../../utils/useQuickAction';
 
 const TARGET_OPTIONS = ['All', 'Admin', 'Teacher', 'Student', 'Parent'];
 
@@ -22,6 +23,8 @@ export default function AnnouncementsPage() {
   });
   const [saving, setSaving] = useState(false);
   const isAdmin = user?.role === 'Admin';
+
+  useQuickAction('announcement', () => setModal(true));
 
   const load = () =>
     announcementService

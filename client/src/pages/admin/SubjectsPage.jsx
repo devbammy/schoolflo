@@ -4,6 +4,7 @@ import { subjectService, classService, userService } from '../../services/api';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from 'react-hot-toast';
+import useQuickAction from '../../utils/useQuickAction';
 
 const EMPTY_FORM = {
   name: '',
@@ -66,6 +67,7 @@ export default function SubjectsPage() {
     setSelected(null);
     setModal('form');
   };
+  useQuickAction('subject', openCreate);
   const openEdit = (s) => {
     setSelected(s);
     setForm({

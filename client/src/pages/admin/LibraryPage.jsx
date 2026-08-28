@@ -21,6 +21,7 @@ import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from 'react-hot-toast';
 import { format, isPast } from 'date-fns';
+import useQuickAction from '../../utils/useQuickAction';
 
 const TABS = ['Books', 'Borrow / Return', 'Overdue', 'Statistics'];
 
@@ -178,6 +179,7 @@ export default function LibraryPage() {
     setSelectedBook(null);
     setBookModal('form');
   };
+  useQuickAction('book', openCreate);
   const openEdit = (b) => {
     setSelectedBook(b);
     setBookForm({

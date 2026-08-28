@@ -9,6 +9,7 @@ import {
   generateAcademicYearOptions,
   getCurrentAcademicYear,
 } from '../../utils/academicYear';
+import useQuickAction from '../../utils/useQuickAction';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 const academicYears = generateAcademicYearOptions({
@@ -70,6 +71,7 @@ export default function FeesPage() {
     setSelected(null);
     setModal('form');
   };
+  useQuickAction('fee', openCreate);
   const openEdit = (fee) => {
     setSelected(fee);
     setForm({

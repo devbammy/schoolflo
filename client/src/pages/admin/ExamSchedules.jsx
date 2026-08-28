@@ -11,6 +11,7 @@ import {
   generateAcademicYearOptions,
   getCurrentAcademicYear,
 } from '../../utils/academicYear';
+import useQuickAction from '../../utils/useQuickAction';
 
 const ExamSchedules = () => {
   const [schedules, setSchedules] = useState([]);
@@ -21,6 +22,8 @@ const ExamSchedules = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [filterAcademicYear, setFilterAcademicYear] = useState('');
+
+  useQuickAction('exam', () => setModalOpen(true));
 
   const [formData, setFormData] = useState({
     title: '',
