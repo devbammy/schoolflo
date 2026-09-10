@@ -20,6 +20,7 @@ let authBridge = {
   getAccessToken: () => null,
   getRefreshToken: () => null,
   setAccessToken: () => {},
+  setRefreshToken: () => {},
   onSessionExpired: () => {},
 };
 
@@ -85,6 +86,15 @@ api.interceptors.response.use(
 
       const { data } = await api.post('/auth/refresh', { refreshToken });
       const newToken = data.data.accessToken;
+
+      // Refresh tokens rotate server-side: each use retires the token that
+      // was sent and issues a replacement. Storing it is not optional — keep
+      // the old one and the next refresh is read as a replay and the session
+      // is revoked. The server omits it only when this call raced another
+      // rotation, in which case the token we already hold is still current.
+      if (data.data.refreshToken) {
+        authBridge.setRefreshToken(data.data.refreshToken);
+      }
 
       authBridge.setAccessToken(newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;

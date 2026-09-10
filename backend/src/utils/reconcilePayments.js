@@ -103,9 +103,10 @@ const buildLedger = (payments = [], feeStructures = []) => {
     entry.totalPaid += Number(payment.amountPaid) || 0;
     entry.recordCount += 1;
 
-    // A gateway attempt that was initialised and never completed. These are
-    // harmless to the ledger (they contribute nothing) but they inflate
-    // `totalExpected` in the financial report, which sums amountDue.
+    // A gateway attempt that was initialised and never completed. They
+    // contribute nothing to the ledger. The financial report no longer sums
+    // amountDue — expected revenue comes from fee structures and enrolment —
+    // so these are now reported for housekeeping rather than as a distortion.
     if (
       (Number(payment.amountPaid) || 0) === 0 &&
       payment.status === PAYMENT_STATUS.PENDING &&
@@ -237,8 +238,8 @@ const formatReport = ({ drift, ledger, applied }) => {
         'paid.',
     );
     lines.push(
-      '  These inflate `totalExpected` in the financial report. They are NOT ' +
-        'deleted here:',
+      '  They no longer distort the financial report, and they are NOT deleted ' +
+        'here:',
     );
     lines.push(
       '  a late webhook for an abandoned-then-completed attempt would lose the ' +

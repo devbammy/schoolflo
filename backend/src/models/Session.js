@@ -12,6 +12,14 @@ const mongoose = require('mongoose');
  *
  * Only a SHA-256 hash of the token is stored — a dump of this collection
  * cannot be replayed against the API.
+ *
+ * Refresh tokens rotate: every use mints a new one and retires the old. The
+ * retired hash is kept in `previousTokenHash` for two reasons. It lets a
+ * request that raced the rotation — a second browser tab holding the same
+ * token, a retry after a dropped response — be answered instead of logging the
+ * user out. And once that grace window has passed, a token presented after it
+ * was rotated away is a replay: the token leaked, and the whole session is
+ * revoked rather than served.
  */
 const SessionSchema = new mongoose.Schema(
   {
@@ -26,6 +34,13 @@ const SessionSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    // The hash this session's token had before its most recent rotation.
+    previousTokenHash: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
+    rotatedAt: Date,
     userAgent: String,
     ip: String,
     lastUsedAt: {
@@ -46,5 +61,11 @@ SessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 SessionSchema.statics.hashToken = function (token) {
   return crypto.createHash('sha256').update(String(token)).digest('hex');
 };
+
+// How long a just-rotated token keeps working. Two tabs share one refresh
+// token through localStorage, and both will present it if their access tokens
+// expire together; without a grace window the second one would be read as a
+// replay and sign the user out of a session they are actively using.
+SessionSchema.statics.ROTATION_GRACE_MS = 60 * 1000;
 
 module.exports = mongoose.model('Session', SessionSchema);

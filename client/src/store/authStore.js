@@ -87,8 +87,13 @@ const useAuthStore = create(
         if (!refreshToken) return false;
         try {
           const { data } = await api.post('/auth/refresh', { refreshToken });
-          const { accessToken } = data.data;
-          set({ accessToken });
+          const { accessToken, refreshToken: rotated } = data.data;
+          // The server rotates the refresh token on every use. Persist the
+          // replacement, or the next refresh presents a retired token and the
+          // session is revoked as a suspected replay.
+          set(
+            rotated ? { accessToken, refreshToken: rotated } : { accessToken },
+          );
           api.defaults.headers.common['Authorization'] =
             `Bearer ${accessToken}`;
           return true;
@@ -121,6 +126,7 @@ registerAuthBridge({
   getAccessToken: () => useAuthStore.getState().accessToken,
   getRefreshToken: () => useAuthStore.getState().refreshToken,
   setAccessToken: (accessToken) => useAuthStore.setState({ accessToken }),
+  setRefreshToken: (refreshToken) => useAuthStore.setState({ refreshToken }),
   onSessionExpired: () => useAuthStore.getState().clearSession(),
 });
 

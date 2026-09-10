@@ -336,12 +336,52 @@ const refreshToken = async (req, res) => {
     throw AppError.unauthorized('Invalid or expired refresh token');
   }
 
+  const presented = Session.hashToken(token);
+
   // A structurally valid token is not enough — it must still correspond to a
   // live session. This is what makes logout actually revoke access.
-  const session = await Session.findOne({
-    tokenHash: Session.hashToken(token),
+  let session = await Session.findOne({
+    tokenHash: presented,
     user: decoded.id,
   });
+
+  // Not the current token. It may still be the one this session just rotated
+  // away from, which is either a harmless race or a leak, depending on when.
+  let rotationRace = false;
+  if (!session) {
+    const retired = await Session.findOne({
+      previousTokenHash: presented,
+      user: decoded.id,
+    });
+
+    if (retired) {
+      const age = Date.now() - (retired.rotatedAt?.getTime() ?? 0);
+
+      if (age > Session.ROTATION_GRACE_MS) {
+        // A token that was rotated away and is being presented again well
+        // after the fact is a replay: whoever holds it is not the client that
+        // rotated it. Revoke the session rather than serve either party.
+        await retired.deleteOne();
+        await audit.record(req, {
+          action: 'auth.refresh_reuse',
+          entity: 'User',
+          entityId: decoded.id,
+          subject: decoded.id,
+          outcome: 'failure',
+          reason: 'Refresh token reused after rotation',
+          meta: { rotatedAt: retired.rotatedAt, sessionsEnded: 1 },
+        });
+        throw AppError.unauthorized(
+          'This session has ended. Please log in again.',
+        );
+      }
+
+      // Inside the grace window: a tab that raced the rotation, or a retry of
+      // a response that never arrived. Serve it without rotating again.
+      session = retired;
+      rotationRace = true;
+    }
+  }
 
   if (!session) {
     throw AppError.unauthorized('This session has ended. Please log in again.');
@@ -359,11 +399,51 @@ const refreshToken = async (req, res) => {
     throw AppError.unauthorized('Password was changed. Please log in again.');
   }
 
-  session.lastUsedAt = new Date();
-  await session.save();
-
   const accessToken = user.generateAccessToken();
-  return sendSuccess(res, 200, 'Token refreshed', { accessToken });
+
+  if (rotationRace) {
+    // The caller is behind by one rotation. Hand back the token this session
+    // currently holds so it catches up, and leave the rotation state alone —
+    // rotating here would retire a token the winning caller is still using.
+    await Session.updateOne(
+      { _id: session._id },
+      { $set: { lastUsedAt: new Date() } },
+    );
+    return sendSuccess(res, 200, 'Token refreshed', { accessToken });
+  }
+
+  const nextToken = user.generateRefreshToken();
+
+  // Swap atomically against the hash we matched on. If two requests get this
+  // far at once only one can win — the loser's update matches nothing, and it
+  // falls into the grace path above on retry instead of minting a second
+  // token against the same session.
+  const rotated = await Session.findOneAndUpdate(
+    { _id: session._id, tokenHash: presented },
+    {
+      $set: {
+        tokenHash: Session.hashToken(nextToken),
+        previousTokenHash: presented,
+        rotatedAt: new Date(),
+        lastUsedAt: new Date(),
+        userAgent: req.get('user-agent')?.slice(0, 300),
+        ip: req.ip,
+      },
+    },
+    { new: true },
+  );
+
+  if (!rotated) {
+    throw AppError.unauthorized('This session has ended. Please log in again.');
+  }
+
+  // The rotated token deliberately inherits the original `expiresAt`. A
+  // sliding expiry would mean a session in daily use never ends, which is the
+  // opposite of what a 30-day limit is for.
+  return sendSuccess(res, 200, 'Token refreshed', {
+    accessToken,
+    refreshToken: nextToken,
+  });
 };
 
 // @desc    Log out of this device

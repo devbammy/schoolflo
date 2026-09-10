@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const AppError = require('../utils/AppError');
 const { Payment } = require('../models/Fees');
+const { buildFeeLedger } = require('./feeLedgerService');
 const Sequence = require('../models/Sequence');
 const { PAYMENT_STATUS, PAYMENT_GATEWAY } = require('../config/constants');
 const { emailTemplates } = require('./notificationService');
@@ -466,42 +467,35 @@ const sendReceiptEmail = async (payment, { amount, outstanding } = {}) => {
  * Get financial summary for a class/term
  */
 const getFinancialSummary = async (classId, term, academicYear) => {
-  const payments = await Payment.find({ term, academicYear })
-    .populate({
-      path: 'student',
-      match: { 'studentProfile.class': classId },
-      select: 'firstName lastName',
-    })
-    .populate('feeStructure', 'totalAmount title');
+  const ledger = await buildFeeLedger({ term, academicYear, classId });
 
-  const filtered = payments.filter((p) => p.student !== null);
+  // Counts are per student per fee, not per Payment document: a family paying
+  // one fee in three instalments is one student who has paid, not three.
+  let paidCount = 0;
+  let partialCount = 0;
+  let pendingCount = 0;
 
-  const summary = {
-    totalExpected: 0,
-    totalCollected: 0,
-    totalOutstanding: 0,
-    paidCount: 0,
-    pendingCount: 0,
-    partialCount: 0,
-  };
-
-  filtered.forEach((p) => {
-    summary.totalExpected += p.amountDue;
-    summary.totalCollected += p.amountPaid;
-    summary.totalOutstanding += p.balance;
-    if (p.status === 'Paid') summary.paidCount++;
-    else if (p.status === 'Pending') summary.pendingCount++;
-    else if (p.status === 'Partial') summary.partialCount++;
+  ledger.structures.forEach((row) => {
+    row.students.forEach((s) => {
+      if (s.shortfall === 0 && row.amount > 0) paidCount += 1;
+      else if (s.paid > 0) partialCount += 1;
+      else pendingCount += 1;
+    });
   });
 
-  summary.collectionRate =
-    summary.totalExpected > 0
-      ? parseFloat(
-          ((summary.totalCollected / summary.totalExpected) * 100).toFixed(1),
-        )
-      : 0;
-
-  return summary;
+  return {
+    totalExpected: ledger.billed,
+    totalCollected: ledger.collected,
+    totalOutstanding: ledger.outstanding,
+    paidCount,
+    pendingCount,
+    partialCount,
+    studentsOwing: ledger.studentsOwing,
+    collectionRate:
+      ledger.billed > 0
+        ? parseFloat(((ledger.collected / ledger.billed) * 100).toFixed(1))
+        : 0,
+  };
 };
 
 module.exports = {

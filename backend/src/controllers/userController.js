@@ -10,6 +10,10 @@ const StaffAttendance = require('../models/StaffAttendance');
 const Class = require('../models/Class');
 const { getCurrentPeriod } = require('../utils/academicPeriod');
 const {
+  getTeacherRosterClassIds,
+  assertRosterAccess,
+} = require('../utils/teacherScope');
+const {
   sendSuccess,
   sendPaginated,
   getPaginationParams,
@@ -100,8 +104,14 @@ const attachFeeStatus = async (students) => {
 // @route   GET /api/v1/users
 // @access  Admin
 const getUsers = async (req, res) => {
-  const { role, search, isActive, class: classId, gender, withFeeStatus } =
-    req.query;
+  const {
+    role,
+    search,
+    isActive,
+    class: classId,
+    gender,
+    withFeeStatus,
+  } = req.query;
   const { page, limit, skip } = getPaginationParams(req.query);
 
   const filter = {};
@@ -160,6 +170,27 @@ const getUserById = async (req, res) => {
     .select('-password');
 
   if (!user) throw AppError.notFound('User not found');
+
+  // This route was open to any Teacher for any id, which handed every teacher
+  // the full profile of every colleague, every parent and every admin in the
+  // school. A teacher's business here is the students they are responsible
+  // for, and `getTeacherClassIds` is the one definition of that.
+  if (
+    req.user.role === 'Teacher' &&
+    String(req.user._id) !== String(user._id)
+  ) {
+    const scoped =
+      user.role === 'Student' &&
+      (await getTeacherRosterClassIds(req.user)).includes(
+        String(user.studentProfile?.class?._id || user.studentProfile?.class),
+      );
+
+    if (!scoped) {
+      throw AppError.forbidden(
+        'You can only view students in a class you teach.',
+      );
+    }
+  }
 
   return sendSuccess(res, 200, 'User fetched', { user });
 };
@@ -224,9 +255,7 @@ const getUserProfile = async (req, res) => {
     );
     const currentPaid = currentFee
       ? payments
-          .filter(
-            (p) => String(p.feeStructure?._id) === String(currentFee._id),
-          )
+          .filter((p) => String(p.feeStructure?._id) === String(currentFee._id))
           .reduce((sum, p) => sum + (p.amountPaid || 0), 0)
       : 0;
 
@@ -453,6 +482,11 @@ const uploadUserAvatar = async (req, res) => {
 // @route   GET /api/v1/users/students/class/:classId
 // @access  Admin, Teacher
 const getStudentsInClass = async (req, res) => {
+  // A teacher lists the roster of a class they teach, not of any class in
+  // the school. Without this the check on GET /users/:id above is decoration:
+  // the whole roster, parent contact details included, is one request away.
+  await assertRosterAccess(req.user, req.params.classId);
+
   const students = await User.find({
     role: 'Student',
     'studentProfile.class': req.params.classId,

@@ -8,11 +8,11 @@ const {
 } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
 const audit = require('../services/auditService');
+const { buildFeeLedger } = require('../services/feeLedgerService');
 const {
   initializePaystack,
   initializeFlutterwave,
   generateReceiptNumber,
-  getFinancialSummary,
   resolvePayableAmount,
   getFeeBalances,
   settlePayment,
@@ -431,19 +431,21 @@ const getFinancialReport = async (req, res) => {
   if (term) matchStage.term = term;
   if (academicYear) matchStage.academicYear = academicYear;
 
-  const [overview, byStatus, byGateway, recent] = await Promise.all([
-    Payment.aggregate([
-      { $match: matchStage },
-      {
-        $group: {
-          _id: null,
-          totalExpected: { $sum: '$amountDue' },
-          totalCollected: { $sum: '$amountPaid' },
-          totalOutstanding: { $sum: '$balance' },
-          count: { $sum: 1 },
-        },
-      },
-    ]),
+  // `classId` used to be read off the query string and then ignored, so the
+  // class filter on the admin page silently reported the whole school.
+  if (classId) {
+    const feeIds = await Fees.find({
+      class: classId,
+      ...(term ? { term } : {}),
+      ...(academicYear ? { academicYear } : {}),
+    }).distinct('_id');
+    matchStage.feeStructure = { $in: feeIds };
+  }
+
+  const [ledger, byStatus, byGateway, recent] = await Promise.all([
+    // Expected revenue comes from fee structures and enrolment, never from
+    // payment attempts — see buildFeeLedger for why.
+    buildFeeLedger({ term, academicYear, classId }),
     Payment.aggregate([
       { $match: matchStage },
       {
@@ -455,7 +457,7 @@ const getFinancialReport = async (req, res) => {
       },
     ]),
     Payment.aggregate([
-      { $match: { ...matchStage, status: 'Paid' } },
+      { $match: { ...matchStage, amountPaid: { $gt: 0 } } },
       {
         $group: {
           _id: '$gateway',
@@ -471,8 +473,31 @@ const getFinancialReport = async (req, res) => {
       .limit(10),
   ]);
 
+  // Checkouts that were initialised and never completed. They are deliberately
+  // kept — a late webhook for an abandoned-then-completed attempt would lose a
+  // real payment — but they are attempts, not debt, so they are reported
+  // separately rather than folded into what the school is owed.
+  const abandonedAttempts = await Payment.countDocuments({
+    ...matchStage,
+    amountPaid: 0,
+    status: 'Pending',
+  });
+
   return sendSuccess(res, 200, 'Financial report fetched', {
-    overview: overview[0] || {},
+    overview: {
+      totalExpected: ledger.billed,
+      totalCollected: ledger.collected,
+      totalOutstanding: ledger.outstanding,
+      collectionRate:
+        ledger.billed > 0
+          ? parseFloat(((ledger.collected / ledger.billed) * 100).toFixed(1))
+          : 0,
+      studentsBilled: ledger.studentsBilled,
+      studentsOwing: ledger.studentsOwing,
+      feeStructures: ledger.structures.length,
+      hasStructures: ledger.hasStructures,
+      abandonedAttempts,
+    },
     byStatus,
     byGateway,
     recentTransactions: recent,

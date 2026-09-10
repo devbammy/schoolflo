@@ -24,6 +24,11 @@ const ViewResults = () => {
   // Second and Third Term report cards carry the earlier terms with them;
   // First Term comes back null and the section is skipped.
   const [cumulative, setCumulative] = useState(null);
+  // The grading ladder and the principal's comment are computed server-side
+  // from GRADE_SCALE and travel with the card, so the printed legend can
+  // never drift from the grades in the table above it.
+  const [gradeScale, setGradeScale] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedTerm, setSelectedTerm] = useState('First Term');
   const [selectedYear, setSelectedYear] = useState(getCurrentAcademicYear());
@@ -80,6 +85,8 @@ const ViewResults = () => {
 
       setResults(response?.data?.data?.results || []);
       setCumulative(response?.data?.data?.cumulative || null);
+      setGradeScale(response?.data?.data?.gradeScale || []);
+      setSummary(response?.data?.data?.summary || null);
     } catch (error) {
       // Handle empty result gracefully
       if (
@@ -89,6 +96,7 @@ const ViewResults = () => {
       ) {
         setResults([]);
         setCumulative(null);
+        setSummary(null);
         return;
       }
 
@@ -324,6 +332,8 @@ const ViewResults = () => {
               term={selectedTerm}
               academicYear={selectedYear}
               cumulative={cumulative}
+              gradeScale={gradeScale}
+              summary={summary}
             />
           </div>
         )}

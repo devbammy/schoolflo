@@ -2,12 +2,21 @@ import React, { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import './PrintableReportCard.scss';
 
+/**
+ * `gradeScale` and `summary` come from the report-card endpoint, which derives
+ * both from the backend's GRADE_SCALE. This component used to hold its own
+ * copy of the ladder and its own principal's-comment thresholds, so a school
+ * that adjusted the scale got a card whose grades and whose legend disagreed.
+ * Nothing here re-derives either.
+ */
 const PrintableReportCard = ({
   student,
   results,
   term,
   academicYear,
   cumulative,
+  gradeScale = [],
+  summary = null,
 }) => {
   const componentRef = useRef(null);
 
@@ -21,16 +30,6 @@ const PrintableReportCard = ({
   const average = (totalScore / results.length).toFixed(2);
   const totalGradePoints = results.reduce((sum, r) => sum + r.gradePoint, 0);
   const gpa = (totalGradePoints / results.length).toFixed(2);
-
-  const getPrincipalComment = (avg) => {
-    if (avg >= 70)
-      return 'Excellent performance. Keep up the outstanding work!';
-    if (avg >= 60) return 'Very good performance. You are doing well.';
-    if (avg >= 50) return 'Good performance. Work harder for better results.';
-    if (avg >= 40)
-      return 'Fair performance. Significant improvement is needed.';
-    return 'Poor performance. Urgent attention required.';
-  };
 
   return (
     <div>
@@ -213,19 +212,27 @@ const PrintableReportCard = ({
         </div>
 
         {/* Principal's Comment */}
-        <div className="comment-section">
-          <h4>Principal's Comment:</h4>
-          <p>{getPrincipalComment(parseFloat(average))}</p>
-        </div>
+        {summary?.principalComment && (
+          <div className="comment-section">
+            <h4>Principal's Comment:</h4>
+            <p>{summary.principalComment}</p>
+          </div>
+        )}
 
         {/* Grading Scale */}
-        <div className="grading-scale">
-          <h4>Grading Scale</h4>
-          <p className="scale-text">
-            A: 70-100 (Distinction) | B: 60-69 (Credit) | C: 50-59 (Merit) | D:
-            45-49 (Pass) | E: 40-44 (Weak Pass) | F: 0-39 (Fail)
-          </p>
-        </div>
+        {gradeScale.length > 0 && (
+          <div className="grading-scale">
+            <h4>Grading Scale</h4>
+            <p className="scale-text">
+              {gradeScale
+                .map(
+                  (band) =>
+                    `${band.grade}: ${band.min}-${band.max} (${band.remark})`,
+                )
+                .join(' | ')}
+            </p>
+          </div>
+        )}
 
         {/* Signatures */}
         <div className="signature-section">

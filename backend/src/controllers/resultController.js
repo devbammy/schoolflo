@@ -1,5 +1,6 @@
 const { Result, Exam, calculateGrade } = require('../models/Exam');
 const User = require('../models/User');
+const { GRADE_SCALE } = require('../config/constants');
 const {
   sendSuccess,
   sendError,
@@ -435,8 +436,14 @@ const getReportCard = async (req, res) => {
     .select('firstName lastName studentProfile avatar')
     .populate('studentProfile.class', 'name level');
 
+  // The legend travels with the card. The printable component used to carry
+  // its own hardcoded copy of the ladder — "A: 70-100 (Distinction) | ..." —
+  // which meant a school adjusting GRADE_SCALE got a report card whose table
+  // and whose legend disagreed. The client cannot import backend constants,
+  // so the server sends them.
   return sendSuccess(res, 200, 'Report card fetched', {
     student,
+    gradeScale: GRADE_SCALE,
     ...reportCard,
   });
 };

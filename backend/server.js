@@ -12,6 +12,7 @@ const hpp = require('hpp');
 const axios = require('axios');
 
 const connectDB = require('./src/config/db');
+const MongoRateLimitStore = require('./src/middleware/rateLimitStore');
 const errorHandler = require('./src/middleware/errorHandler');
 const { verifyTransport } = require('./src/services/notificationService');
 const { startJobQueue, stopJobQueue } = require('./src/services/jobQueue');
@@ -139,19 +140,28 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Rate Limiting
+//
+// Counters live in MongoDB rather than in this process's memory. An in-memory
+// limiter is per-instance: two instances behind a load balancer silently
+// double every allowance, and a deploy resets them all to zero. See
+// src/middleware/rateLimitStore.js — it fails open, so a database blip
+// degrades the limit rather than locking everyone out.
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 200,
+  store: new MongoRateLimitStore({ prefix: 'api' }),
   message: {
     success: false,
     message: 'Too many requests, please try again later.',
   },
 });
 
-// Auth-specific strict limiter
+// Auth-specific strict limiter. Its own prefix, so a user's ordinary API
+// traffic and their login attempts are counted separately.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
+  store: new MongoRateLimitStore({ prefix: 'auth' }),
   message: {
     success: false,
     message: 'Too many login attempts, please try again later.',

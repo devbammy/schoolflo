@@ -1,8 +1,7 @@
-const mongoose = require('mongoose');
 const User = require('../models/User');
 const Class = require('../models/Class');
 const Attendance = require('../models/Attendance');
-const { Fees, Payment } = require('../models/Fees');
+const { buildFeeLedger } = require('./feeLedgerService');
 const { Assignment, Submission } = require('../models/Assignment');
 const { Result } = require('../models/Exam');
 const Announcement = require('../models/Announcement');
@@ -195,17 +194,16 @@ const buildAttendance = async () => {
 /**
  * What the term is owed, what has arrived, and who is behind.
  *
- * Billed is derived from the fee structures themselves (amount × students in
- * the class), not from Payment documents — a student who has never paid has no
- * Payment row at all, and counting only the rows that exist would report a
- * school collecting 100% of nothing.
+ * Billed comes from `paymentService.buildFeeLedger` — the one definition of
+ * expected revenue in the system (amount × the students enrolled in the class,
+ * not the Payment documents that happen to exist). Everything this screen adds
+ * on top is derived from that same ledger, so the overview card and the
+ * financial report can never disagree about what the school is owed.
  */
 const buildFees = async ({ academicYear, term }) => {
-  const feeStructures = await Fees.find({ academicYear, term, isActive: true })
-    .select('title class totalAmount dueDate')
-    .lean();
+  const ledger = await buildFeeLedger({ academicYear, term });
 
-  if (feeStructures.length === 0) {
+  if (!ledger.hasStructures) {
     return {
       billed: 0,
       collected: 0,
@@ -217,96 +215,38 @@ const buildFees = async ({ academicYear, term }) => {
     };
   }
 
-  const feeIds = feeStructures.map((f) => f._id);
-  const classIds = [
-    ...new Set(feeStructures.map((f) => String(f.class)).filter(Boolean)),
-  ];
-
-  const [studentsByClass, paidRows] = await Promise.all([
-    User.aggregate([
-      {
-        $match: {
-          role: 'Student',
-          'studentProfile.profileStatus': 'Active',
-          'studentProfile.class': {
-            $in: classIds.map((id) => new mongoose.Types.ObjectId(id)),
-          },
-        },
-      },
-      { $group: { _id: '$studentProfile.class', students: { $push: '$_id' } } },
-    ]),
-    Payment.aggregate([
-      { $match: { feeStructure: { $in: feeIds } } },
-      {
-        $group: {
-          _id: { feeStructure: '$feeStructure', student: '$student' },
-          paid: { $sum: '$amountPaid' },
-        },
-      },
-    ]),
-  ]);
-
-  const rosterByClass = new Map(
-    studentsByClass.map((row) => [String(row._id), row.students]),
-  );
-  const paidByPair = new Map(
-    paidRows.map((row) => [
-      `${row._id.feeStructure}:${row._id.student}`,
-      Number(row.paid) || 0,
-    ]),
-  );
-
-  let billed = 0;
-  let collected = 0;
-  const owing = new Set();
-  const overdueStudents = new Set();
-  let overdueAmount = 0;
-  const overdueStructures = [];
   const now = new Date();
+  const overdueStudents = new Set();
+  const overdueStructures = [];
+  let overdueAmount = 0;
 
-  feeStructures.forEach((fee) => {
-    const roster = rosterByClass.get(String(fee.class)) || [];
-    const amount = Math.round(Number(fee.totalAmount) || 0);
-    const isOverdue = Boolean(fee.dueDate) && new Date(fee.dueDate) < now;
-    let structureOutstanding = 0;
-    let structureOwing = 0;
+  ledger.structures.forEach((row) => {
+    const { fee } = row;
+    if (!fee.dueDate || new Date(fee.dueDate) >= now) return;
+    if (row.studentsOwing === 0) return;
 
-    roster.forEach((studentId) => {
-      const paid = paidByPair.get(`${fee._id}:${studentId}`) || 0;
-      const shortfall = Math.max(0, amount - paid);
-      billed += amount;
-      // Overpayment on one fee must not subsidise another in the headline rate.
-      collected += Math.min(paid, amount);
-      if (shortfall > 0) {
-        owing.add(String(studentId));
-        if (isOverdue) {
-          structureOutstanding += shortfall;
-          structureOwing += 1;
-          overdueStudents.add(String(studentId));
-        }
-      }
+    row.students.forEach((s) => {
+      if (s.shortfall > 0) overdueStudents.add(String(s.student));
     });
 
-    if (isOverdue && structureOwing > 0) {
-      overdueAmount += structureOutstanding;
-      overdueStructures.push({
-        _id: fee._id,
-        title: fee.title,
-        dueDate: fee.dueDate,
-        students: structureOwing,
-        amount: structureOutstanding,
-      });
-    }
+    overdueAmount += row.outstanding;
+    overdueStructures.push({
+      _id: fee._id,
+      title: fee.title,
+      dueDate: fee.dueDate,
+      students: row.studentsOwing,
+      amount: row.outstanding,
+    });
   });
 
   overdueStructures.sort((a, b) => b.amount - a.amount);
 
   return {
-    billed,
-    collected,
-    outstanding: Math.max(0, billed - collected),
-    collectionRate: pct(collected, billed),
-    studentsOwing: owing.size,
+    billed: ledger.billed,
+    collected: ledger.collected,
+    outstanding: ledger.outstanding,
+    collectionRate: pct(ledger.collected, ledger.billed),
+    studentsOwing: ledger.studentsOwing,
     overdue: {
       students: overdueStudents.size,
       amount: overdueAmount,

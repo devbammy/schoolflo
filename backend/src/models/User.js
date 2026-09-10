@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -217,10 +218,18 @@ UserSchema.methods.generateAccessToken = function () {
 };
 
 // Generate JWT Refresh Token
+//
+// The `jti` is not decoration. Without it the payload is just { id }, and
+// jsonwebtoken stamps iat/exp in whole seconds — so two tokens minted for the
+// same user inside the same second are byte-identical. That collides on
+// Session.tokenHash's unique index, and it makes rotation impossible: the
+// "new" token would hash to the row we are trying to replace.
 UserSchema.methods.generateRefreshToken = function () {
-  return jwt.sign({ id: this._id }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d',
-  });
+  return jwt.sign(
+    { id: this._id, jti: crypto.randomBytes(16).toString('hex') },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d' },
+  );
 };
 
 // Check if password changed after token issued

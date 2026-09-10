@@ -85,11 +85,15 @@ schoolflo/
 │   │   ├── config/
 │   │   │   ├── db.js
 │   │   │   └── constants.js       # roles, terms, GRADE_SCALE, score caps
-│   │   ├── models/                # 19 Mongoose models
-│   │   ├── controllers/           # 21 controllers, one per domain
-│   │   ├── services/
+│   │   ├── models/                # 21 Mongoose models
+│   │   ├── controllers/           # 24 controllers, one per domain
+│   │   ├── services/              # 13 services
 │   │   │   ├── gradingService.js      # class stats, ranking, report cards
 │   │   │   ├── paymentService.js      # gateways + settlement
+│   │   │   ├── feeLedgerService.js    # what the school is owed (see §7)
+│   │   │   ├── adminOverviewService.js
+│   │   │   ├── auditService.js        # record(), diff(), redaction
+│   │   │   ├── searchService.js       # cross-domain search and its scoping
 │   │   │   ├── notificationService.js # SMTP transport + email templates
 │   │   │   ├── jobQueue.js            # Agenda-backed background email
 │   │   │   ├── fileService.js         # multer + Cloudinary
@@ -101,6 +105,7 @@ schoolflo/
 │   │   │   ├── auth.js            # protect()
 │   │   │   ├── rbac.js            # authorize(), ownDataOnly()
 │   │   │   ├── validate.js        # express-validator runner
+│   │   │   ├── rateLimitStore.js  # Mongo-backed, shared across instances
 │   │   │   └── errorHandler.js
 │   │   ├── validators/            # request schemas, grouped by domain
 │   │   ├── routes/                # thin routers, one file per domain
@@ -108,8 +113,11 @@ schoolflo/
 │   │       ├── AppError.js
 │   │       ├── apiResponse.js
 │   │       ├── scoreValidation.js
+│   │       ├── teacherScope.js    # the one definition of a teacher's scope
+│   │       ├── schoolTime.js      # school wall clock (staff attendance)
+│   │       ├── reconcilePayments.js
 │   │       └── ms.js
-│   └── tests/
+│   └── tests/                     # 18 suites, 316 tests
 │       ├── unit/                  # grading, validation, error handling
 │       ├── integration/           # payments, auth (real in-memory MongoDB)
 │       └── setup/db.js
@@ -198,7 +206,8 @@ helmet
   → express.json
   → mongo-sanitize, hpp
   → morgan
-  → rate limit      (/api only, so webhooks are never throttled)
+  → rate limit      (/api only, so webhooks are never throttled;
+                     counters in MongoDB, shared across instances)
   → routes
   → 404
   → errorHandler
@@ -278,6 +287,14 @@ as a zero) means a subject picked up mid-session is not punished for the terms
 it was not offered in. Because the cumulative stays on a 0–100 scale, the same
 `GRADE_SCALE` bands, remarks and grade points apply to it, and cumulative
 position uses the same competition ranking as the termly position.
+
+The legend travels with the card. `GET /results/report-card/:studentId`
+returns `gradeScale` (the `GRADE_SCALE` rows) and `summary.principalComment`
+alongside the results, and `PrintableReportCard` renders both from that
+payload. It used to hold its own hardcoded copy of the ladder and its own
+comment thresholds, so a school adjusting the scale got a card whose grades
+and whose legend disagreed. The client cannot import backend constants, so the
+server sends them rather than the client guessing.
 
 `computeCumulative` (`services/gradingService.js`) reads only **published**
 results, so an unpublished term never leaks into a parent-facing card. It is
@@ -384,6 +401,36 @@ GET /api/v1/payments/balance/:studentId?feeStructureId=   ← one named fee
 Paystack dashboard. Without it, a payment is only confirmed if the payer
 returns to the site.
 
+### What the school is owed
+
+`totalExpected` is **not** summed from Payment documents. `buildFeeLedger()`
+in `services/feeLedgerService.js` is the one definition of expected revenue,
+and it derives it from the fee structures and the roster they apply to:
+
+```
+billed      = Σ over active fee structures of (fee.totalAmount × students enrolled in its class)
+collected   = Σ min(what that student paid toward that fee, the fee total)
+outstanding = billed − collected
+```
+
+Summing `Payment.amountDue` instead measured payment *attempts*. Every
+abandoned checkout leaves a Pending row behind, so a parent who opened the
+payment page four times and paid once quadrupled the school's expected
+revenue — while a student nobody had raised a payment for contributed nothing
+at all, so a school that had billed everyone and collected from nobody
+reported a 100% collection rate against ₦0 expected.
+
+Collection is capped per student per fee, so a duplicate payment on one child
+cannot subsidise another child's debt in the headline rate.
+
+Both `GET /payments/report` and the admin overview card read from this one
+function, so the two screens cannot drift into disagreeing about the same
+number. Abandoned attempts are still counted and reported, as
+`overview.abandonedAttempts` — housekeeping, not debt.
+
+For what an individual student owes, the authority is still
+`getFeeBalances()`; `buildFeeLedger()` answers the school-wide question.
+
 ### Reconciliation
 
 `pnpm reconcile` audits the payment collection and prints a report. It is
@@ -425,9 +472,42 @@ fact that is trusted. Running it twice is safe: the second run finds nothing.
 - **Access token** — JWT, default **1 hour**. Not revocable, so its lifetime is
   its blast radius. Overridden by `JWT_EXPIRE`.
 - **Refresh token** — JWT, default **30 days**, and only valid while a matching
-  `Session` row exists.
+  `Session` row exists. **Rotated on every use.**
 - **Sessions** — one row per signed-in device, storing a SHA-256 hash of the
   refresh token. A dump of the collection cannot be replayed.
+
+### Refresh token rotation
+
+`POST /auth/refresh` mints a new refresh token, retires the one presented, and
+returns **both** tokens. A client that keeps the old one will be signed out on
+its next refresh, so the client stores what comes back
+(`services/api.js` and `store/authStore.js`).
+
+The retired hash is kept on the session as `previousTokenHash`, which is what
+makes two things possible:
+
+| A retired token arrives | Within 60s of rotation | After 60s |
+| ----------------------- | ---------------------- | --------- |
+| Interpretation          | A race — a second tab, or a retried request | A replay — the token leaked |
+| Response                | A fresh access token, no second rotation | 401, **the whole session is deleted**, `auth.refresh_reuse` audited |
+
+The grace window is not optional. Two browser tabs share one refresh token
+through `localStorage` and will both present it when their access tokens
+expire together; without it the loser of that race is signed out of a session
+they are actively using. `Session.ROTATION_GRACE_MS` holds the value.
+
+Rotation swaps the hash with an atomic `findOneAndUpdate` matched on the old
+one, so two requests that reach that point together cannot both mint a token
+against the same session.
+
+A rotated token **inherits the original `expiresAt`**. Sliding the expiry
+forward on every use would mean a session in daily use never ends, which is
+the opposite of what a 30-day limit is for.
+
+Refresh tokens carry a random `jti`. Without it the payload is just `{ id }`
+plus whole-second `iat`/`exp`, so two tokens minted for one user inside the
+same second are byte-identical — they collide on `Session.tokenHash`'s unique
+index, and rotation cannot replace a row with a token that hashes to it.
 
 This is what makes logout real:
 
@@ -468,9 +548,25 @@ because "own data" means something different per domain.
 | Library issue / return | ✅    | ✅                     | ❌       | ❌          |
 | Announcements          | ✅    | create + view          | view     | view        |
 
-**Teacher scoping:** a teacher may manage results for subjects in their
+**Teacher scoping** comes in two widths, and `utils/teacherScope.js` holds
+both. Conflating them either breaks grade entry or hands the register to
+someone who teaches one period a week.
+
+| Question | Function | Means |
+| -------- | -------- | ----- |
+| May this teacher **act on** this class? | `getTeacherClassIds` / `assertClassAccess` | Form teacher of it, or class teacher of one of its sections. Marking a register, running its attendance report. |
+| May this teacher **see the students of** this class? | `getTeacherRosterClassIds` / `assertRosterAccess` | The above, plus every class a subject they teach is offered in. Loading a roster to enter grades. |
+
+A teacher may manage results for subjects in their
 `teacherProfile.subjectsTaught`, plus everything in the class they are form
 teacher of (`classTeacherOf`).
+
+`GET /users/:id` is scoped by the roster rule: a Teacher may fetch a Student
+in a class they teach, and their own record. Every other id — a colleague, an
+admin, a parent, a student in another class — is a 403. The route used to be
+open to any Teacher for any id, which handed every teacher the full profile of
+everyone in the school. `GET /users/students/class/:classId` carries the same
+check, without which the first one is decoration.
 
 ---
 
@@ -506,7 +602,7 @@ Base URL: `/api/v1`. All routes require a Bearer token unless marked Public.
 `POST /results/bulk` validates every row first and rejects the **whole batch**
 if any row is invalid — a half-applied set of scores is worse than none.
 
-### Payments — `/payments` (6) and `/fees` (4)
+### Payments — `/payments` (7) and `/fees` (4)
 
 | Method | Endpoint                    | Access                    |
 | ------ | --------------------------- | ------------------------- |
@@ -515,7 +611,14 @@ if any row is invalid — a half-applied set of scores is worse than none.
 | POST   | `/initialize/flutterwave`   | Admin, own, own child     |
 | POST   | `/manual`                   | Admin (Cash / Bank Transfer only) |
 | GET    | `/student/:studentId`       | Admin, own, own child     |
+| GET    | `/balance/:studentId`       | Admin, own, own child     |
 | GET    | `/report`                   | Admin                     |
+
+`GET /report` accepts `term`, `academicYear` and `classId`. Its `overview`
+carries `totalExpected` / `totalCollected` / `totalOutstanding`,
+`collectionRate`, `studentsBilled`, `studentsOwing` and `abandonedAttempts` —
+see [What the school is owed](#what-the-school-is-owed) for where each comes
+from.
 
 `amount` is optional on initialize. Omit it to settle the outstanding balance
 in full — which is what the client does.
@@ -651,7 +754,7 @@ Enter navigation.
 
 | Base                | Routes | Controller                  |
 | ------------------- | ------ | --------------------------- |
-| `/users`            | 7      | `userController`            |
+| `/users`            | 8      | `userController`            |
 | `/parents`          | 7      | `parentController`          |
 | `/classes`          | 5      | `classController`           |
 | `/subjects`         | 4      | `subjectController`         |
@@ -670,7 +773,7 @@ Enter navigation.
 | `/certificates`     | 8      | `certificateController`     |
 | `/webhooks`         | 1      | HMAC-verified, no JWT       |
 
-**161 routes total.**
+**173 routes total.**
 
 ### Attendance — `/attendance` (5 routes)
 
@@ -778,7 +881,7 @@ await audit.record(req, {
 
 ## 11. Database schema
 
-19 models. The ones with non-obvious behaviour:
+21 models. The ones with non-obvious behaviour:
 
 ### User
 
@@ -836,10 +939,13 @@ the two still come to the fee total, which is what keeps the financial report's
 ### Session
 
 ```
-user→User, tokenHash (sha256, unique), userAgent, ip, lastUsedAt, expiresAt
+user→User, tokenHash (sha256, unique), previousTokenHash (sha256, sparse),
+rotatedAt, userAgent, ip, lastUsedAt, expiresAt
 ```
 
-TTL index on `expiresAt`.
+TTL index on `expiresAt`. `previousTokenHash` and `rotatedAt` are what
+distinguish a refresh that raced a rotation from a token being replayed — see
+[Refresh token rotation](#refresh-token-rotation).
 
 ### Sequence
 
@@ -971,7 +1077,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 247 tests
+pnpm test              # 18 suites, 316 tests
 pnpm test:coverage
 ```
 
@@ -984,6 +1090,17 @@ pnpm test:coverage
 | `integration/tasks.test.js`  | The approval workflow, and that one teacher cannot touch another's task |
 | `integration/attendance.test.js` | Class scoping, calendar-stamped term, one record per student per day |
 | `integration/search.test.js` | What each role may and may not find                       |
+| `integration/splitPayments.test.js` | Part-payments across channels, the gateway floor, balance endpoints |
+| `integration/financialReport.test.js` | Expected revenue from enrolment, abandoned attempts, the classId filter |
+| `integration/refreshRotation.test.js` | Rotation, the two-tab race, replay detection, session expiry |
+| `integration/userScope.test.js` | Which users and rosters a teacher may fetch               |
+| `integration/rateLimitStore.test.js` | Counters shared across instances, window expiry, failing open |
+| `integration/rateLimitIntegration.test.js` | The store driven through `express-rate-limit` itself |
+| `integration/staffAttendance.test.js` | The clock, school time, one record per staff member per day |
+| `integration/audit.test.js`  | What is recorded, and that nothing sensitive is           |
+| `integration/reconcile.test.js` | Drift detection, and that `--apply` is idempotent      |
+| `unit/cumulative.test.js`    | Folding terms into a cumulative, and the missing-term rule |
+| `unit/adminOverview.test.js` | The overview's pulse, attention items and fee maths       |
 
 Integration tests run against a **real MongoDB in memory**
 (`mongodb-memory-server`). Mocking Mongoose would defeat the purpose — the
@@ -1023,6 +1140,13 @@ Set `VITE_API_URL` in the dashboard.
 - [ ] MongoDB URI with `?retryWrites=true&w=majority`
 - [ ] Atlas IP allowlist includes the backend host
 - [ ] Backup retention enabled (7 days minimum)
+- [ ] `pnpm reconcile` run against production and its report read (see
+      [Known gaps](#17-known-gaps)) before trusting any financial figure
+
+Running more than one backend instance is supported: rate-limit counters are
+shared through MongoDB, and sessions were already in the database. The one
+thing that is still per-instance is the Agenda job queue's in-process
+scheduler, which Agenda itself locks against double-running a job.
 
 ---
 
@@ -1031,7 +1155,8 @@ Set `VITE_API_URL` in the dashboard.
 Recorded honestly so nobody rediscovers them the hard way.
 
 - **No test coverage** for `pdfService`, the dashboard aggregations, the
-  library and timetable domains, or any client code.
+  library, timetable, calendar, certificate or promotion domains, or any
+  client code. The client still has no test runner at all.
 - **The audit log UI has no automated test.** The page is smoke-checked to
   mount without throwing, but the client has no test runner, so the loaded
   state (filters, expanded rows) is unverified.
@@ -1040,21 +1165,35 @@ Recorded honestly so nobody rediscovers them the hard way.
 - **`pdfService` uses async Promise executors.** Safe today (each wraps its
   body in try/catch and calls `reject`), but the lint rule is disabled at file
   scope until those three generators are restructured.
-- **The report-card legend in `client/src/components/results/PrintableReportCard.jsx`
-  is a hardcoded copy** of the grading scale. The backend derives its copy from
-  `GRADE_SCALE`; the client cannot import backend constants, so this one will
-  drift unless the scale is served from an endpoint.
-- **`getFinancialReport` over-counts `totalExpected`.** Every abandoned payment
-  attempt leaves a `Pending` row with an `amountDue`, and the report sums them.
-  `pnpm reconcile` counts them so you can see the scale, but the report itself
-  still needs fixing — probably by excluding zero-paid pending rows, or by
-  reporting expected revenue from fee structures and enrolment rather than from
-  payment attempts.
 - **Historic payment data may still be wrong** until `pnpm reconcile:apply` has
   been run against production. Anything settled before the settlement fix is
-  marked `Paid` with `balance: 0` regardless of what was collected.
-- **Refresh tokens are not rotated** on use. Sessions are revocable, which
-  covers the main risk, but rotation would be stronger.
-- **`GET /users/:id`** is open to any Teacher, returning full profiles.
-- **Rate limiting is in-process.** With more than one instance, limits apply
-  per instance rather than globally.
+  marked `Paid` with `balance: 0` regardless of what was collected. This is
+  the one item on this list that code cannot close: it is an operational step
+  against the live database. Run `pnpm reconcile` first — it is read-only —
+  and read the report before applying anything.
+- **Overpayments are reported, never corrected.** More collected than a fee is
+  worth is usually a duplicate payment, and whether that becomes a refund or a
+  credit against next term is a decision for a human.
+- **The financial report's per-status and per-gateway breakdowns still count
+  Payment documents**, not students. That is the right unit for "how did money
+  arrive", but it means the counts beside `byStatus` are not comparable with
+  `studentsOwing` in the same payload.
+
+### Closed, and worth knowing why
+
+These were on this list and are now fixed. Kept briefly so nobody
+re-introduces them.
+
+- **`totalExpected` over-counting.** Now derived from fee structures and
+  enrolment via `buildFeeLedger`, not summed from payment attempts. Covered by
+  `integration/financialReport.test.js`.
+- **The hardcoded report-card legend.** `gradeScale` and
+  `summary.principalComment` now travel with the report-card payload; the
+  client renders what it is given.
+- **Refresh tokens not rotating.** They rotate, with a 60-second grace window
+  for racing tabs and session revocation on replay.
+- **`GET /users/:id` open to any Teacher.** Scoped to students in classes the
+  teacher actually teaches; `GET /users/students/class/:classId` too.
+- **In-process rate limiting.** Counters live in MongoDB and are shared across
+  instances. The store fails open, so a database blip degrades the limit
+  rather than locking everyone out.
