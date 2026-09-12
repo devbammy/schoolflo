@@ -3,6 +3,7 @@ import { CreditCard, Users } from 'lucide-react';
 import { paymentService } from '../../services/api';
 import FeeBalanceCard from '../../components/payments/FeeBalanceCard';
 import useAuthStore from '../../store/authStore';
+import { useFeature } from '../../store/featureStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
@@ -54,6 +55,7 @@ function ChildAvatar({ child, size = 36, active = false }) {
 
 export default function ParentPayments() {
   const { user } = useAuthStore();
+  const canPayOnline = useFeature('onlinePayments');
 
   // Normalise children — populated objects or bare IDs
   const rawChildren = user?.parentProfile?.children || [];
@@ -368,6 +370,7 @@ export default function ParentPayments() {
                     key={balance.feeStructure._id}
                     balance={balance}
                     paying={paying === balance.feeStructure._id}
+                    canPayOnline={canPayOnline}
                     onPay={(amount) =>
                       handlePaystack(balance.feeStructure, amount)
                     }

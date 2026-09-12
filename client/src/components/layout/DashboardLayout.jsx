@@ -30,6 +30,7 @@ import {
   Zap,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
+import useFeatureStore from '../../store/featureStore';
 import GlobalSearch from '../common/GlobalSearch';
 import QuickActionsModal from '../common/QuickActionsModal';
 
@@ -100,6 +101,7 @@ const NAV_CONFIG = {
           to: '/admin/staff-attendance',
           icon: UserRoundCheck,
           label: 'Staff Attendance',
+          feature: 'staffAttendance',
         },
         { to: '/admin/audit', icon: ScrollText, label: 'Audit Log' },
       ],
@@ -141,7 +143,12 @@ const NAV_CONFIG = {
         },
         { to: '/teacher/library', icon: BookMarked, label: 'Library' },
         { to: '/teacher/tasks', icon: CheckSquare, label: 'My Tasks' },
-        { to: '/teacher/clock', icon: Timer, label: 'Clock In / Out' },
+        {
+          to: '/teacher/clock',
+          icon: Timer,
+          label: 'Clock In / Out',
+          feature: 'staffAttendance',
+        },
       ],
     },
     {
@@ -276,8 +283,18 @@ export default function DashboardLayout() {
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const features = useFeatureStore((s) => s.features);
 
-  const navItems = NAV_CONFIG[user?.role] || [];
+  // Drop entries this school does not run, and any section left empty by
+  // that — a heading over nothing reads as a broken page.
+  const navItems = (NAV_CONFIG[user?.role] || [])
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) => !item.feature || features[item.feature] !== false,
+      ),
+    }))
+    .filter((section) => section.items.length > 0);
   const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : '?';
 
   const handleLogout = async () => {

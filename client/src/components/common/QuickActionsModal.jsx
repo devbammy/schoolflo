@@ -23,6 +23,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import Modal from './Modal';
+import useFeatureStore from '../../store/featureStore';
 
 /**
  * Config is keyed by role. Every entry points at the page that already owns the
@@ -173,6 +174,7 @@ const CONFIG = {
           icon: Timer,
           label: 'Clock In / Out',
           hint: 'Log your working hours',
+          feature: 'staffAttendance',
         },
         {
           to: '/teacher/tasks',
@@ -228,6 +230,10 @@ const CONFIG = {
           icon: CreditCard,
           label: 'Make a Payment',
           hint: 'Pay outstanding fees',
+          // Where fees are collected at the office the page is still worth
+          // opening — it is where you find out what you owe.
+          feature: 'onlinePayments',
+          fallback: { label: 'Fee Balance', hint: 'See what you owe' },
         },
         {
           to: '/student/library',
@@ -254,6 +260,8 @@ const CONFIG = {
           icon: CreditCard,
           label: 'Make a Payment',
           hint: 'Settle school fees',
+          feature: 'onlinePayments',
+          fallback: { label: 'Fee Balance', hint: 'See what is outstanding' },
         },
         {
           to: '/parent/results',
@@ -296,8 +304,23 @@ const CONFIG = {
 };
 
 export default function QuickActionsModal({ open, onClose, role }) {
+  const features = useFeatureStore((s) => s.features);
   const navigate = useNavigate();
-  const groups = CONFIG[role] || [];
+  // A feature-tagged action either falls back to a different label or drops
+  // out entirely; a group left with nothing in it goes too.
+  const groups = (CONFIG[role] || [])
+    .map((group) => ({
+      ...group,
+      actions: group.actions.reduce((kept, item) => {
+        if (!item.feature || features[item.feature] !== false) {
+          kept.push(item);
+        } else if (item.fallback) {
+          kept.push({ ...item, ...item.fallback });
+        }
+        return kept;
+      }, []),
+    }))
+    .filter((group) => group.actions.length > 0);
 
   const run = (item) => {
     onClose();

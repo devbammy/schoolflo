@@ -57,6 +57,47 @@ If `pnpm` is not on PATH in your shell, `npx jest` / `npx eslint` /
 
 ---
 
+## One codebase, many schools
+
+SchoolFlo is deployed once per school, and a school is a **configuration,
+never a branch**. Deleting features on a branch makes every future upstream
+change a merge conflict, and the branch that is painful to merge is the one
+that stops getting security patches.
+
+`src/config/features.js` is the single source. Everything defaults to on, so
+a deployment that sets nothing is the full product.
+
+```
+SCHOOL_PROFILE=office-fees      # named profile: full | office-fees
+FEATURE_STAFF_ATTENDANCE=true   # per-feature override wins over the profile
+```
+
+Two enforcement mechanisms, and the choice is not stylistic:
+
+| Shape of feature | How |
+| --- | --- |
+| A whole domain (staff attendance) | Don't mount its router in `server.js` |
+| A feature inside a router the school still needs (payment gateways) | `requireFeature('name')` on those routes |
+
+`requireFeature` returns **404, not 403**, and goes **before `protect`** — a
+disabled feature must be indistinguishable from a route that was never
+mounted.
+
+**"Remove payments" is a trap.** A school collecting fees at the office still
+needs fee structures, manual payments, balances, receipts and the financial
+report. Only the gateway goes. Read the table in
+[DOCUMENTATION.md §4a](DOCUMENTATION.md#4a-school-profiles-and-feature-flags)
+before touching this.
+
+The client reads the flags from `GET /api/v1/config` into
+`store/featureStore.js`. Do not add a `VITE_FEATURES` build constant — that
+is a second copy of a truth in a second deployable, and it will drift. Nav
+entries and quick actions opt in with a `feature:` tag; a quick action can
+declare a `fallback` label instead of vanishing. Hiding a nav item is
+cosmetic; the server guard is the control.
+
+---
+
 ## Layering — the rule that everything else follows
 
 ```
@@ -182,7 +223,7 @@ vulnerability.
 
 ## Testing
 
-`pnpm test` — 18 suites, 316 tests, Jest, `maxWorkers: 1`.
+`pnpm test` — 19 suites, 333 tests, Jest, `maxWorkers: 1`.
 
 Integration tests run against a **real MongoDB in memory**
 (`mongodb-memory-server`), started once in `globalSetup` with a database per
@@ -228,6 +269,8 @@ Client code has **no test runner**. The check is that it builds.
 | Search scoping per role | `searchService.GROUP_ROLES` |
 | Audit recording and redaction | `services/auditService.js` |
 | Rate-limit store | `middleware/rateLimitStore.js` |
+| Which features this school runs | `config/features.js` |
+| Client's copy of the feature set | `client/src/store/featureStore.js` |
 | Axios interceptors + auth bridge | `client/src/services/api.js` |
 | Persisted auth state | `client/src/store/authStore.js` |
 

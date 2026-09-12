@@ -12,6 +12,7 @@ const hpp = require('hpp');
 const axios = require('axios');
 
 const connectDB = require('./src/config/db');
+const { getFeatures } = require('./src/config/features');
 const MongoRateLimitStore = require('./src/middleware/rateLimitStore');
 const errorHandler = require('./src/middleware/errorHandler');
 const { verifyTransport } = require('./src/services/notificationService');
@@ -44,6 +45,7 @@ const webhookRoutes = require('./src/routes/webhooks');
 const auditRoutes = require('./src/routes/audit');
 const taskRoutes = require('./src/routes/tasks');
 const searchRoutes = require('./src/routes/search');
+const configRoutes = require('./src/routes/config');
 
 const app = express();
 
@@ -109,10 +111,17 @@ app.use(
 
 app.use(compression());
 
+// Which features this school runs. Resolved once at boot so a bad
+// SCHOOL_PROFILE fails here, loudly, rather than at the first request.
+const features = getFeatures();
+
 // Gateway webhooks are mounted ahead of the JSON parser: signature
 // verification needs the untouched raw body. They sit outside /api so the
-// rate limiter cannot reject a genuine payment notification.
-app.use('/webhooks', webhookRoutes);
+// rate limiter cannot reject a genuine payment notification. A school with no
+// gateway has nothing to receive, so the endpoint does not exist for them.
+if (features.onlinePayments) {
+  app.use('/webhooks', webhookRoutes);
+}
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -195,7 +204,13 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/classes', classRoutes);
 app.use('/api/v1/subjects', subjectRoutes);
 app.use('/api/v1/attendance', attendanceRoutes);
-app.use('/api/v1/staff-attendance', staffAttendanceRoutes);
+
+// A whole domain that a school does not run is not mounted at all — there is
+// no route to guard. Features that live inside a router the school still
+// needs are guarded individually instead (see routes/payments.js).
+if (features.staffAttendance) {
+  app.use('/api/v1/staff-attendance', staffAttendanceRoutes);
+}
 app.use('/api/v1/exams', examRoutes);
 app.use('/api/v1/results', resultRoutes);
 app.use('/api/v1/fees', feesRoutes);
@@ -215,6 +230,7 @@ app.use('/api/v1/certificates', certificateRoutes);
 app.use('/api/v1/audit', auditRoutes);
 app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/search', searchRoutes);
+app.use('/api/v1/config', configRoutes);
 
 app.get('/', (req, res) => {
   res.status(200).json({

@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from './store/authStore';
+import useFeatureStore, { useFeature } from './store/featureStore';
 import api from './services/api';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import './styles/main.scss';
@@ -113,6 +114,19 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
+/**
+ * A route that belongs to a feature this school does not run.
+ *
+ * Hiding the nav entry is not enough: a bookmark, a link in an old email or a
+ * typed URL still reaches the page, which would then sit there firing 404s at
+ * a server that has no such route. Sending them home is the honest answer.
+ */
+const FeatureRoute = ({ feature, children }) => {
+  const enabled = useFeature(feature);
+
+  return enabled ? children : <Navigate to=".." replace />;
+};
+
 const RoleRedirect = () => {
   const role = useAuthStore((s) => s.user?.role);
 
@@ -127,12 +141,23 @@ const RoleRedirect = () => {
 
 export default function App() {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const loadFeatures = useFeatureStore((s) => s.load);
+  const featuresLoaded = useFeatureStore((s) => s.loaded);
 
   useEffect(() => {
     if (accessToken) {
       api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
     }
   }, [accessToken]);
+
+  // Which features this school runs, before anything renders. Painting the
+  // full navigation and then pulling items out of it as the answer arrives
+  // looks like a bug to the person watching.
+  useEffect(() => {
+    loadFeatures();
+  }, [loadFeatures]);
+
+  if (!featuresLoaded) return <PageLoader />;
 
   return (
     <BrowserRouter>
@@ -200,7 +225,11 @@ export default function App() {
               <Route path="tasks" element={<TasksPage />} />
               <Route
                 path="staff-attendance"
-                element={<StaffAttendancePage />}
+                element={
+                  <FeatureRoute feature="staffAttendance">
+                    <StaffAttendancePage />
+                  </FeatureRoute>
+                }
               />
             </Route>
 
@@ -223,7 +252,14 @@ export default function App() {
               <Route path="timetable" element={<TeacherTimetable />} />
               <Route path="exam-schedules" element={<TeacherExamSchedule />} />
               <Route path="tasks" element={<MyTasksPage />} />
-              <Route path="clock" element={<ClockPage />} />
+              <Route
+                path="clock"
+                element={
+                  <FeatureRoute feature="staffAttendance">
+                    <ClockPage />
+                  </FeatureRoute>
+                }
+              />
             </Route>
 
             {/* Student */}

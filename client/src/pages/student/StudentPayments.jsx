@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { paymentService } from '../../services/api';
 import FeeBalanceCard from '../../components/payments/FeeBalanceCard';
 import useAuthStore from '../../store/authStore';
+import { useFeature } from '../../store/featureStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
@@ -13,6 +14,7 @@ const TERMS = ['First Term', 'Second Term', 'Third Term'];
 
 export default function StudentPayments() {
   const { user } = useAuthStore();
+  const canPayOnline = useFeature('onlinePayments');
   const [term, setTerm] = useState('First Term');
   const [payments, setPayments] = useState([]);
   const [balances, setBalances] = useState([]);
@@ -132,6 +134,7 @@ export default function StudentPayments() {
                 key={balance.feeStructure._id}
                 balance={balance}
                 paying={paying === balance.feeStructure._id}
+                canPayOnline={canPayOnline}
                 onPay={(amount) => handlePaystack(balance.feeStructure, amount)}
               />
             ))}

@@ -11,6 +11,7 @@
 2. [Project structure](#2-project-structure)
 3. [Getting started](#3-getting-started)
 4. [Working on this repo](#working-on-this-repo)
+4a. [School profiles and feature flags](#4a-school-profiles-and-feature-flags)
 5. [Request lifecycle](#5-request-lifecycle)
 6. [Grading](#6-grading)
 7. [Payments](#7-payments)
@@ -191,6 +192,78 @@ inconsistent.
 
 CI runs lint, format check, tests and the client build on every push and pull
 request to `main`.
+
+---
+
+## 4a. School profiles and feature flags
+
+SchoolFlo is one codebase deployed once per school, and schools do not all
+want the same portal. A school is a **configuration, never a branch**: a
+branch whose customisation is deleted code turns every upstream change into a
+merge conflict, and the schools on old branches are the ones that quietly stop
+getting security patches.
+
+`src/config/features.js` is the single source. Everything is on by default, so
+a deployment that sets nothing behaves exactly as the full product does.
+
+```
+SCHOOL_PROFILE=office-fees          # a named profile
+FEATURE_STAFF_ATTENDANCE=true       # per-feature override, last word
+```
+
+Resolution order, last wins: **all on → profile → `FEATURE_*` override.**
+An unknown `SCHOOL_PROFILE` throws at boot rather than silently shipping the
+full product to a school that asked for less.
+
+| Feature | Off removes | Off does **not** remove |
+| ------- | ----------- | ----------------------- |
+| `onlinePayments` | `/payments/initialize/*`, `/payments/verify/*`, `/webhooks` | Fee structures, `POST /payments/manual`, balances, receipts, the financial report |
+| `staffAttendance` | The whole `/staff-attendance` domain, the teacher clock, the admin roster | Student attendance, which is unrelated |
+
+Profiles shipped today: `full` (default) and `office-fees` (fees collected at
+the school office, no staff clock).
+
+### How a feature is enforced
+
+Two mechanisms, and which one to use depends on the shape of the feature:
+
+- **A whole domain** — do not mount its router in `server.js`. There is no
+  route left to guard, and the domain is unreachable by construction.
+- **A feature inside a router the school still needs** — guard those specific
+  routes with `requireFeature('name')`. Online payment is this case: the
+  gateway routes sit alongside manual payments and the fee ledger, which a
+  cash-collecting school uses daily.
+
+`requireFeature` answers **404, not 403**, and sits **ahead of `protect`**. A
+feature this deployment does not run should be indistinguishable from a route
+that was never mounted — which is what a disabled domain looks like — and that
+means the same answer for everyone, signed in or not, with no database round
+trip first. 403 would imply a permission the caller might be granted.
+
+### The client
+
+`GET /api/v1/config` (public) serves the resolved feature set;
+`store/featureStore.js` fetches it once before the app renders. The client
+does **not** carry a `VITE_FEATURES` copy — same rule as the grading scale,
+two copies of one truth in two deployables will drift.
+
+A nav entry or quick action opts in with a `feature:` tag and is filtered out
+when it is off, along with any section left empty. A quick action may declare
+a `fallback` label instead of disappearing: with gateways off, "Make a
+Payment" becomes "Fee Balance", because the page is still where a parent finds
+out what they owe. `FeatureRoute` in `App.jsx` redirects a disabled page, so
+a bookmark or an old email link does not land on a screen firing 404s.
+
+**Hiding a nav item is cosmetic. The server-side guard is the actual
+control** — and it is the one under test.
+
+### Adding a feature
+
+1. A key in `FEATURES` in `src/config/features.js`, defaulting to `true`.
+2. Either skip mounting the router, or add `requireFeature` to its routes.
+3. A `feature:` tag on the client nav entry and quick action.
+4. A case in `tests/integration/features.test.js` proving the route actually
+   closes.
 
 ---
 
@@ -1036,6 +1109,10 @@ JWT_REFRESH_SECRET=          # different from JWT_SECRET
 JWT_REFRESH_EXPIRE=30d
 
 CLIENT_URL=https://yourschool.ng   # exact origin; comma-separate for several
+
+SCHOOL_PROFILE=full                # full | office-fees — see section 4a
+FEATURE_ONLINE_PAYMENTS=           # optional per-feature override
+FEATURE_STAFF_ATTENDANCE=
 
 SCHOOL_DAY_START=08:00             # staff clock-in: school-local wall clock
 SCHOOL_DAY_END=15:30

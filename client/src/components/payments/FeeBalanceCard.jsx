@@ -20,8 +20,19 @@ const naira = (value) => `₦${Number(value || 0).toLocaleString()}`;
  * around the fee's balance rather than around any one transaction — the bar
  * shows both channels side by side, and the amount box starts at the full
  * remainder but can be edited down to whatever is being paid today.
+ *
+ * `canPayOnline` is false at a school that collects fees at the office. The
+ * card is still worth showing there — it is where a parent finds out what is
+ * owed — but the channel split collapses to a single bar, because an "Online
+ * ₦0" legend on every card is noise, and the amount box gives way to a note
+ * saying where to actually pay.
  */
-export default function FeeBalanceCard({ balance, onPay, paying = false }) {
+export default function FeeBalanceCard({
+  balance,
+  onPay,
+  paying = false,
+  canPayOnline = true,
+}) {
   const fee = balance.feeStructure || {};
   const {
     totalAmount = 0,
@@ -80,9 +91,7 @@ export default function FeeBalanceCard({ balance, onPay, paying = false }) {
             <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>
               {fee.title}
             </div>
-            <div
-              style={{ fontSize: '0.8125rem', color: 'var(--clr-text-3)' }}
-            >
+            <div style={{ fontSize: '0.8125rem', color: 'var(--clr-text-3)' }}>
               {fee.term} • {fee.academicYear}
             </div>
           </div>
@@ -109,9 +118,7 @@ export default function FeeBalanceCard({ balance, onPay, paying = false }) {
             {settled ? naira(totalAmount) : naira(outstanding)}
           </div>
           <div style={{ fontSize: '0.8125rem', color: 'var(--clr-text-3)' }}>
-            {settled
-              ? 'Fully paid'
-              : `still to pay of ${naira(totalAmount)}`}
+            {settled ? 'Fully paid' : `still to pay of ${naira(totalAmount)}`}
           </div>
         </div>
 
@@ -128,15 +135,17 @@ export default function FeeBalanceCard({ balance, onPay, paying = false }) {
           role="img"
           aria-label={`${naira(paidTotal)} of ${naira(totalAmount)} paid`}
         >
+          {canPayOnline && (
+            <div
+              style={{
+                width: `${pctOf(paidOnline)}%`,
+                background: 'var(--clr-primary)',
+              }}
+            />
+          )}
           <div
             style={{
-              width: `${pctOf(paidOnline)}%`,
-              background: 'var(--clr-primary)',
-            }}
-          />
-          <div
-            style={{
-              width: `${pctOf(paidOffline)}%`,
+              width: `${pctOf(canPayOnline ? paidOffline : paidTotal)}%`,
               background: 'var(--clr-success)',
             }}
           />
@@ -152,19 +161,22 @@ export default function FeeBalanceCard({ balance, onPay, paying = false }) {
             marginBottom: 16,
           }}
         >
-          <span
-            style={{ display: 'flex', alignItems: 'center', gap: 5 }}
-            title="Paid by card or transfer through the portal"
-          >
-            <CreditCard size={12} color="var(--clr-primary)" />
-            Online {naira(paidOnline)}
-          </span>
+          {canPayOnline && (
+            <span
+              style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+              title="Paid by card or transfer through the portal"
+            >
+              <CreditCard size={12} color="var(--clr-primary)" />
+              Online {naira(paidOnline)}
+            </span>
+          )}
           <span
             style={{ display: 'flex', alignItems: 'center', gap: 5 }}
             title="Paid in cash or by bank transfer at the school office"
           >
             <Banknote size={12} color="var(--clr-success)" />
-            At school {naira(paidOffline)}
+            {canPayOnline ? 'At school ' : 'Paid '}
+            {naira(canPayOnline ? paidOffline : paidTotal)}
           </span>
           {!settled && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -231,7 +243,30 @@ export default function FeeBalanceCard({ balance, onPay, paying = false }) {
           </div>
         )}
 
-        {!settled && (
+        {!settled && !canPayOnline && (
+          <div
+            style={{
+              marginTop: 14,
+              padding: '10px 12px',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--clr-surface-2)',
+              border: '1px solid var(--clr-border)',
+              fontSize: '0.8125rem',
+              color: 'var(--clr-text-2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Banknote size={15} color="var(--clr-success)" />
+            <span>
+              <strong>{naira(outstanding)}</strong> outstanding — payable at the
+              school office. Your receipt will appear here once it is recorded.
+            </span>
+          </div>
+        )}
+
+        {!settled && canPayOnline && (
           <div style={{ marginTop: 16 }}>
             <label
               style={{
