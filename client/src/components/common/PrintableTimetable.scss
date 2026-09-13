@@ -1,0 +1,182 @@
+/**
+ * Print styling for the weekly timetable grid.
+ *
+ * The grid lives off-screen rather than hidden with `display: none` —
+ * react-to-print clones the node, and a node that was never laid out has no
+ * column widths to clone, which prints as a collapsed table.
+ */
+
+.ptt__offscreen {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 1100px; // a landscape sheet, so the clone has real widths
+  pointer-events: none;
+}
+
+.ptt {
+  font-family: var(--font-body, system-ui, sans-serif);
+  color: #111;
+  background: #fff;
+  padding: 16px;
+
+  &__header {
+    text-align: center;
+    border-bottom: 2px solid #111;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  &__subtitle {
+    margin: 4px 0 0;
+    font-size: 0.9rem;
+    color: #444;
+  }
+
+  &__grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+
+    th,
+    td {
+      border: 1px solid #999;
+      padding: 5px 6px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    thead th {
+      background: #f1f5f9;
+      text-align: center;
+      font-size: 0.7rem;
+      line-height: 1.3;
+    }
+  }
+
+  &__pnum {
+    display: block;
+    font-weight: 700;
+  }
+
+  &__ptime {
+    display: block;
+    font-weight: 400;
+    color: #555;
+    font-size: 0.65rem;
+  }
+
+  &__dayhead {
+    width: 92px;
+    background: #f1f5f9;
+    font-size: 0.75rem;
+    font-weight: 700;
+    vertical-align: middle !important;
+    text-align: left;
+  }
+
+  &__cell {
+    height: 58px;
+
+    &--free {
+      background: #fafafa;
+    }
+
+    &--break {
+      background: #f4f4f5;
+      text-align: center;
+      vertical-align: middle !important;
+    }
+
+    // A teacher's own periods, on a class timetable they are not teaching
+    // every slot of. Border rather than fill, so it survives a mono printer.
+    &--mine {
+      box-shadow: inset 0 0 0 2px #111;
+    }
+  }
+
+  &__subject {
+    display: block;
+    font-size: 0.74rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  &__meta {
+    display: block;
+    font-size: 0.64rem;
+    color: #444;
+    line-height: 1.3;
+  }
+
+  &__break {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #555;
+  }
+
+  &__free {
+    font-size: 0.7rem;
+    color: #bbb;
+  }
+
+  &__notes {
+    margin-top: 12px;
+    font-size: 0.72rem;
+    color: #333;
+  }
+
+  &__footer {
+    margin-top: 14px;
+    padding-top: 8px;
+    border-top: 1px solid #ccc;
+    font-size: 0.65rem;
+    color: #666;
+    text-align: right;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  // While printing the clone IS the page, so it must come back on-screen.
+  .ptt__offscreen {
+    position: static;
+    left: auto;
+    width: auto;
+  }
+
+  .ptt {
+    padding: 0;
+  }
+
+  // Header fills and the highlight ring are meaning, not decoration, so keep
+  // them when the browser would otherwise drop backgrounds to save ink.
+  .ptt__grid thead th,
+  .ptt__dayhead,
+  .ptt__cell--break,
+  .ptt__cell--free {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ptt__grid {
+    page-break-inside: avoid;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+}

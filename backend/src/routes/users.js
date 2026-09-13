@@ -3,7 +3,11 @@ const router = express.Router();
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const validate = require('../middleware/validate');
-const { uploadAvatar, handleUploadErrors } = require('../services/fileService');
+const {
+  uploadAvatar,
+  uploadCsv,
+  handleUploadErrors,
+} = require('../services/fileService');
 const {
   getUsers,
   getUserById,
@@ -19,6 +23,29 @@ const {
   idParam,
 } = require('../validators/academicValidators');
 const { objectIdParam, paginationQuery } = require('../validators/common');
+const {
+  previewUserImport,
+  commitUserImport,
+  downloadTemplate,
+  getImportColumns,
+} = require('../controllers/userImportController');
+
+// Bulk import. These sit above '/:id' for the same reason the student roster
+// does — 'import' must never be read as a user id.
+router.get('/import/columns', protect, authorize('Admin'), getImportColumns);
+
+router.get('/import/template', protect, authorize('Admin'), downloadTemplate);
+
+router.post(
+  '/import/preview',
+  protect,
+  authorize('Admin'),
+  uploadCsv.single('file'),
+  handleUploadErrors,
+  previewUserImport,
+);
+
+router.post('/import', protect, authorize('Admin'), commitUserImport);
 
 // Static segments first: '/students/class/:classId' must be matched before
 // anything that could treat 'students' as an :id.

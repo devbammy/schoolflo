@@ -797,6 +797,46 @@ UI: `/admin/staff-attendance` (Oversight → Staff Attendance) for the daily
 roster and per-staff summary; `/teacher/clock` (Classroom → Clock In / Out)
 for the clock itself and a teacher's own history.
 
+### Bulk account import — `/users/import` (4 routes, Admin only)
+
+| Method | Endpoint             | Does                                        |
+| ------ | -------------------- | ------------------------------------------- |
+| GET    | `/import/columns`    | Which columns each role accepts             |
+| GET    | `/import/template`   | Download a CSV template for Student/Teacher |
+| POST   | `/import/preview`    | Validate an uploaded CSV. **Writes nothing** |
+| POST   | `/import`            | Create accounts from reviewed rows          |
+
+Only `Student` and `Teacher` can be imported. Admins and Parents are created
+one at a time on purpose — there are few of them and they carry more privilege.
+
+**Required columns:** `firstname`, `lastname`, `email`.
+**Optional:** `phone` plus, for a student, `class`, `section`, `gender`,
+`dateofbirth`, `address`; for a teacher, `qualification`,
+`specialization`, `designation`. Headers are matched loosely, so
+`First Name`, `firstname` and `FIRST_NAME` all agree. Unknown columns are
+ignored rather than rejected — schools export from systems that add their own.
+
+The two-step shape is the whole point. A file of two hundred students will have
+one malformed date in it, and discovering that after half the accounts exist is
+much worse than discovering it before any of them do. Preview returns a verdict
+per row with the **line number as it appears in the admin's spreadsheet**
+(header is line 1), and the commit step **re-validates every row from scratch**
+— the preview is a courtesy to the reader, never an input the server trusts.
+
+What preview catches: missing required fields, malformed addresses, an address
+that already has an account, an address repeated **within the file** (which
+would otherwise create the first and collide on the unique index for the
+second), a class or section that does not exist, an out-of-range gender, an
+unparseable or future date of birth.
+
+Passwords are generated per account and emailed; the CSV never carries one and
+nothing stores or returns the clear text. Rows are created **one at a time**,
+because admission numbers and staff IDs come from a `pre('save')` hook that
+`insertMany` would skip. A row that fails at creation time — someone took the
+address between preview and commit — is reported without abandoning the rest.
+
+Capped at 1,000 rows and 2 MB per file.
+
 ### Search — `/search` (2 routes)
 
 | Method | Endpoint   | Returns                                          |
@@ -1045,6 +1085,29 @@ three ways it actually gets read.
 `AcademicCalendar`, `Timetable`, `Library` (Book + BorrowRecord), `CATracker`,
 `Certificate`, `ExamSchedule`, `Promotion`, `Counter`, `Task` (one per
 assignee, grouped by `batchId`), `StaffAttendance` (unique `{staff, date}`).
+
+---
+
+## 11a. Printing
+
+Report cards and timetables are printed from the browser with
+`react-to-print` — no server-side PDF for either, and no extra dependency.
+
+`PrintableTimetable` renders **its own week grid** rather than printing the
+interactive view. The on-screen `TimetableView` is built for a phone, one day
+at a time with a day switcher; what gets pinned to a noticeboard is the whole
+week at once. Columns are **period numbers, not clock times** — schools shift a
+period's timing between days, and keying the grid on times yields a column per
+variant.
+
+The button lives inside `TimetableView`, so every dashboard that renders a
+timetable gets it, and it always prints the timetable currently on screen — the
+component owns the active-timetable index, so putting the button on each page
+would mean the page guessing, and a parent printing the wrong child's week.
+
+The grid is positioned off-screen rather than `display: none`: react-to-print
+clones the node, and a node that was never laid out has no column widths to
+clone, which prints as a collapsed table.
 
 ---
 

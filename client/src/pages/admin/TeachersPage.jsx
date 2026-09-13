@@ -9,8 +9,10 @@ import {
   UserX,
   BookOpen,
   Eye,
+  Upload,
 } from 'lucide-react';
 import { userService, classService, subjectService } from '../../services/api';
+import BulkImportModal from '../../components/common/BulkImportModal';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Pagination from '../../components/common/Pagination';
@@ -51,6 +53,7 @@ export default function TeachersPage() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -179,10 +182,25 @@ export default function TeachersPage() {
           <h1 className="page-header__title">Teachers</h1>
           <p className="page-header__subtitle">{meta.total} staff members</p>
         </div>
-        <button className="btn btn--primary" onClick={openCreate}>
-          <Plus size={16} /> Add Teacher
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn--secondary"
+            onClick={() => setImporting(true)}
+          >
+            <Upload size={16} /> Import CSV
+          </button>
+          <button className="btn btn--primary" onClick={openCreate}>
+            <Plus size={16} /> Add Teacher
+          </button>
+        </div>
       </div>
+
+      <BulkImportModal
+        open={importing}
+        role="Teacher"
+        onClose={() => setImporting(false)}
+        onImported={load}
+      />
 
       <div style={{ marginBottom: 24 }}>
         <div style={{ position: 'relative', maxWidth: 400 }}>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Plus,
+  Upload,
   Edit2,
   Trash2,
   ToggleLeft,
@@ -16,6 +17,7 @@ import {
 import { userService, classService } from '../../services/api';
 import toast from 'react-hot-toast';
 import useQuickAction from '../../utils/useQuickAction';
+import BulkImportModal from '../../components/common/BulkImportModal';
 
 // How each fee-status value from the API renders in the table.
 const FEE_STATUS = {
@@ -72,6 +74,7 @@ export default function StudentsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [stats, setStats] = useState(null);
+  const [importing, setImporting] = useState(false);
 
   // The overview is school-wide, so it is fetched independently of the table's
   // search / class / page filters. `limit: 1` — we only want the counts.
@@ -221,10 +224,25 @@ export default function StudentsPage() {
             Manage enrolment, classes and student records
           </p>
         </div>
-        <button className="btn btn--primary" onClick={openCreate}>
-          <Plus size={16} /> Add Student
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn--secondary"
+            onClick={() => setImporting(true)}
+          >
+            <Upload size={16} /> Import CSV
+          </button>
+          <button className="btn btn--primary" onClick={openCreate}>
+            <Plus size={16} /> Add Student
+          </button>
+        </div>
       </div>
+
+      <BulkImportModal
+        open={importing}
+        role="Student"
+        onClose={() => setImporting(false)}
+        onImported={load}
+      />
 
       {/* Compact overview — school-wide, independent of the table filters */}
       <div className="overview-strip">

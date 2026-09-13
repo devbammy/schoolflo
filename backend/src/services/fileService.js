@@ -68,6 +68,43 @@ const uploadAssignment = makeUploader('assignment');
 const uploadSubmission = makeUploader('submission');
 
 /**
+ * The bulk-import uploader, with its own filter rather than a wider global
+ * one — a CSV has no business being accepted as an avatar.
+ *
+ * Browsers cannot agree on what a .csv is. Chrome on Windows reports
+ * `application/vnd.ms-excel` when Excel owns the file association, some
+ * send `application/octet-stream`, and a few send nothing useful at all, so
+ * the extension is the tiebreaker. The parser is the real gate: whatever
+ * arrives has to survive being read as CSV text.
+ */
+const CSV_MIME_TYPES = [
+  'text/csv',
+  'text/plain',
+  'application/csv',
+  'application/vnd.ms-excel',
+  'application/octet-stream',
+  '',
+];
+
+const uploadCsv = multer({
+  storage,
+  limits: { fileSize: 2 * MB },
+  fileFilter: (req, file, cb) => {
+    const isCsvName =
+      path.extname(file.originalname || '').toLowerCase() === '.csv';
+
+    if (isCsvName && CSV_MIME_TYPES.includes(file.mimetype || '')) {
+      return cb(null, true);
+    }
+
+    cb(
+      new Error('Upload a .csv file. Save your spreadsheet as CSV first.'),
+      false,
+    );
+  },
+});
+
+/**
  * Turn multer's terse errors into something a user can act on.
  * Mount after the routes that accept uploads; it passes anything else through.
  */
@@ -184,6 +221,7 @@ module.exports = {
   uploadAvatar,
   uploadAssignment,
   uploadSubmission,
+  uploadCsv,
   makeUploader,
   handleUploadErrors,
   resourceTypeFor,

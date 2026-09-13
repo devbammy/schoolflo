@@ -9,6 +9,8 @@ import {
   Calendar,
 } from 'lucide-react';
 
+import PrintableTimetable from './PrintableTimetable';
+
 const DAYS = [
   'Monday',
   'Tuesday',
@@ -395,6 +397,22 @@ export default function TimetableView({
             </div>
           )}
         </div>
+
+        {/* Print — always the timetable currently on screen */}
+        <PrintableTimetable
+          timetable={timetable}
+          title={
+            timetable?.class?.name ? `${timetable.class.name} Timetable` : title
+          }
+          subtitle={[
+            timetable?.section && `Section ${timetable.section}`,
+            timetable?.term,
+            timetable?.academicYear,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+          highlightTeacherId={highlightTeacherId}
+        />
 
         {/* View toggle */}
         <div style={{ display: 'flex', gap: 4 }}>

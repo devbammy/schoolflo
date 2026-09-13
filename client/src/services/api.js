@@ -180,6 +180,17 @@ export const userService = {
     });
   },
   getByClass: (classId) => api.get(`/users/students/class/${classId}`),
+
+  // Bulk import is two steps on purpose: preview writes nothing, commit does.
+  importPreview: (file, role) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('role', role);
+    return api.post('/users/import/preview', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  importCommit: (rows, role) => api.post('/users/import', { rows, role }),
 };
 
 export const classService = {

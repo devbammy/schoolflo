@@ -177,6 +177,23 @@ Using the narrow one for a roster breaks grade entry for every teacher who is
 not also a form teacher. Using the wide one for a register hands the register
 to someone who teaches one period a week.
 
+### Bulk account import
+
+- **Two passes, never one.** `previewImport` says what it would do and writes
+  nothing; `createUsers` does it. The admin approves in between.
+- **The commit re-validates from scratch.** The preview's verdict is for the
+  person reading it — the browser could send back anything, and an address free
+  at preview time may be taken by the time they press the button.
+- **One `User.create` per row, never `insertMany`.** Admission numbers and
+  staff IDs come from a `pre('save')` hook, and `insertMany` skips save
+  middleware — a bulk insert silently produces students with no admission
+  number. Same family of trap as `bulkWrite` and the Result hooks.
+- Passwords are generated server-side, emailed, and never stored or returned.
+  The CSV never carries one.
+- `utils/csv.js` is hand-written because this tree only tolerates pnpm and it
+  is not always on PATH. It handles quoted fields, embedded commas and
+  newlines, CRLF, and the UTF-8 BOM Excel prepends to every file it saves.
+
 ### Audit log
 
 - Append-only. No write/update/delete route exists, and none should.
@@ -211,6 +228,8 @@ vulnerability.
   comment saying "the attendance page used to send hard-coded values, so every
   register was filed under First Term 2024/2025" is the point.
 - Files use **CRLF** line endings. Preserve them when scripting edits.
+- **Never put a literal U+FEFF in source.** ESLint's `no-irregular-whitespace`
+  rejects it; build it with `String.fromCharCode(0xfeff)` or `\uFEFF`.
 - Prettier config is at the repo root and applies to both workspaces.
   Backend lint is ESLint 8 with `.eslintrc.json`; **the client has no lint
   config at all** — its check is `vite build`.
@@ -223,7 +242,7 @@ vulnerability.
 
 ## Testing
 
-`pnpm test` — 19 suites, 333 tests, Jest, `maxWorkers: 1`.
+`pnpm test` — 21 suites, 373 tests, Jest, `maxWorkers: 1`.
 
 Integration tests run against a **real MongoDB in memory**
 (`mongodb-memory-server`), started once in `globalSetup` with a database per
@@ -267,10 +286,14 @@ Client code has **no test runner**. The check is that it builds.
 | Teacher scope | `utils/teacherScope.js` |
 | School wall clock (staff attendance) | `utils/schoolTime.js` |
 | Search scoping per role | `searchService.GROUP_ROLES` |
+| CSV reading and writing | `utils/csv.js` |
+| Import validation and creation | `services/userImportService.js` |
 | Audit recording and redaction | `services/auditService.js` |
 | Rate-limit store | `middleware/rateLimitStore.js` |
 | Which features this school runs | `config/features.js` |
 | Client's copy of the feature set | `client/src/store/featureStore.js` |
+| Printable timetable grid | `client/src/components/common/PrintableTimetable.jsx` |
+| Bulk import UI | `client/src/components/common/BulkImportModal.jsx` |
 | Axios interceptors + auth bridge | `client/src/services/api.js` |
 | Persisted auth state | `client/src/store/authStore.js` |
 
