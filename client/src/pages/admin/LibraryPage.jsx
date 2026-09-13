@@ -331,7 +331,7 @@ export default function LibraryPage() {
             Book inventory, borrowing and return management
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
             className="btn btn--secondary"
             onClick={() => setIssueModal(true)}
@@ -378,6 +378,10 @@ export default function LibraryPage() {
       )}
 
       {/* ── Tab bar ────────────────────────────────────────────────── */}
+      {/* Scrolls sideways rather than wrapping. Four tabs came to 389px and
+          pushed the whole page off a 320px screen; wrapping them onto a
+          second line under one shared underline reads as broken, so the bar
+          itself scrolls — the usual mobile tab pattern. */}
       <div
         style={{
           display: 'flex',
@@ -385,6 +389,9 @@ export default function LibraryPage() {
           marginBottom: 20,
           borderBottom: '1px solid var(--clr-border)',
           paddingBottom: 0,
+          overflowX: 'auto',
+          maxWidth: '100%',
+          WebkitOverflowScrolling: 'touch',
         }}
       >
         {TABS.map((t) => (
@@ -395,6 +402,9 @@ export default function LibraryPage() {
               padding: '8px 18px',
               background: 'none',
               border: 'none',
+              // Keeps each tab on one line inside the scrolling bar.
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
               borderBottom: `2.5px solid ${tab === t ? 'var(--clr-primary)' : 'transparent'}`,
               color: tab === t ? 'var(--clr-primary)' : 'var(--clr-text-3)',
               fontFamily: 'var(--font-body)',
@@ -1059,7 +1069,7 @@ export default function LibraryPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(240px, 100%), 1fr))',
             gap: 16,
           }}
         >

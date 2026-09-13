@@ -403,7 +403,10 @@ export default function DashboardLayout() {
 
       {/* Mobile Sidebar Overlay */}
       {mobileOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 150 }}>
+        <div
+          className="mobile-drawer"
+          style={{ position: 'fixed', inset: 0, zIndex: 150 }}
+        >
           <div
             style={{
               position: 'absolute',
@@ -442,9 +445,9 @@ export default function DashboardLayout() {
               <Menu size={20} />
             </button>
             <button
-              className="btn btn--ghost btn--icon"
-              style={{ display: 'none' }}
+              className="btn btn--ghost btn--icon only-mobile"
               onClick={() => setMobileOpen(true)}
+              aria-label="Open navigation"
             >
               <Menu size={20} />
             </button>

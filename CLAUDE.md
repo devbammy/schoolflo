@@ -283,6 +283,45 @@ vulnerability.
 
 ---
 
+## Responsive rules — easy to undo by accident
+
+The portal is used on phones by parents and students, so a page that scrolls
+sideways is a real failure: the button they need sits off the right edge.
+Measured at 320 / 375 / 768px across all four roles, 34 page/width
+combinations scrolled before this was fixed. Five rules keep it at zero.
+
+1. **`.main-content` carries `min-width: 0`.** It is a flex item, and a flex
+   item defaults to `min-width: auto` — "never shrink below my widest child".
+   One wide table therefore stretched the whole page; at 320px the students
+   list ran 541px over. This single property accounted for 27 of the 34.
+   **No `overflow-x` on a descendant can fix that** — the ancestor has already
+   grown.
+
+2. **Grid tracks use `minmax(min(280px, 100%), 1fr)`**, never a bare
+   `minmax(280px, 1fr)`. The `min(…, 100%)` lets a track collapse below its
+   preferred width instead of forcing the container wide.
+
+3. **Any flex row of controls needs `flex-wrap: wrap`.** Filter bars were the
+   second biggest cause — `.controls-bar` and `.selection-bar__filters` ran to
+   535px on a 320px screen.
+
+4. **Never hide something with an inline `style={{ display: 'none' }}`.** An
+   inline style cannot be overridden by a media query. The mobile menu button
+   was hidden that way while the desktop one was hidden by `.hidden-mobile`,
+   so on a phone there was **no way to open the navigation at all**. Use
+   `.hidden-mobile` / `.only-mobile`.
+
+5. **Form controls are 16px on phones.** Below that, iOS Safari zooms the page
+   on focus and does not zoom back out. That is Safari's threshold, not a
+   design choice — and note `.global-search__input` needs its own override,
+   because a class selector beats the bare `input` rule on source order.
+
+A tab strip that will not fit **scrolls** (`overflow-x: auto` plus
+`flex-shrink: 0` on the tabs) rather than wrapping — tabs on two lines under
+one shared underline read as broken.
+
+---
+
 ## Conventions
 
 - **Comments explain *why*, and usually name the bug that made the code look

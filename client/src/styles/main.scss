@@ -176,6 +176,17 @@ p {
   min-height: 100vh;
   transition: margin-left var(--transition-base);
 
+  // A flex item defaults to min-width: auto, which means "never shrink below
+  // my widest content". A wide table therefore stretched this container past
+  // the viewport and the whole page scrolled sideways — on a 320px phone the
+  // students page ran 541px over. No overflow-x on a descendant can fix that,
+  // because it is the ancestor that has grown.
+  //
+  // min-width: 0 lets it shrink to its column, so .table-wrapper's own
+  // overflow-x finally has a boundary to scroll inside.
+  min-width: 0;
+  max-width: 100%;
+
   &.sidebar-collapsed {
     margin-left: var(--sidebar-collapsed);
   }
@@ -194,6 +205,9 @@ p {
   padding: var(--space-8);
   max-width: var(--content-max);
   margin: 0 auto;
+  // Never wider than the column it sits in, whatever --content-max says.
+  max-width: min(var(--content-max), 100%);
+  min-width: 0;
 
   @media (max-width: 768px) {
     padding: var(--space-4);
@@ -441,7 +455,18 @@ p {
   overflow-x: auto;
   border-radius: var(--radius-lg);
   border: 1px solid var(--clr-border);
+
+  // The wrapper scrolls; it must not itself be stretched by the table inside
+  // it, or the scroll never engages and the page moves instead.
+  max-width: 100%;
+  // Momentum scrolling on iOS, and a hint that there is more to the right.
+  -webkit-overflow-scrolling: touch;
 }
+
+// Grids of cards are written as
+// `repeat(auto-fill, minmax(min(280px, 100%), 1fr))`. The `min(…, 100%)` is
+// the whole trick: a track can collapse below its preferred width instead of
+// forcing the container wider than the screen.
 
 .table {
   width: 100%;
@@ -700,7 +725,7 @@ p {
 // ─── Dashboard Grid ───────────────────────────────────────────────────────────
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: var(--space-5);
   margin-bottom: var(--space-8);
 }
@@ -1009,6 +1034,18 @@ p {
   flex-wrap: wrap;
   gap: var(--space-4);
 
+  // The header itself wraps, but a button group inside it is a flex box of
+  // its own and defaults to min-width: auto — so two buttons side by side
+  // stayed 323px wide inside a 288px column and pushed the page sideways.
+  > * {
+    min-width: 0;
+  }
+
+  // Groups of actions wrap onto their own line rather than overflowing.
+  > div {
+    flex-wrap: wrap;
+  }
+
   &__title {
     font-size: 1.5rem;
     font-weight: 700;
@@ -1063,7 +1100,7 @@ p {
 
   .schedule-dates {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
     gap: var(--space-3);
     padding: var(--space-4) 0;
     border-top: 1px solid var(--clr-border);
@@ -1203,6 +1240,8 @@ select.form-control {
 .student-exam-container {
   .controls-bar {
     display: flex;
+    // Term buttons plus a year select ran to 560px on a 320px screen.
+    flex-wrap: wrap;
     justify-content: flex-start;
     align-items: center;
     gap: var(--space-3);
@@ -1362,7 +1401,7 @@ select.form-control {
 
     .session-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
       gap: var(--space-4);
     }
 
@@ -1406,6 +1445,8 @@ select.form-control {
 .parent-schedule-container {
   .selection-bar {
     display: flex;
+    // A child picker and two selects came to 535px unwrapped.
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     gap: var(--space-4);
@@ -1418,6 +1459,8 @@ select.form-control {
 
     &__filters {
       display: flex;
+      flex-wrap: wrap;
+      min-width: 0;
       gap: var(--space-2);
       align-items: center;
     }
@@ -1511,7 +1554,7 @@ select.form-control {
 
 .promotions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 1.5rem;
 }
 
@@ -1788,7 +1831,7 @@ select.form-control {
   // Grid Layout
   .certificates-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
     gap: var(--space-6);
   }
 
@@ -2007,7 +2050,7 @@ select.form-control {
   // The Grid
   .certificates-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(350px, 100%), 1fr));
     gap: var(--space-6);
   }
 
@@ -2180,7 +2223,7 @@ select.form-control {
   // Reuse and tweak the grid from the student page
   .certificates-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
     gap: var(--space-6);
   }
 
@@ -2274,7 +2317,7 @@ select.form-control {
   // Promotion Cards Grid
   .promotions-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(400px, 100%), 1fr));
     gap: var(--space-6);
   }
 
@@ -2636,7 +2679,7 @@ select.form-control {
 .summary-layout {
   .stats-header {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
     gap: var(--space-4);
     margin-bottom: var(--space-8);
   }
@@ -2718,6 +2761,60 @@ select.form-control {
 .hidden-mobile {
   @media (max-width: 768px) {
     display: none !important;
+  }
+}
+
+// The counterpart. The mobile menu button used to carry an inline
+// `display: none`, and an inline style cannot be overridden by a media query —
+// so on a phone the desktop toggle was hidden by .hidden-mobile and the mobile
+// toggle was hidden by its own style attribute. There was no way to open the
+// navigation at all.
+.only-mobile {
+  display: none;
+
+  @media (max-width: 768px) {
+    display: inline-flex;
+  }
+}
+
+// ─── Touch ergonomics ─────────────────────────────────────────────────────────
+//
+// Two things phones need that a desktop never shows you.
+@media (max-width: 768px) {
+  // 1. iOS Safari zooms the whole page when a field smaller than 16px takes
+  //    focus, and it does not zoom back out. Every text control goes to 16px
+  //    on a phone regardless of what it uses on a desktop. This is the one
+  //    place a magic number is the correct answer — it is Safari's threshold,
+  //    not a design choice.
+  input,
+  select,
+  textarea,
+  .form-control,
+  // Named explicitly: a class selector outranks a bare element one, so
+  // .global-search__input kept its 0.9rem and stayed a zoom trigger.
+  .global-search__input {
+    font-size: 16px;
+  }
+
+  // 2. A 18px-tall search box is not reliably hittable with a thumb. 40px is
+  //    comfortable without being large enough to unbalance the topbar.
+  .form-control,
+  .global-search__input {
+    min-height: 40px;
+  }
+
+  // The field wrapper is a fixed 38px on desktop, which would clip the taller
+  // input inside it.
+  .global-search__field {
+    height: 44px;
+  }
+
+  .btn {
+    min-height: 40px;
+  }
+
+  .btn--icon {
+    min-width: 40px;
   }
 }
 .hidden-tablet {
@@ -3095,7 +3192,7 @@ select.form-control {
 // and on the dashboard for the roster. Deliberately lighter than .pulse-tile.
 .overview-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(148px, 100%), 1fr));
   gap: var(--space-3);
   margin-bottom: var(--space-6);
 }
@@ -3154,7 +3251,7 @@ select.form-control {
 // denominator, and four of them have to sit on one line without crowding.
 .pulse-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
   gap: var(--space-4);
   margin-bottom: var(--space-8);
 }
@@ -3375,6 +3472,12 @@ select.form-control {
     font-family: var(--font-body);
     font-size: 0.9rem;
     color: var(--clr-text-1);
+
+    // iOS Safari zooms the page when a field under 16px takes focus, and
+    // never zooms back out. 16px is Safari's threshold, not a design choice.
+    @media (max-width: 768px) {
+      font-size: 16px;
+    }
 
     &::placeholder {
       color: var(--clr-text-3);

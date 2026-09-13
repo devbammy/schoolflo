@@ -180,7 +180,7 @@ export default function GradesPage() {
           className="card__body"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(180px, 100%), 1fr))',
             gap: 16,
           }}
         >

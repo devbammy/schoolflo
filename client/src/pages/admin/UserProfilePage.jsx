@@ -95,7 +95,7 @@ function InfoGrid({ items }) {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
         gap: 16,
       }}
     >
@@ -129,7 +129,7 @@ function StatTiles({ tiles }) {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(120px, 100%), 1fr))',
         gap: 12,
       }}
     >

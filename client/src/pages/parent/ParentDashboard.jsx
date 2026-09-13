@@ -93,7 +93,7 @@ export default function ParentDashboard() {
                   style={{
                     display: 'grid',
                     gridTemplateColumns:
-                      'repeat(auto-fill, minmax(160px, 1fr))',
+                      'repeat(auto-fill, minmax(min(160px, 100%), 1fr))',
                     gap: 16,
                     marginBottom: 20,
                   }}
