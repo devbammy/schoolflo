@@ -142,6 +142,7 @@ const RoleRedirect = () => {
 export default function App() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const loadFeatures = useFeatureStore((s) => s.load);
+  const refreshFeatures = useFeatureStore((s) => s.refresh);
   const featuresLoaded = useFeatureStore((s) => s.loaded);
 
   useEffect(() => {
@@ -156,6 +157,24 @@ export default function App() {
   useEffect(() => {
     loadFeatures();
   }, [loadFeatures]);
+
+  // A teacher leaves the portal open all day. If the school's configuration
+  // changes in that time, the tab would otherwise keep offering links to
+  // routes the server has stopped serving until someone thought to reload.
+  // Coming back to the tab is the cheapest honest moment to re-read.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshFeatures();
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [refreshFeatures]);
 
   if (!featuresLoaded) return <PageLoader />;
 

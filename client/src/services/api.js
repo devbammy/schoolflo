@@ -28,6 +28,39 @@ export const registerAuthBridge = (bridge) => {
   authBridge = { ...authBridge, ...bridge };
 };
 
+/**
+ * The feature store registers itself here, for the same reason the auth store
+ * does: it imports api, so api cannot import it back.
+ */
+let featureBridge = { onStaleFeature: () => {} };
+
+export const registerFeatureBridge = (bridge) => {
+  featureBridge = { ...featureBridge, ...bridge };
+};
+
+// Two ways the server says "this school does not run that": the catch-all 404
+// for a router that was never mounted, and requireFeature's own message for a
+// route guarded inside a router that was.
+const UNMOUNTED_ROUTE = /^Route .+ not found$/i;
+const FEATURE_DISABLED = 'This feature is not enabled for this school.';
+
+/**
+ * A 404 for something the client still has a link to means our copy of the
+ * feature set has gone stale — the flags changed while this tab was open.
+ * Re-read them, and replace the message before it reaches a page, because
+ * every page surfaces `err.response.data.message` directly and
+ * "Route /api/v1/staff-attendance/today not found" tells a teacher nothing.
+ */
+const handlePossibleStaleFeature = (error) => {
+  if (error.response?.status !== 404) return;
+
+  const message = error.response?.data?.message || '';
+  if (message !== FEATURE_DISABLED && !UNMOUNTED_ROUTE.test(message)) return;
+
+  featureBridge.onStaleFeature();
+  error.response.data.message = "This part of the portal isn't available.";
+};
+
 // Request interceptor — attach token
 api.interceptors.request.use(
   (config) => {
@@ -55,6 +88,8 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    handlePossibleStaleFeature(error);
 
     const isAuthCall =
       originalRequest?.url?.includes('/auth/login') ||
