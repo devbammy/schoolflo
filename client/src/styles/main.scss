@@ -347,6 +347,12 @@ p {
   transition: all var(--transition-fast);
   white-space: nowrap;
 
+  // A button is never the thing that should give way when a row runs out of
+  // room. As a flex item it would otherwise shrink, and the topbar menu
+  // button was squeezed to 0px wide by the user's name beside it — present,
+  // focusable and clickable, but invisible.
+  flex-shrink: 0;
+
   &:disabled {
     opacity: 0.55;
     cursor: not-allowed;
@@ -399,6 +405,10 @@ p {
   }
   &--icon {
     padding: 10px;
+  }
+
+  svg {
+    flex-shrink: 0;
   }
   &--full {
     width: 100%;

@@ -474,12 +474,18 @@ export default function DashboardLayout() {
             >
               {user?.role}
             </span>
-            <div style={{ textAlign: 'right' }}>
+            {/* Desktop only. On a phone this name competed with the menu
+                button for the same row and won, squeezing the button to zero
+                width — the icon was still "there" and still clickable, just
+                0px wide, which read as an invisible button. The avatar and
+                role badge already identify who is signed in. */}
+            <div className="hidden-mobile" style={{ textAlign: 'right' }}>
               <div
                 style={{
                   fontSize: '0.875rem',
                   fontWeight: 600,
                   color: 'var(--clr-text-1)',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {user?.firstName} {user?.lastName}

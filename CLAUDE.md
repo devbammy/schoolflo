@@ -316,6 +316,18 @@ combinations scrolled before this was fixed. Five rules keep it at zero.
    design choice — and note `.global-search__input` needs its own override,
    because a class selector beats the bare `input` rule on source order.
 
+6. **`.btn` carries `flex-shrink: 0`, and so does an `svg` inside one.** A
+   button is never the thing that should give way when a row runs out of room.
+   The topbar menu button was squeezed to **0px wide** by the user's name
+   sitting beside it — the button was still there, still focusable, still
+   clickable, just invisible, which is a genuinely confusing way to fail.
+   The name is `.hidden-mobile` now; the `flex-shrink` is what stops it
+   happening again with something else.
+
+   Note the symptom, because it misleads: the *icon* measured 0px wide while
+   its computed `color` was correct, so it reads as a colour bug. It was a
+   layout bug one level up.
+
 A tab strip that will not fit **scrolls** (`overflow-x: auto` plus
 `flex-shrink: 0` on the tabs) rather than wrapping — tabs on two lines under
 one shared underline read as broken.
