@@ -203,6 +203,19 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
     </>
   );
 
+  // Only worth a column when the file actually names parents.
+  const showsParents = Boolean(preview?.rows?.some((r) => r.parent));
+
+  // Distinct new parent addresses, so two siblings count once — which is what
+  // the importer will actually do.
+  const newParents = preview
+    ? new Set(
+        preview.rows
+          .filter((r) => r.valid && r.parent && !r.parent.exists)
+          .map((r) => r.parent.email),
+      ).size
+    : 0;
+
   // ── Step 2: what the server would do ─────────────────────────────────────
   const reviewStep = preview && (
     <>
@@ -245,6 +258,7 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
               <th style={{ width: 56 }}>Row</th>
               <th>Name</th>
               <th>Email</th>
+              {showsParents && <th>Parent</th>}
               <th>Status</th>
             </tr>
           </thead>
@@ -264,6 +278,35 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
                 >
                   {row.user.email || '—'}
                 </td>
+                {showsParents && (
+                  <td
+                    style={{
+                      fontSize: '0.8125rem',
+                      color: 'var(--clr-text-2)',
+                      wordBreak: 'break-all',
+                    }}
+                  >
+                    {row.parent ? (
+                      <>
+                        <span style={{ display: 'block' }}>
+                          {row.parent.email}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            color: 'var(--clr-text-3)',
+                          }}
+                        >
+                          {row.parent.exists
+                            ? 'link to existing'
+                            : 'new account'}
+                        </span>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                )}
                 <td>
                   {row.valid ? (
                     <Pill tone="success">Ready</Pill>
@@ -292,8 +335,10 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
           marginBottom: 0,
         }}
       >
-        Each new account gets its own password, sent to them by email. Rejected
-        rows are skipped — nothing about them is created.
+        Each new account gets its own password, sent to them by email.
+        {newParents > 0 &&
+          ` ${newParents} parent account${newParents === 1 ? '' : 's'} will also be created — siblings sharing an address get one account.`}{' '}
+        Rejected rows are skipped — nothing about them is created.
       </p>
     </>
   );
@@ -326,6 +371,10 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
             }}
           >
             Each one has been emailed their password.
+            {result.summary.parentsCreated > 0 &&
+              ` ${result.summary.parentsCreated} parent account${
+                result.summary.parentsCreated === 1 ? '' : 's'
+              } created and linked.`}
           </div>
         </div>
       </div>

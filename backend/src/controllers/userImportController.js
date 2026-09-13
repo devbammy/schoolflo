@@ -46,23 +46,28 @@ const commitUserImport = async (req, res) => {
   // Everything is validated again from the raw row. The preview's verdict was
   // for the admin to read, not for the server to trust — the browser could
   // send back anything, and an address free five minutes ago may be taken now.
-  const { created, failed } = await createUsers(rows, role);
+  const { created, failed, parentsCreated } = await createUsers(rows, role);
 
-  created.forEach((user) => {
+  const welcome = (person, personRole) =>
     enqueueEmail({
-      to: user.email,
+      to: person.email,
       subject: 'Your account is ready',
       html: emailTemplates.welcome({
-        firstName: user.firstName,
-        email: user.email,
-        password: user.password,
-        role,
+        firstName: person.firstName,
+        email: person.email,
+        password: person.password,
+        role: personRole,
         loginUrl: `${process.env.CLIENT_URL}/login`,
       }),
     }).catch((err) =>
-      console.error(`Welcome email failed for ${user.email}: ${err.message}`),
+      console.error(`Welcome email failed for ${person.email}: ${err.message}`),
     );
-  });
+
+  created.forEach((user) => welcome(user, role));
+
+  // Only parents this import actually created. One that already existed keeps
+  // the password it has — resending would be a password nobody asked to change.
+  (parentsCreated || []).forEach((parent) => welcome(parent, 'Parent'));
 
   await audit.record(req, {
     action: 'user.import',
@@ -73,19 +78,24 @@ const commitUserImport = async (req, res) => {
       requested: rows.length,
       created: created.length,
       failed: failed.length,
+      parentsCreated: (parentsCreated || []).length,
       // The addresses, so the log answers "who did this import create".
       // Passwords are never written anywhere but the email.
       emails: created.map((u) => u.email),
+      parentEmails: (parentsCreated || []).map((p) => p.email),
     },
   });
 
   return sendSuccess(res, 201, `Created ${created.length} of ${rows.length}`, {
     created: created.map(({ password, ...safe }) => safe),
     failed,
+    parentsCreated: (parentsCreated || []).map(({ password, ...safe }) => safe),
     summary: {
       requested: rows.length,
       created: created.length,
       failed: failed.length,
+      parentsCreated: (parentsCreated || []).length,
+      parentsLinked: created.filter((u) => u.parentLinked).length,
     },
   });
 };

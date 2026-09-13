@@ -829,6 +829,41 @@ would otherwise create the first and collide on the unique index for the
 second), a class or section that does not exist, an out-of-range gender, an
 unparseable or future date of birth.
 
+### Parents, on the student row
+
+A student row may also carry `parentfirstname`, `parentlastname`,
+`parentemail`, `parentphone` and `parentrelationship`. Filling **any** of
+them makes `parentemail` required — an account cannot exist without somewhere
+to send its password.
+
+There is no separate Parents CSV, deliberately. The only stable way for one to
+name its children is the admission number, which the import *generates*, so it
+would force a round trip: import students, read back their numbers, build a
+second file. Parent columns on the student row match the spreadsheet a school
+already keeps and need no round trip.
+
+The rule that makes this work is the inverse of the student rule: an existing
+**student** address is an error, while an existing **parent** address means
+*reuse and link*. That is what puts two siblings under one parent account —
+repeat the same `parentemail` on both rows. An address belonging to any other
+role is refused outright: one account, one role, so a teacher's address cannot
+quietly become a parent as well.
+
+Names are only required for a parent that does not exist yet; linking to one
+who does needs nothing but the address.
+
+The link is written **both ways** — `parentProfile.children` and
+`studentProfile.parentId` — because the portal reads the relationship from
+both ends. The parent is resolved **after** the student is created, and a
+failure there is reported against the row without undoing the student: a child
+enrolled with no parent linked is a gap an admin can close on the Parents page,
+whereas a child who failed to enrol because their mother's address was
+malformed is not.
+
+Only parents the import actually created are emailed a password. One that
+already existed keeps the password they have — resending would be a password
+change nobody asked for.
+
 Passwords are generated per account and emailed; the CSV never carries one and
 nothing stores or returns the clear text. Rows are created **one at a time**,
 because admission numbers and staff IDs come from a `pre('save')` hook that

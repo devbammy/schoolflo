@@ -25,7 +25,21 @@ const IMPORTABLE_ROLES = ['Student', 'Teacher'];
 const COLUMNS = {
   Student: {
     required: ['firstname', 'lastname', 'email'],
-    optional: ['phone', 'class', 'section', 'gender', 'dateofbirth', 'address'],
+    optional: [
+      'phone',
+      'class',
+      'section',
+      'gender',
+      'dateofbirth',
+      'address',
+      // A parent is optional, but naming one commits you to an address: an
+      // account cannot exist without somewhere to send its password.
+      'parentfirstname',
+      'parentlastname',
+      'parentemail',
+      'parentphone',
+      'parentrelationship',
+    ],
   },
   Teacher: {
     required: ['firstname', 'lastname', 'email'],
@@ -34,6 +48,17 @@ const COLUMNS = {
 };
 
 const GENDERS = ['Male', 'Female', 'Other'];
+const RELATIONSHIPS = ['Father', 'Mother', 'Guardian', 'Other'];
+
+// The parent columns on a student row. Any one of them means "this row names
+// a parent", which is what makes the email mandatory rather than optional.
+const PARENT_FIELDS = [
+  'parentfirstname',
+  'parentlastname',
+  'parentemail',
+  'parentphone',
+  'parentrelationship',
+];
 
 // Deliberately loose. The authority on whether an address works is whether the
 // welcome email arrives; a clever regex here only rejects valid addresses.
@@ -108,6 +133,25 @@ const validateRows = async (rows, role) => {
     ).map((u) => String(u.email).toLowerCase()),
   );
 
+  // Parent addresses are looked up too, but an existing one is not an error —
+  // it is the whole mechanism by which two siblings end up under one parent.
+  // What matters is the role behind the address.
+  const parentEmails = rows
+    .map((r) =>
+      String(r.parentemail || '')
+        .trim()
+        .toLowerCase(),
+    )
+    .filter(Boolean);
+
+  const existingByEmail = new Map(
+    (
+      await User.find({ email: { $in: parentEmails } })
+        .select('email role')
+        .lean()
+    ).map((u) => [String(u.email).toLowerCase(), u]),
+  );
+
   // A file that lists the same address twice would otherwise pass validation
   // and then fail half way through creation on the unique index.
   const seen = new Map();
@@ -176,6 +220,74 @@ const validateRows = async (rows, role) => {
       if (address) profile.address = address;
     }
 
+    // ── The parent named on this row, if any ─────────────────────────────
+    let parent = null;
+
+    if (role === 'Student') {
+      const named = PARENT_FIELDS.some((field) =>
+        String(row[field] || '').trim(),
+      );
+
+      if (named) {
+        const parentEmail = String(row.parentemail || '')
+          .trim()
+          .toLowerCase();
+        const parentFirst = String(row.parentfirstname || '').trim();
+        const parentLast = String(row.parentlastname || '').trim();
+
+        if (!parentEmail) {
+          errors.push('parentEmail is required when a parent is named');
+        } else if (!EMAIL_SHAPE.test(parentEmail)) {
+          errors.push('parentEmail is not a valid address');
+        } else if (parentEmail === email) {
+          errors.push('parentEmail cannot be the same as the student email');
+        } else if (seen.get(parentEmail)) {
+          // The address is also a student in this file, so it cannot be both.
+          errors.push('parentEmail is used as a student email in this file');
+        }
+
+        const found = existingByEmail.get(parentEmail);
+
+        if (found && found.role !== 'Parent') {
+          // One account, one role. An address already spent on a teacher
+          // cannot quietly become a parent as well.
+          errors.push(`parentEmail already belongs to a ${found.role} account`);
+        }
+
+        // Names are only needed when the account does not exist yet; linking
+        // to an existing parent needs nothing but the address.
+        if (!found && parentEmail && EMAIL_SHAPE.test(parentEmail)) {
+          if (!parentFirst) {
+            errors.push('parentFirstName is required for a new parent');
+          }
+          if (!parentLast) {
+            errors.push('parentLastName is required for a new parent');
+          }
+        }
+
+        const relationship = String(row.parentrelationship || '').trim();
+        let normalizedRelationship;
+        if (relationship) {
+          normalizedRelationship = titleCase(relationship);
+          if (!RELATIONSHIPS.includes(normalizedRelationship)) {
+            errors.push(
+              `parentRelationship must be one of ${RELATIONSHIPS.join(', ')}`,
+            );
+            normalizedRelationship = undefined;
+          }
+        }
+
+        parent = {
+          email: parentEmail,
+          firstName: parentFirst,
+          lastName: parentLast,
+          phone: String(row.parentphone || '').trim() || undefined,
+          relationship: normalizedRelationship,
+          exists: Boolean(found),
+        };
+      }
+    }
+
     if (role === 'Teacher') {
       ['qualification', 'specialization', 'designation'].forEach((field) => {
         const value = String(row[field] || '').trim();
@@ -199,6 +311,7 @@ const validateRows = async (rows, role) => {
         role,
         profile,
       },
+      parent,
     };
   });
 };
@@ -239,6 +352,75 @@ const previewImport = async (buffer, role) => {
 };
 
 /**
+ * Find the parent account for a row, creating it if this is the first time we
+ * have seen the address.
+ *
+ * `cache` spans the whole import: two siblings naming the same parent must end
+ * up under one account, and the second row would otherwise try to create an
+ * address the first row just took.
+ *
+ * Returns `{ parent, createdNow }` — the caller needs to know whether to send
+ * a welcome email, because an existing parent already has a password.
+ */
+const resolveParent = async (details, cache) => {
+  const key = details.email;
+
+  if (cache.has(key)) return { parent: cache.get(key), createdNow: false };
+
+  const existing = await User.findOne({ email: key });
+  if (existing) {
+    cache.set(key, existing);
+    return { parent: existing, createdNow: false };
+  }
+
+  const password = generatePassword();
+
+  const parent = await User.create({
+    firstName: details.firstName,
+    lastName: details.lastName,
+    email: key,
+    password,
+    phone: details.phone,
+    role: 'Parent',
+    parentProfile: {
+      relationship: details.relationship,
+      children: [],
+    },
+  });
+
+  parent._generatedPassword = password;
+  cache.set(key, parent);
+
+  return { parent, createdNow: true };
+};
+
+/**
+ * Link a child to a parent in both directions.
+ *
+ * The portal reads the relationship from both ends — the parent's dashboard
+ * walks `parentProfile.children`, while a student's own record carries
+ * `studentProfile.parentId` — so writing only one of them produces an account
+ * that works from one side and not the other.
+ */
+const linkChildToParent = async (parent, student) => {
+  const alreadyLinked = (parent.parentProfile?.children || []).some(
+    (id) => String(id) === String(student._id),
+  );
+
+  if (!alreadyLinked) {
+    if (!parent.parentProfile) parent.parentProfile = { children: [] };
+    if (!Array.isArray(parent.parentProfile.children)) {
+      parent.parentProfile.children = [];
+    }
+    parent.parentProfile.children.push(student._id);
+    await parent.save();
+  }
+
+  student.studentProfile.parentId = parent._id;
+  await student.save();
+};
+
+/**
  * Create the accounts for rows that are still valid at this moment.
  *
  * One `User.create` per row rather than `insertMany`: admission numbers and
@@ -251,6 +433,8 @@ const createUsers = async (rows, role) => {
 
   const created = [];
   const failed = [];
+  const parentsCreated = [];
+  const parentCache = new Map();
 
   for (const entry of validated) {
     if (!entry.valid) {
@@ -280,7 +464,7 @@ const createUsers = async (rows, role) => {
         teacherProfile: role === 'Teacher' ? profile : undefined,
       });
 
-      created.push({
+      const record = {
         line: entry.line,
         _id: user._id,
         firstName,
@@ -289,7 +473,40 @@ const createUsers = async (rows, role) => {
         password, // handed to the caller for the welcome email, never stored
         admissionNumber: user.studentProfile?.admissionNumber,
         staffId: user.teacherProfile?.staffId,
-      });
+      };
+
+      // The parent is attached after the student exists, and its failure is
+      // reported without undoing the student. An enrolled child with no parent
+      // linked is a gap an admin can close on the Parents page; a child who
+      // failed to enrol because their father's address was malformed is not.
+      if (entry.parent) {
+        try {
+          const { parent, createdNow } = await resolveParent(
+            entry.parent,
+            parentCache,
+          );
+
+          await linkChildToParent(parent, user);
+
+          record.parentEmail = parent.email;
+          record.parentLinked = true;
+
+          if (createdNow) {
+            parentsCreated.push({
+              _id: parent._id,
+              firstName: parent.firstName,
+              lastName: parent.lastName,
+              email: parent.email,
+              password: parent._generatedPassword,
+            });
+          }
+        } catch (err) {
+          record.parentLinked = false;
+          record.parentError = err.message;
+        }
+      }
+
+      created.push(record);
     } catch (err) {
       // A unique-index collision here means someone took the address between
       // the preview and now. One row failing must not abandon the rest.
@@ -305,7 +522,7 @@ const createUsers = async (rows, role) => {
     }
   }
 
-  return { created, failed };
+  return { created, failed, parentsCreated };
 };
 
 /** The CSV an admin downloads to see what the importer expects. */
@@ -314,6 +531,9 @@ const buildTemplate = (role) => {
   const headers = [...required, ...optional];
 
   const examples = {
+    // Two rows on purpose: siblings naming the same parent email is how one
+    // parent account ends up linked to both children, and the template is the
+    // only place an admin learns that.
     Student: [
       [
         'Ada',
@@ -325,6 +545,27 @@ const buildTemplate = (role) => {
         'Female',
         '2013-04-12',
         '12 Broad Street, Lagos',
+        'Chinwe',
+        'Obi',
+        'chinwe.obi@example.com',
+        '08030000009',
+        'Mother',
+      ],
+      [
+        'Emeka',
+        'Obi',
+        'emeka.obi@example.com',
+        '',
+        'JSS 1',
+        'B',
+        'Male',
+        '2011-09-30',
+        '12 Broad Street, Lagos',
+        'Chinwe',
+        'Obi',
+        'chinwe.obi@example.com',
+        '08030000009',
+        'Mother',
       ],
     ],
     Teacher: [

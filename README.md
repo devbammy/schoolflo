@@ -17,7 +17,9 @@ cd backend && cp .env.example .env && pnpm install && pnpm dev
 cd client && pnpm install && pnpm dev
 ```
 
-See **[DOCUMENTATION.md](DOCUMENTATION.md)** for the full technical reference.
+See **[DOCUMENTATION.md](DOCUMENTATION.md)** for the full technical reference,
+and **[CSV_IMPORT.md](CSV_IMPORT.md)** for the admin's guide to bulk-importing
+student and teacher accounts from a spreadsheet.
 
 ## Stack
 

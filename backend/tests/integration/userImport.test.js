@@ -328,7 +328,237 @@ describe('buildTemplate', () => {
     );
 
     expect(result.error).toBeNull();
-    expect(result.summary.total).toBe(1);
+    expect(result.summary.valid).toBe(result.summary.total);
+  });
+
+  it('demonstrates siblings sharing one parent', async () => {
+    // The template is the only place an admin learns that repeating a parent
+    // email links one parent to both children rather than erroring.
+    const result = await previewImport(
+      Buffer.from(buildTemplate('Student')),
+      'Student',
+    );
+
+    const parentEmails = result.rows.map((r) => r.parent?.email);
+    expect(parentEmails).toHaveLength(2);
+    expect(new Set(parentEmails).size).toBe(1);
+  });
+});
+
+describe('parent columns', () => {
+  const withParent = (rows) =>
+    csv([
+      'firstname,lastname,email,parentfirstname,parentlastname,parentemail,parentrelationship',
+      ...rows,
+    ]);
+
+  it('treats a row with no parent columns as before', async () => {
+    const result = await previewImport(
+      csv(['firstname,lastname,email', 'Ada,Obi,ada@school.ng']),
+      'Student',
+    );
+
+    expect(result.rows[0].valid).toBe(true);
+    expect(result.rows[0].parent).toBeNull();
+  });
+
+  it('requires an address once any parent column is filled', async () => {
+    const result = await previewImport(
+      withParent(['Ada,Obi,ada@school.ng,Chinwe,Obi,,Mother']),
+      'Student',
+    );
+
+    expect(result.rows[0].errors).toContain(
+      'parentEmail is required when a parent is named',
+    );
+  });
+
+  it('requires a name for a parent that does not exist yet', async () => {
+    const result = await previewImport(
+      csv([
+        'firstname,lastname,email,parentemail',
+        'Ada,Obi,ada@school.ng,chinwe@school.ng',
+      ]),
+      'Student',
+    );
+
+    expect(result.rows[0].errors).toContain(
+      'parentFirstName is required for a new parent',
+    );
+  });
+
+  it('needs only the address to link an existing parent', async () => {
+    await User.create({
+      firstName: 'Chinwe',
+      lastName: 'Obi',
+      email: 'chinwe@school.ng',
+      password: 'Password123',
+      role: 'Parent',
+    });
+
+    const result = await previewImport(
+      csv([
+        'firstname,lastname,email,parentemail',
+        'Ada,Obi,ada@school.ng,chinwe@school.ng',
+      ]),
+      'Student',
+    );
+
+    expect(result.rows[0].valid).toBe(true);
+    expect(result.rows[0].parent.exists).toBe(true);
+  });
+
+  it('refuses an address that belongs to another role', async () => {
+    // One account, one role. A teacher's address cannot quietly become a
+    // parent account as well.
+    await User.create({
+      firstName: 'Ngozi',
+      lastName: 'Eze',
+      email: 'ngozi@school.ng',
+      password: 'Password123',
+      role: 'Teacher',
+    });
+
+    const result = await previewImport(
+      withParent(['Ada,Obi,ada@school.ng,Ngozi,Eze,ngozi@school.ng,Mother']),
+      'Student',
+    );
+
+    expect(result.rows[0].errors).toContain(
+      'parentEmail already belongs to a Teacher account',
+    );
+  });
+
+  it('refuses a parent address that is also the student', async () => {
+    const result = await previewImport(
+      withParent(['Ada,Obi,ada@school.ng,Chinwe,Obi,ada@school.ng,Mother']),
+      'Student',
+    );
+
+    expect(result.rows[0].errors).toContain(
+      'parentEmail cannot be the same as the student email',
+    );
+  });
+
+  it('refuses a parent address used as a student elsewhere in the file', async () => {
+    const result = await previewImport(
+      withParent([
+        'Ada,Obi,ada@school.ng,Chinwe,Obi,ben@school.ng,Mother',
+        'Ben,Eze,ben@school.ng,Ada,Eze,other@school.ng,Father',
+      ]),
+      'Student',
+    );
+
+    expect(result.rows[0].errors).toContain(
+      'parentEmail is used as a student email in this file',
+    );
+  });
+
+  it('validates the relationship', async () => {
+    const result = await previewImport(
+      withParent(['Ada,Obi,ada@school.ng,Chinwe,Obi,chinwe@school.ng,Cousin']),
+      'Student',
+    );
+
+    expect(result.rows[0].errors[0]).toMatch(/parentRelationship must be/);
+  });
+});
+
+describe('creating parents', () => {
+  const sibling = (first, email) => ({
+    _line: 2,
+    firstname: first,
+    lastname: 'Obi',
+    email,
+    parentfirstname: 'Chinwe',
+    parentlastname: 'Obi',
+    parentemail: 'chinwe@school.ng',
+    parentrelationship: 'Mother',
+  });
+
+  it('creates the parent and links both directions', async () => {
+    // The portal reads the relationship from both ends, so one direction
+    // alone produces an account that works for the parent but not the child.
+    const { created, parentsCreated } = await createUsers(
+      [sibling('Ada', 'ada@school.ng')],
+      'Student',
+    );
+
+    const parent = await User.findOne({ email: 'chinwe@school.ng' });
+    const student = await User.findById(created[0]._id);
+
+    expect(parent.role).toBe('Parent');
+    expect(parent.parentProfile.relationship).toBe('Mother');
+    expect(parent.parentProfile.children.map(String)).toEqual([
+      String(student._id),
+    ]);
+    expect(String(student.studentProfile.parentId)).toBe(String(parent._id));
+
+    expect(parentsCreated).toHaveLength(1);
+    expect(created[0].parentLinked).toBe(true);
+  });
+
+  it('puts siblings under one parent account', async () => {
+    const { parentsCreated } = await createUsers(
+      [
+        sibling('Ada', 'ada@school.ng'),
+        { ...sibling('Emeka', 'emeka@school.ng'), _line: 3 },
+      ],
+      'Student',
+    );
+
+    expect(parentsCreated).toHaveLength(1);
+    expect(await User.countDocuments({ role: 'Parent' })).toBe(1);
+
+    const parent = await User.findOne({ email: 'chinwe@school.ng' });
+    expect(parent.parentProfile.children).toHaveLength(2);
+  });
+
+  it('reuses a parent that already existed and does not re-issue a password', async () => {
+    const existing = await User.create({
+      firstName: 'Chinwe',
+      lastName: 'Obi',
+      email: 'chinwe@school.ng',
+      password: 'Password123',
+      role: 'Parent',
+    });
+
+    const { parentsCreated } = await createUsers(
+      [sibling('Ada', 'ada@school.ng')],
+      'Student',
+    );
+
+    // Nothing was created, so nothing gets a welcome email — resending would
+    // be a password change nobody asked for.
+    expect(parentsCreated).toHaveLength(0);
+
+    const parent = await User.findById(existing._id);
+    expect(parent.parentProfile.children).toHaveLength(1);
+  });
+
+  it('generates a password for the parent and hashes it', async () => {
+    const { parentsCreated } = await createUsers(
+      [sibling('Ada', 'ada@school.ng')],
+      'Student',
+    );
+
+    const stored = await User.findOne({ email: 'chinwe@school.ng' }).select(
+      '+password',
+    );
+
+    expect(parentsCreated[0].password).toBeTruthy();
+    expect(await stored.comparePassword(parentsCreated[0].password)).toBe(true);
+  });
+
+  it('still enrols the student when the row names no parent', async () => {
+    const { created, parentsCreated } = await createUsers(
+      [{ _line: 2, firstname: 'Ada', lastname: 'Obi', email: 'ada@school.ng' }],
+      'Student',
+    );
+
+    expect(created).toHaveLength(1);
+    expect(created[0].parentLinked).toBeUndefined();
+    expect(parentsCreated).toHaveLength(0);
   });
 });
 

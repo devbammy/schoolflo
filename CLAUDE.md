@@ -190,9 +190,26 @@ to someone who teaches one period a week.
   number. Same family of trap as `bulkWrite` and the Result hooks.
 - Passwords are generated server-side, emailed, and never stored or returned.
   The CSV never carries one.
-- `utils/csv.js` is hand-written because this tree only tolerates pnpm and it
-  is not always on PATH. It handles quoted fields, embedded commas and
-  newlines, CRLF, and the UTF-8 BOM Excel prepends to every file it saves.
+- **A student row may name a parent.** An existing *student* email is an error;
+  an existing *parent* email means reuse-and-link — that is what puts siblings
+  under one account. An address belonging to any other role is refused: one
+  account, one role.
+- **The parent link is written both ways** — `parentProfile.children` and
+  `studentProfile.parentId`. The portal reads the relationship from both ends,
+  so writing one alone produces an account that works from one side only.
+- The parent is attached **after** the student exists, and a failure there is
+  reported without undoing the student. A child enrolled with no parent linked
+  is a gap an admin can close on the Parents page; a child who failed to enrol
+  because their mother's address was malformed is not.
+- `utils/csv.js` is hand-written to avoid a dependency. It handles quoted
+  fields, embedded commas and newlines, CRLF, and the UTF-8 BOM Excel prepends
+  to every file it saves.
+- **[CSV_IMPORT.md](CSV_IMPORT.md) is the admin-facing guide**, and
+  `tests/integration/importDocs.test.js` runs its worked examples through the
+  real validator and checks its column tables against `COLUMNS`. Rename a
+  column and that suite fails until the doc is updated — which is the point,
+  because a doc that lies sends a school off to fix a file that was never
+  wrong.
 
 ### Audit log
 
@@ -242,7 +259,7 @@ vulnerability.
 
 ## Testing
 
-`pnpm test` — 21 suites, 373 tests, Jest, `maxWorkers: 1`.
+`pnpm test` — 22 suites, 416 tests, Jest, `maxWorkers: 1`.
 
 Integration tests run against a **real MongoDB in memory**
 (`mongodb-memory-server`), started once in `globalSetup` with a database per
