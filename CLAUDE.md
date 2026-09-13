@@ -163,6 +163,31 @@ Response shape is fixed — `sendSuccess`, `sendError`, `sendPaginated` in
   one user in the same second are byte-identical and collide on
   `Session.tokenHash`.
 
+### Student data ownership
+
+`utils/studentAccess.js` is the one definition of "own data" for anything
+filed against a student — results, attendance, certificates, CA tracking.
+
+| Need | Use |
+| --- | --- |
+| Reading ONE student's records | `assertStudentAccess(user, studentId, subject)` (throws 403) |
+| Filtering a LIST | `scopeQueryToStudents(query, user)` |
+
+Staff are unrestricted; a student sees themselves; a parent sees their own
+children. **`visibleStudentIds` returns `null` for staff (no restriction) and
+`[]` for a parent with no children (see nothing)** — collapsing those two
+would show a childless parent the whole school.
+
+The rule used to be hand-written in `resultController` and copied into
+`attendanceController`. The two domains that never copied it —
+`certificateController` and `caTrackingController` — shipped with **no check
+at all**: any signed-in account could list every certificate in the school, or
+read any child's continuous assessment by changing the id in the URL. Both were
+caught in review and both now go through this helper.
+
+**A route with `protect` but no `authorize` is reachable by every role.** If
+it returns anything belonging to a student, it needs one of the two calls above.
+
 ### Teacher scoping
 
 `utils/teacherScope.js` is the one definition, and it has two widths:
@@ -228,6 +253,27 @@ const audit = require('../services/auditService');
 await audit.record(req, { action, entity, entityId, subject, changes: audit.diff(before, after), meta });
 ```
 
+### Rate limiting
+
+Counted **per account**, not per IP. A school NATs its whole staff room behind
+one address, so IP keying gave thirty teachers one shared budget — measured on
+a running server, the twelfth person to sign in on a Monday was refused.
+
+| Limiter | Keyed on | Default | Env |
+| --- | --- | --- | --- |
+| API | user id (falls back to IP) | 600 / 15 min | `RATE_LIMIT_MAX` |
+| Login | **the account being attempted** | 10 / 15 min | `AUTH_RATE_LIMIT_MAX` |
+| Login, per host | IP | 200 / 15 min | `AUTH_RATE_LIMIT_PER_HOST` |
+
+Brute force is an attack on one account, so that is what the login budget
+protects — one teacher fumbling their password no longer locks out the school,
+while the host ceiling still blunts someone walking a list of addresses.
+
+The two auth limiters `skip` anything that is not a credential submission.
+Applying them to the whole `/auth` router throttled `/auth/me` and
+`/auth/refresh` too, and those carry no email to key on, so they fell back to
+per-IP and put the school back on one small budget.
+
 ### Middleware order in `server.js` is load-bearing
 
 `/webhooks` mounts **before** `express.json` (HMAC needs the raw body), and
@@ -259,7 +305,12 @@ vulnerability.
 
 ## Testing
 
-`pnpm test` — 22 suites, 416 tests, Jest, `maxWorkers: 1`.
+`pnpm test` — 24 suites, 441 tests, Jest, `maxWorkers: 1`.
+
+The client now has ESLint too (`pnpm lint` from `client/`), and CI runs it.
+The build alone never caught an undefined component — an undefined
+`<BulkImportModal/>` shipped that way — nor a stray `/>`, which JSX treats as
+*text* and renders on the page. Both are lint errors now.
 
 Integration tests run against a **real MongoDB in memory**
 (`mongodb-memory-server`), started once in `globalSetup` with a database per
@@ -281,11 +332,20 @@ Two patterns to follow:
    ```
 
 2. **Mock `jobQueue` and `notificationService` in any suite that reaches
-   them.** `jobQueue` requires `agenda`, which is ESM and blows up under Jest
-   with `Cannot use import statement outside a module`. This is a real
-   constraint on architecture, not just on tests: importing `paymentService`
-   into a module that unit tests load will drag Agenda in with it. That is why
-   `buildFeeLedger` lives in its own dependency-free `feeLedgerService`.
+   them.** Cheaper than letting a test send mail, and it keeps assertions
+   about "was this queued" honest.
+
+   `jobQueue` no longer poisons everything that imports it. Agenda used to be
+   `require`d at module scope, and being ESM it threw `Cannot use import
+   statement outside a module` under Jest — which spread to every module that
+   imported it, and is why `buildFeeLedger` had to be split into its own
+   dependency-free service. It is now loaded with `await import()` inside
+   `startJobQueue`, so the ESM boundary is confined to that one function.
+
+   Jest still cannot execute that import (`--experimental-vm-modules`), so
+   **the running queue is proved end-to-end against real Node, not in Jest**.
+   `tests/integration/jobQueue.test.js` covers the inline fallback and that
+   the module is safe to require.
 
 Client code has **no test runner**. The check is that it builds.
 
@@ -307,6 +367,8 @@ Client code has **no test runner**. The check is that it builds.
 | Import validation and creation | `services/userImportService.js` |
 | Audit recording and redaction | `services/auditService.js` |
 | Rate-limit store | `middleware/rateLimitStore.js` |
+| What a rate limit counts | `middleware/rateLimitKeys.js` |
+| Who may see a student's records | `utils/studentAccess.js` |
 | Which features this school runs | `config/features.js` |
 | Client's copy of the feature set | `client/src/store/featureStore.js` |
 | Printable timetable grid | `client/src/components/common/PrintableTimetable.jsx` |

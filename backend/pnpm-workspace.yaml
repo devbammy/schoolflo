@@ -1,0 +1,11 @@
+# pnpm 10 blocks dependency install scripts unless they are named here.
+#
+# mongodb-memory-server must be allowed: its postinstall fetches the mongod
+# binary that every integration test runs against, and without it a clean
+# install produces a suite that cannot start.
+#
+# The other two only build optional native speedups and are fine left off.
+allowBuilds:
+  mongodb-memory-server: true
+  core-js: false
+  unrs-resolver: false

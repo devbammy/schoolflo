@@ -144,7 +144,12 @@ export default function LibraryPage() {
     try {
       const r = await libraryService.getStats();
       setStats(r.data.data);
-    } catch {}
+    } catch (err) {
+      // The header counters are decoration; the page is still usable without
+      // them, so this must not raise a toast. It is logged rather than
+      // swallowed outright so a broken stats endpoint is still diagnosable.
+      console.warn('Library stats unavailable:', err?.message);
+    }
   }, []);
 
   useEffect(() => {

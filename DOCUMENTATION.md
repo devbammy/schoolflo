@@ -634,6 +634,19 @@ A teacher may manage results for subjects in their
 `teacherProfile.subjectsTaught`, plus everything in the class they are form
 teacher of (`classTeacherOf`).
 
+**Student data ownership** is a separate question with one answer:
+`utils/studentAccess.js`. `assertStudentAccess` guards reading one student's
+records; `scopeQueryToStudents` filters a list. Staff are unrestricted, a
+student sees themselves, a parent sees their own children.
+
+This matters most on a route carrying `protect` but no `authorize`, which
+every role can reach. Two such routes shipped with **no ownership check at
+all** — `GET /certificates` returned every certificate in the school to any
+signed-in account, and the `/ca-tracking/*` handlers read the student id
+straight out of the URL and never looked at `req.user`. Both were found by
+driving the running server as each role, and both are now covered by
+`tests/integration/studentAccess.test.js`.
+
 `GET /users/:id` is scoped by the roster rule: a Teacher may fetch a Student
 in a class they teach, and their own record. Every other id — a colleague, an
 admin, a parent, a student in another class — is a 403. The route used to be
@@ -1207,6 +1220,11 @@ JWT_REFRESH_SECRET=          # different from JWT_SECRET
 JWT_REFRESH_EXPIRE=30d
 
 CLIENT_URL=https://yourschool.ng   # exact origin; comma-separate for several
+
+RATE_LIMIT_WINDOW_MINUTES=15       # window for every limiter below
+RATE_LIMIT_MAX=600                 # API calls per ACCOUNT per window
+AUTH_RATE_LIMIT_MAX=10             # login attempts per ACCOUNT per window
+AUTH_RATE_LIMIT_PER_HOST=200       # login attempts per IP, a loose ceiling
 
 SCHOOL_PROFILE=full                # full | office-fees — see section 4a
 FEATURE_ONLINE_PAYMENTS=           # optional per-feature override

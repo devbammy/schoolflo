@@ -79,7 +79,6 @@ export default function TeacherExamSchedule() {
             </option>
           ))}
         </select>
-        />
       </div>
 
       {loading ? (

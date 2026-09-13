@@ -5,6 +5,10 @@ const pdfService = require('../services/pdfService');
 const audit = require('../services/auditService');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
 const {
+  assertStudentAccess,
+  scopeQueryToStudents,
+} = require('../utils/studentAccess');
+const {
   sendEmail,
   emailTemplates,
 } = require('../services/notificationService');
@@ -235,12 +239,21 @@ exports.getAllCertificates = async (req, res) => {
   if (student) query.student = student;
   if (academicYear) query.academicYear = academicYear;
 
+  // This route carries no authorize(), so every signed-in account reaches it —
+  // and it used to answer with every certificate in the school. A parent could
+  // read another family's leaving certificate simply by opening the list.
+  // Staff are unrestricted; a student is narrowed to themselves and a parent
+  // to their own children.
+  scopeQueryToStudents(query, req.user);
+
   const certificates = await Certificate.find(query)
     .populate('student', 'firstName lastName studentProfile')
     .populate('issuedBy', 'firstName lastName')
     .sort({ createdAt: -1 });
 
-  sendSuccess(res, 201, 'Certificates retrieved successfully', certificates);
+  // 200, not 201. Reading a list creates nothing, and a client checking for
+  // 200 would treat this as a failure.
+  sendSuccess(res, 200, 'Certificates retrieved successfully', certificates);
 };
 
 // Get certificate by ID
@@ -251,10 +264,18 @@ exports.getCertificateById = async (req, res) => {
     .populate('issuedBy', 'firstName lastName');
 
   if (!certificate) {
-    return sendError(res, 'Certificate not found', 404);
+    return sendError(res, 404, 'Certificate not found');
   }
 
-  sendSuccess(res, 201, 'Certificate retrieved successfully', certificate);
+  // Fetched first, then checked: the ownership question is about the student
+  // on the certificate, which is not knowable from the id in the URL.
+  assertStudentAccess(
+    req.user,
+    certificate.student?._id || certificate.student,
+    'certificates',
+  );
+
+  sendSuccess(res, 200, 'Certificate retrieved successfully', certificate);
 };
 
 // Revoke certificate
@@ -264,7 +285,7 @@ exports.revokeCertificate = async (req, res) => {
   const certificate = await Certificate.findById(req.params.id);
 
   if (!certificate) {
-    return sendError(res, 'Certificate not found', 404);
+    return sendError(res, 404, 'Certificate not found');
   }
 
   certificate.status = 'Revoked';

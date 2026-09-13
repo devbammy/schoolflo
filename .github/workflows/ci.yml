@@ -59,7 +59,7 @@ jobs:
           JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-chars
 
   client:
-    name: Client — build
+    name: Client — lint, build
     runs-on: ubuntu-latest
 
     defaults:
@@ -79,7 +79,15 @@ jobs:
 
       - run: pnpm install --no-frozen-lockfile
 
-      # A failing build is the signal that matters here — the client has no
-      # test suite yet.
+      # The build alone was never enough. It compiles a component that was
+      # never imported (which shipped once, as an undefined <BulkImportModal/>)
+      # and it compiles a stray "/>" as literal text, which rendered on the
+      # teacher's exam schedule page. Both are lint errors now.
+      #
+      # Warnings are mostly unused React imports left over from the old JSX
+      # transform; the ceiling stops them growing while they are cleaned up.
+      - name: Lint
+        run: pnpm exec eslint src --ext .js,.jsx --max-warnings 130
+
       - name: Build
         run: pnpm run build

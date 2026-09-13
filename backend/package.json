@@ -20,6 +20,7 @@
     "reconcile:apply": "node src/utils/reconcilePayments.js --apply"
   },
   "dependencies": {
+    "@agendajs/mongo-backend": "^4.0.3",
     "agenda": "^6.2.6",
     "axios": "^1.16.0",
     "bcryptjs": "^2.4.3",

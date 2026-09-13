@@ -14,6 +14,11 @@ const axios = require('axios');
 const connectDB = require('./src/config/db');
 const { getFeatures } = require('./src/config/features');
 const MongoRateLimitStore = require('./src/middleware/rateLimitStore');
+const {
+  byUserOrIp,
+  byLoginTarget,
+  byIp,
+} = require('./src/middleware/rateLimitKeys');
 const errorHandler = require('./src/middleware/errorHandler');
 const { verifyTransport } = require('./src/services/notificationService');
 const { startJobQueue, stopJobQueue } = require('./src/services/jobQueue');
@@ -155,9 +160,21 @@ if (process.env.NODE_ENV === 'development') {
 // double every allowance, and a deploy resets them all to zero. See
 // src/middleware/rateLimitStore.js — it fails open, so a database blip
 // degrades the limit rather than locking everyone out.
+// Every limit below is configurable, because "how much traffic is normal"
+// depends on the school. A 40-pupil primary and a 2,000-pupil college cannot
+// share one number, and a hard-coded one can only be changed by a deploy.
+const minutes = (value, fallback) => (Number(value) || fallback) * 60 * 1000;
+const count = (value, fallback) => Number(value) || fallback;
+
+const RATE_WINDOW_MS = minutes(process.env.RATE_LIMIT_WINDOW_MINUTES, 15);
+
+// Counted per ACCOUNT, not per IP. A school NATs its whole staff room behind
+// one address; keying on IP meant thirty teachers shared one budget, and a
+// measured run had the twelfth person to sign in on a Monday refused.
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+  windowMs: RATE_WINDOW_MS,
+  max: count(process.env.RATE_LIMIT_MAX, 600),
+  keyGenerator: byUserOrIp,
   store: new MongoRateLimitStore({ prefix: 'api' }),
   message: {
     success: false,
@@ -165,15 +182,43 @@ const limiter = rateLimit({
   },
 });
 
-// Auth-specific strict limiter. Its own prefix, so a user's ordinary API
-// traffic and their login attempts are counted separately.
+// Only the routes where credentials are actually submitted belong under the
+// strict limiter. Applying it to the whole /auth router throttled `/auth/me`
+// and `/auth/refresh` too — and since those carry no email to key on, they
+// fell back to per-IP, which put the entire school back on one small budget.
+// Everything under /api is still covered by the main per-account limiter.
+const CREDENTIAL_PATHS = ['/login', '/forgot-password', '/reset-password'];
+const isCredentialSubmission = (req) =>
+  CREDENTIAL_PATHS.some((p) => req.path.startsWith(p));
+
+// Login, counted per ACCOUNT BEING ATTEMPTED. Brute force is an attack on one
+// account, so that is what the budget protects — and one member of staff
+// fumbling their password no longer locks out the rest of the school.
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
+  windowMs: RATE_WINDOW_MS,
+  max: count(process.env.AUTH_RATE_LIMIT_MAX, 10),
+  keyGenerator: byLoginTarget,
+  skip: (req) => !isCredentialSubmission(req),
   store: new MongoRateLimitStore({ prefix: 'auth' }),
   message: {
     success: false,
-    message: 'Too many login attempts, please try again later.',
+    message:
+      'Too many attempts for this account. Try again later, or reset your password.',
+  },
+});
+
+// A loose ceiling per host, so that making the login budget per-account does
+// not hand one machine a free run at a list of addresses. Set far above what a
+// whole staff room signing in at 07:45 will ever reach.
+const authHostLimiter = rateLimit({
+  windowMs: RATE_WINDOW_MS,
+  max: count(process.env.AUTH_RATE_LIMIT_PER_HOST, 200),
+  keyGenerator: byIp,
+  skip: (req) => !isCredentialSubmission(req),
+  store: new MongoRateLimitStore({ prefix: 'auth-host' }),
+  message: {
+    success: false,
+    message: 'Too many attempts from this network, please try again later.',
   },
 });
 
@@ -199,7 +244,7 @@ app.get('/health', async (req, res) => {
 });
 
 // API Routes
-app.use('/api/v1/auth', authLimiter, authRoutes);
+app.use('/api/v1/auth', authHostLimiter, authLimiter, authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/classes', classRoutes);
 app.use('/api/v1/subjects', subjectRoutes);

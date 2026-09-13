@@ -6,6 +6,7 @@ const { sendSuccess } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
 const audit = require('../services/auditService');
 const { getCurrentPeriod } = require('../utils/academicPeriod');
+const { checkStudentAccess } = require('../utils/studentAccess');
 const {
   getTeacherClasses,
   assertClassAccess,
@@ -34,27 +35,13 @@ const endOfDay = (value) => {
 
 /**
  * Who may read a given student's attendance.
- * Mirrors the rule used for results: staff see everyone, students see
- * themselves, parents see their own children.
+ *
+ * Was a hand-rolled copy of the results rule. Both now read from
+ * `utils/studentAccess`, so there is one definition of "own data" rather
+ * than one per domain that remembered to write it.
  */
-const checkAttendanceAccess = (user, studentId) => {
-  if (user.role === 'Admin' || user.role === 'Teacher') return null;
-
-  if (user.role === 'Student') {
-    return String(user._id) === String(studentId)
-      ? null
-      : 'You can only view your own attendance.';
-  }
-
-  if (user.role === 'Parent') {
-    const childIds = user.parentProfile?.children?.map(String) || [];
-    return childIds.includes(String(studentId))
-      ? null
-      : "You can only view your own children's attendance.";
-  }
-
-  return 'Access denied.';
-};
+const checkAttendanceAccess = (user, studentId) =>
+  checkStudentAccess(user, studentId, 'attendance');
 
 // @desc    Mark attendance for a class (bulk upsert, one record per student/day)
 // @route   POST /api/v1/attendance/mark

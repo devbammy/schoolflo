@@ -1,0 +1,10 @@
+# pnpm 10 blocks dependency install scripts unless they are named here.
+#
+# esbuild must be allowed: Vite shells out to its platform binary, and that
+# binary is fetched by the postinstall script. A clean install without it
+# produces a tree where `pnpm run build` cannot run at all.
+#
+# @parcel/watcher is an optional native speedup for file watching in dev.
+allowBuilds:
+  esbuild: true
+  '@parcel/watcher': false

@@ -1,6 +1,7 @@
 const { Result, Exam, calculateGrade } = require('../models/Exam');
 const User = require('../models/User');
 const { GRADE_SCALE } = require('../config/constants');
+const { checkStudentAccess } = require('../utils/studentAccess');
 const {
   sendSuccess,
   sendError,
@@ -39,26 +40,13 @@ const computeResultFields = (scores = {}) => {
 
 /**
  * Who may read a given student's academic records.
- * Returns an error message, or null when the request is permitted.
+ *
+ * A thin alias over `utils/studentAccess` now. This rule used to live here
+ * and only here, so the domains that never copied it — certificates, CA
+ * tracking — shipped with no ownership check at all.
  */
-const checkResultAccess = (user, studentId) => {
-  if (user.role === 'Admin' || user.role === 'Teacher') return null;
-
-  if (user.role === 'Student') {
-    return String(user._id) === String(studentId)
-      ? null
-      : 'You can only view your own results.';
-  }
-
-  if (user.role === 'Parent') {
-    const childIds = user.parentProfile?.children?.map(String) || [];
-    return childIds.includes(String(studentId))
-      ? null
-      : "You can only view your own children's results.";
-  }
-
-  return 'Access denied.';
-};
+const checkResultAccess = (user, studentId) =>
+  checkStudentAccess(user, studentId, 'results');
 
 /**
  * May this teacher enter or amend scores for a subject in a class?

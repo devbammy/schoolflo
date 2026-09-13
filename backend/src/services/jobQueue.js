@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const Agenda = require('agenda');
 const { sendEmail } = require('./notificationService');
 
 const SEND_EMAIL = 'send email';
@@ -14,14 +13,50 @@ let started = false;
  * Its job is to get slow work off the request path. Sending a term's results
  * to 200 parents inline meant the publish request stayed open for the whole
  * fan-out, and a slow SMTP server made recording a payment feel broken.
+ *
+ * Two things about how agenda is loaded are load-bearing, and both were
+ * wrong:
+ *
+ *   - agenda 6 is an ES module with a NAMED export, so `require('agenda')`
+ *     handed back the namespace object. `new Agenda(...)` on that threw
+ *     "Agenda is not a constructor" on every boot, in every environment.
+ *   - agenda 6 also moved storage into separate packages. It no longer takes
+ *     `mongo`/`db` options; it takes a `backend`, from
+ *     `@agendajs/mongo-backend`.
+ *
+ * Between them the queue had never actually started. It failed safe — every
+ * caller falls back to sending inline — so nothing was lost, but nothing was
+ * ever queued or retried either, which is exactly the fan-out this exists to
+ * prevent.
+ *
+ * Both packages are loaded with `await import()` inside startJobQueue rather
+ * than required at the top. Requiring ESM at module scope made this file
+ * unloadable under Jest ("Cannot use import statement outside a module"), and
+ * that spread: any module importing this one became untestable too, which is
+ * why `buildFeeLedger` had to be split into its own dependency-free service.
+ * Loading on start confines the ESM boundary to the one function that needs
+ * it.
  */
 const startJobQueue = async () => {
   if (started) return agenda;
 
   try {
+    // Reuses the connection the app already holds rather than dialing its
+    // own, so the queue cannot outlive or race the main connection.
+    if (!mongoose.connection?.db) {
+      throw new Error('MongoDB connection is not ready');
+    }
+
+    const [{ Agenda }, { MongoBackend }] = await Promise.all([
+      import('agenda'),
+      import('@agendajs/mongo-backend'),
+    ]);
+
     agenda = new Agenda({
-      mongo: mongoose.connection.db,
-      db: { collection: 'jobs' },
+      backend: new MongoBackend({
+        mongo: mongoose.connection.db,
+        collection: 'jobs',
+      }),
       processEvery: '20 seconds',
       maxConcurrency: 5,
       defaultConcurrency: 3,
