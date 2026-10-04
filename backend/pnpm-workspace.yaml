@@ -9,3 +9,10 @@ allowBuilds:
   mongodb-memory-server: true
   core-js: false
   unrs-resolver: false
+
+# express 4 pins an old qs and body-parser, and the newest express 4 release
+# still does. Both have published denial-of-service fixes within the same major
+# version, so force them rather than wait for express 5.
+overrides:
+  qs: '>=6.16.0 <7'
+  body-parser: '>=1.20.6 <2'

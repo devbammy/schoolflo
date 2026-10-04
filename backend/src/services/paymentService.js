@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const { clientUrl } = require('../config/clientUrl');
 const AppError = require('../utils/AppError');
 const { Payment } = require('../models/Fees');
@@ -13,6 +13,13 @@ const { enqueueEmail } = require('./jobQueue');
 // transaction that costs more in gateway fees than it collects.
 const MIN_PAYMENT_NGN = 100;
 
+// How long to wait on a payment gateway. fetch has no timeout of its own, so a
+// gateway that accepted the connection and then went quiet held the request —
+// and a database-connected worker with it — open indefinitely. The webhook
+// path is safe to abort: a non-2xx makes the gateway retry.
+const GATEWAY_TIMEOUT_MS = 15 * 1000;
+const gatewaySignal = () => AbortSignal.timeout(GATEWAY_TIMEOUT_MS);
+
 /**
  * Initialize a Paystack payment
  */
@@ -21,6 +28,7 @@ const initializePaystack = async ({ email, amount, metadata, callbackUrl }) => {
     'https://api.paystack.co/transaction/initialize',
     {
       method: 'POST',
+      signal: gatewaySignal(),
       headers: {
         Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
         'Content-Type': 'application/json',
@@ -28,7 +36,7 @@ const initializePaystack = async ({ email, amount, metadata, callbackUrl }) => {
       body: JSON.stringify({
         email,
         amount: Math.round(amount * 100), // Convert to kobo
-        reference: `SMP-${uuidv4().split('-')[0].toUpperCase()}`,
+        reference: `SMP-${randomUUID().split('-')[0].toUpperCase()}`,
         callback_url: callbackUrl || `${clientUrl()}/payments/verify`,
         metadata,
       }),
@@ -51,6 +59,7 @@ const verifyPaystack = async (reference) => {
   const response = await fetch(
     `https://api.paystack.co/transaction/verify/${reference}`,
     {
+      signal: gatewaySignal(),
       headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
     },
   );
@@ -81,10 +90,11 @@ const initializeFlutterwave = async ({
   metadata,
   redirectUrl,
 }) => {
-  const txRef = `SMP-FLW-${uuidv4().split('-')[0].toUpperCase()}`;
+  const txRef = `SMP-FLW-${randomUUID().split('-')[0].toUpperCase()}`;
 
   const response = await fetch('https://api.flutterwave.com/v3/payments', {
     method: 'POST',
+    signal: gatewaySignal(),
     headers: {
       Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
       'Content-Type': 'application/json',
@@ -119,6 +129,7 @@ const verifyFlutterwave = async (reference) => {
   const response = await fetch(
     `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`,
     {
+      signal: gatewaySignal(),
       headers: {
         Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
       },

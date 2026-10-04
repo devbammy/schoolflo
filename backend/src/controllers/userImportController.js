@@ -6,6 +6,7 @@ const { enqueueEmail } = require('../services/jobQueue');
 const audit = require('../services/auditService');
 const {
   IMPORTABLE_ROLES,
+  MAX_IMPORT_ROWS,
   COLUMNS,
   previewImport,
   createUsers,
@@ -42,6 +43,14 @@ const commitUserImport = async (req, res) => {
 
   if (!Array.isArray(rows) || rows.length === 0) {
     throw AppError.badRequest('Send the rows to import.');
+  }
+
+  // The preview enforces this too, but the commit cannot trust that the
+  // browser went through the preview.
+  if (rows.length > MAX_IMPORT_ROWS) {
+    throw AppError.badRequest(
+      `Import at most ${MAX_IMPORT_ROWS} rows at a time — split the file.`,
+    );
   }
 
   // Everything is validated again from the raw row. The preview's verdict was

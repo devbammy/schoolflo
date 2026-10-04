@@ -20,6 +20,12 @@ const { parseCsv, toCsv } = require('../utils/csv');
 
 const IMPORTABLE_ROLES = ['Student', 'Teacher'];
 
+// Every row costs one deliberately slow password hash (two when it names a new
+// parent), done in sequence inside a single HTTP request. A few hundred rows
+// runs for minutes — longer than most hosts keep a request open — and leaves
+// the admin looking at an error while the import carries on without them.
+const MAX_IMPORT_ROWS = 150;
+
 // What a row may carry, per role. Anything else in the file is ignored rather
 // than rejected: schools export from systems that add columns nobody asked for.
 const COLUMNS = {
@@ -336,6 +342,12 @@ const previewImport = async (buffer, role) => {
     };
   }
 
+  if (rows.length > MAX_IMPORT_ROWS) {
+    return {
+      error: `This file has ${rows.length} rows. Import at most ${MAX_IMPORT_ROWS} at a time — split it into smaller files.`,
+    };
+  }
+
   const results = await validateRows(rows, role);
 
   return {
@@ -586,6 +598,7 @@ const buildTemplate = (role) => {
 
 module.exports = {
   IMPORTABLE_ROLES,
+  MAX_IMPORT_ROWS,
   COLUMNS,
   previewImport,
   createUsers,

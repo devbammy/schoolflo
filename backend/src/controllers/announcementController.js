@@ -11,9 +11,16 @@ const ALL_ROLES = ['Admin', 'Teacher', 'Student', 'Parent'];
 // @route   GET /api/v1/announcements
 // @access  Any authenticated user
 const getAnnouncements = async (req, res) => {
+  const now = new Date();
+
   const announcements = await Announcement.find({
     isPublished: true,
-    $or: [{ targetAudience: 'All' }, { targetAudience: req.user.role }],
+    $and: [
+      { $or: [{ targetAudience: 'All' }, { targetAudience: req.user.role }] },
+      // `expiresAt` was stored and never read, so an announcement meant to run
+      // until Friday stayed on every dashboard for good.
+      { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
+    ],
   })
     .populate('author', 'firstName lastName role')
     .sort({ publishedAt: -1 })
@@ -61,8 +68,19 @@ const emailAudience = async (announcement, author) => {
 // @route   POST /api/v1/announcements
 // @access  Admin, Teacher
 const createAnnouncement = async (req, res) => {
+  // Named fields only. `...req.body` let any Teacher set isPublished,
+  // publishedAt, readBy or emailStatus directly, which skipped the publish
+  // step below and forged the "sent to N recipients" record.
+  const { title, body, targetAudience, priority, channels, expiresAt } =
+    req.body;
+
   const announcement = await Announcement.create({
-    ...req.body,
+    title,
+    body,
+    targetAudience,
+    priority,
+    channels,
+    expiresAt,
     author: req.user._id,
   });
 
@@ -95,11 +113,25 @@ const createAnnouncement = async (req, res) => {
 // @route   PATCH /api/v1/announcements/:id/read
 // @access  Any authenticated user
 const markAsRead = async (req, res) => {
-  const announcement = await Announcement.findByIdAndUpdate(req.params.id, {
-    $addToSet: { readBy: { user: req.user._id, readAt: new Date() } },
-  });
+  const visible = {
+    _id: req.params.id,
+    isPublished: true,
+    targetAudience: { $in: ['All', req.user.role] },
+  };
 
-  if (!announcement) throw AppError.notFound('Announcement not found');
+  // One entry per reader. $addToSet compared the whole sub-document, and
+  // `readAt` differs on every call, so it never recognised a repeat and the
+  // list grew with each click. The filter below only matches while this user
+  // is absent from it.
+  const updated = await Announcement.findOneAndUpdate(
+    { ...visible, 'readBy.user': { $ne: req.user._id } },
+    { $push: { readBy: { user: req.user._id, readAt: new Date() } } },
+  );
+
+  if (!updated && !(await Announcement.exists(visible))) {
+    // Not found, a draft, or meant for another audience — the same answer.
+    throw AppError.notFound('Announcement not found');
+  }
 
   return sendSuccess(res, 200, 'Marked as read');
 };

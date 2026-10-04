@@ -139,8 +139,19 @@ const upsertResult = async (req, res) => {
     term,
     academicYear,
   })
-    .select('scores totalScore grade')
+    .select('scores totalScore grade isPublished')
     .lean();
+
+  // Once published, a score is on a report card a family may already have
+  // seen. A teacher can no longer change it quietly; an admin can, with the
+  // audit trail, and the class figures are recomputed below.
+  if (previous?.isPublished && req.user.role !== 'Admin') {
+    return sendError(
+      res,
+      403,
+      'These results have been published and are locked. Ask an administrator to correct them.',
+    );
+  }
 
   const result = await Result.findOneAndUpdate(
     { student, subject, term, academicYear },
@@ -181,6 +192,13 @@ const upsertResult = async (req, res) => {
     meta: { term, academicYear, class: classId },
   });
 
+  // A correction to a published score moves the subject's average, highest,
+  // lowest and everyone's position in it. Refresh them rather than leave the
+  // report cards describing a class that no longer exists.
+  if (previous?.isPublished) {
+    await computeClassStatistics(classId, term, academicYear);
+  }
+
   return sendSuccess(res, 200, 'Result saved successfully', { result });
 };
 
@@ -215,6 +233,25 @@ const bulkUpsertResults = async (req, res) => {
       400,
       `${batch.errors.length} invalid score${batch.errors.length === 1 ? '' : 's'} — no results were saved.`,
       batch.errors,
+    );
+  }
+
+  // The same lock as the single-score path. Checked before anything is
+  // written, and across the whole batch, so a teacher cannot overwrite
+  // published marks by sending them through the bulk route.
+  const publishedCount = await Result.countDocuments({
+    student: { $in: batch.rows.map((row) => row.student) },
+    subject,
+    term,
+    academicYear,
+    isPublished: true,
+  });
+
+  if (publishedCount > 0 && req.user.role !== 'Admin') {
+    return sendError(
+      res,
+      403,
+      `${publishedCount} of these results have been published and are locked. Ask an administrator to correct them.`,
     );
   }
 
@@ -262,6 +299,10 @@ const bulkUpsertResults = async (req, res) => {
     },
   });
 
+  if (publishedCount > 0) {
+    await computeClassStatistics(classId, term, academicYear);
+  }
+
   return sendSuccess(
     res,
     200,
@@ -282,6 +323,16 @@ const publishResults = async (req, res) => {
   // Step 1: Compute stats & positions
   const statsResult = await computeClassStatistics(classId, term, academicYear);
   if (!statsResult.success) return sendError(res, 400, statsResult.message);
+
+  // Who is about to be published for the first time. Read BEFORE the update:
+  // afterwards every student with any published result looks the same, and
+  // publishing a late subject re-emailed every parent in the class.
+  const newlyPublishedStudents = await Result.find({
+    class: classId,
+    term,
+    academicYear,
+    isPublished: false,
+  }).distinct('student');
 
   // Step 2: Publish all results
   const updated = await Result.updateMany(
@@ -304,15 +355,8 @@ const publishResults = async (req, res) => {
       .catch(console.error);
   });
 
-  // Step 4: Get student IDs for notifications
-  const studentsForNotification = await Result.find({
-    class: classId,
-    term,
-    academicYear,
-    isPublished: true,
-  })
-    .populate('student', 'firstName lastName studentProfile.parentId')
-    .distinct('student');
+  // Step 4: Only the students whose results were released just now.
+  const studentsForNotification = newlyPublishedStudents;
 
   // Fire notifications async (don't block response)
   notifyParentsOfResults(studentsForNotification, term, academicYear).catch(

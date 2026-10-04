@@ -54,6 +54,10 @@ Values (.csv)*.
 button. It gives you a file with the correct column headings and a filled-in
 example row, which is the quickest way to get the format right.
 
+**Up to 150 rows per file.** Each new account takes a moment to set up
+securely, so a very large file can run for minutes and may time out. If you
+have more, split it into several files and import them one after another.
+
 **Classes must already exist.** If you are going to put students in JSS 1, the
 class JSS 1 has to exist in the portal first, spelled the same way. Sections
 work the same — section A must be a section of the class you named.

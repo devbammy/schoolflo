@@ -8,3 +8,8 @@
 allowBuilds:
   esbuild: true
   '@parcel/watcher': false
+
+# sass pins an old `immutable` with published denial-of-service fixes in the
+# same major version. It is a build-time dependency only.
+overrides:
+  immutable: '>=5.1.8 <6'

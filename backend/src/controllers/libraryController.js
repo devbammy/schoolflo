@@ -149,10 +149,15 @@ const borrowBook = async (req, res) => {
     User.findById(borrowerId).select('firstName lastName role'),
   ]);
 
-  if (!book) throw AppError.notFound('Book not found');
+  if (!book || !book.isActive) throw AppError.notFound('Book not found');
   if (!borrower) throw AppError.notFound('Borrower not found');
-  if (book.availableCopies < 1)
-    throw AppError.badRequest('No copies available');
+
+  // BorrowRecord.borrowerRole only knows Student, Teacher and Staff. An Admin
+  // borrower failed with an enum error nobody could act on.
+  const borrowerRole = borrower.role === 'Admin' ? 'Staff' : borrower.role;
+  if (!['Student', 'Teacher', 'Staff'].includes(borrowerRole)) {
+    throw AppError.badRequest(`${borrower.role} accounts cannot borrow books`);
+  }
 
   const existing = await BorrowRecord.findOne({
     book: bookId,
@@ -168,17 +173,30 @@ const borrowBook = async (req, res) => {
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + days);
 
-  const record = await BorrowRecord.create({
-    book: bookId,
-    borrower: borrowerId,
-    borrowerRole: borrower.role,
-    issuedBy: req.user._id,
-    dueDate,
-    notes,
-  });
+  // Take the copy first, in one atomic step that is also the availability
+  // check. Reading `availableCopies` and decrementing it later let two people
+  // issuing the last copy at the same moment both succeed.
+  const taken = await Book.findOneAndUpdate(
+    { _id: bookId, isActive: true, availableCopies: { $gt: 0 } },
+    { $inc: { availableCopies: -1 } },
+  );
+  if (!taken) throw AppError.badRequest('No copies available');
 
-  book.availableCopies -= 1;
-  await book.save();
+  let record;
+  try {
+    record = await BorrowRecord.create({
+      book: bookId,
+      borrower: borrowerId,
+      borrowerRole,
+      issuedBy: req.user._id,
+      dueDate,
+      notes,
+    });
+  } catch (error) {
+    // No loan was recorded, so the copy has to go back on the shelf.
+    await Book.findByIdAndUpdate(bookId, { $inc: { availableCopies: 1 } });
+    throw error;
+  }
 
   await record.populate(BORROW_POPULATE);
 
@@ -189,7 +207,7 @@ const borrowBook = async (req, res) => {
 // @route   POST /api/v1/library/return/:recordId
 // @access  Admin, Teacher
 const returnBook = async (req, res) => {
-  const record = await BorrowRecord.findById(req.params.recordId).populate(
+  let record = await BorrowRecord.findById(req.params.recordId).populate(
     'book',
   );
 
@@ -198,24 +216,39 @@ const returnBook = async (req, res) => {
     throw AppError.badRequest('Book already returned');
   }
 
-  record.returnDate = new Date();
-  record.returnedTo = req.user._id;
-  record.status = 'Returned';
-
+  let fineAmount = record.fine?.amount || 0;
   if (new Date() > record.dueDate) {
     const daysLate = Math.floor(
       (Date.now() - new Date(record.dueDate)) / (1000 * 60 * 60 * 24),
     );
-    record.fine.amount = daysLate * FINE_PER_DAY;
+    fineAmount = daysLate * FINE_PER_DAY;
   }
 
-  await record.save();
+  // The status change is the gate. Two returns arriving together both passed
+  // the "already returned" check above and each put a copy back on the shelf,
+  // so the library could end up holding more copies than it owns. Only the
+  // request that actually flips the status goes on to add the copy.
+  const returned = await BorrowRecord.findOneAndUpdate(
+    { _id: record._id, status: { $ne: 'Returned' } },
+    {
+      $set: {
+        returnDate: new Date(),
+        returnedTo: req.user._id,
+        status: 'Returned',
+        'fine.amount': fineAmount,
+      },
+    },
+    { new: true },
+  );
+
+  if (!returned) throw AppError.badRequest('Book already returned');
 
   await Book.findByIdAndUpdate(record.book._id, {
     $inc: { availableCopies: 1 },
   });
 
-  await record.populate(BORROW_POPULATE);
+  await returned.populate(BORROW_POPULATE);
+  record = returned;
 
   return sendSuccess(res, 200, 'Book returned successfully', {
     record,

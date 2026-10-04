@@ -1,9 +1,19 @@
 const ExamSchedule = require('../models/ExamSchedule');
-const Class = require('../models/Class');
-const Subject = require('../models/Subject');
 const User = require('../models/User');
-const notificationService = require('./notificationService');
+const { emailTemplates } = require('./notificationService');
+const { enqueueBulkEmail } = require('./jobQueue');
+const { clientUrl } = require('../config/clientUrl');
 const AppError = require('../utils/AppError');
+
+const formatSessionDate = (date) =>
+  new Date(date).toLocaleDateString('en-NG', { dateStyle: 'medium' });
+
+const toEmailSession = (session) => ({
+  subject: session.subject?.name || 'Subject',
+  date: formatSessionDate(session.date),
+  time: `${session.startTime} – ${session.endTime}`,
+  venue: session.venue,
+});
 
 class ExamScheduleService {
   // Create exam schedule
@@ -31,6 +41,11 @@ class ExamScheduleService {
     if (filters.term) query.term = filters.term;
     if (filters.academicYear) query.academicYear = filters.academicYear;
     if (filters.examType) query.examType = filters.examType;
+
+    // Students and parents must not see a timetable the school has not
+    // released. Set by the controller from the caller's role, never from the
+    // query string.
+    if (filters.publishedOnly) query.isPublished = true;
 
     const schedules = await ExamSchedule.find(query)
       .populate('class', 'name level')
@@ -97,22 +112,68 @@ class ExamScheduleService {
     schedule.publishedAt = new Date();
     await schedule.save();
 
-    // Notify all students in the class
-    const students = await User.find({
-      role: 'Student',
-      'studentProfile.class': schedule.class._id,
-      isActive: true,
-    });
-
-    // Notify all invigilators
-    const invigilators = schedule.sessions
-      .map((session) => session.invigilator)
-      .filter(
-        (inv, index, arr) =>
-          inv && arr.findIndex((i) => i._id.equals(inv._id)) === index,
+    // The schedule is published at this point. Telling people is best effort:
+    // this method used to work out who to tell and then send nothing, while
+    // the API answered "published and notifications sent". An email problem
+    // must not undo a publish, so failures are logged, never thrown.
+    try {
+      const sessions = [...schedule.sessions].sort(
+        (a, b) => new Date(a.date) - new Date(b.date),
       );
 
-    // Send email notifications
+      // Every student in the class gets the whole timetable.
+      const students = await User.find({
+        role: 'Student',
+        'studentProfile.class': schedule.class._id,
+        isActive: true,
+      }).select('firstName email');
+
+      const classSessions = sessions.map(toEmailSession);
+
+      await enqueueBulkEmail(students, (student) => ({
+        to: student.email,
+        subject: `${schedule.title} timetable`,
+        html: emailTemplates.examSchedule({
+          studentName: student.firstName,
+          examTitle: schedule.title,
+          sessions: classSessions,
+          viewUrl: `${clientUrl()}/student/exam-schedules`,
+        }),
+      }));
+
+      // Each invigilator gets only the sessions they are covering.
+      const byInvigilator = new Map();
+      sessions.forEach((session) => {
+        const teacher = session.invigilator;
+        if (!teacher?.email) return;
+        const key = String(teacher._id);
+        if (!byInvigilator.has(key)) {
+          // `email` at the top level: enqueueBulkEmail skips any recipient
+          // without one.
+          byInvigilator.set(key, {
+            email: teacher.email,
+            teacher,
+            sessions: [],
+          });
+        }
+        byInvigilator.get(key).sessions.push(toEmailSession(session));
+      });
+
+      await enqueueBulkEmail([...byInvigilator.values()], (entry) => ({
+        to: entry.teacher.email,
+        subject: `Invigilation duty: ${schedule.title}`,
+        html: emailTemplates.examSchedule({
+          studentName: entry.teacher.firstName,
+          examTitle: `${schedule.title} — your invigilation`,
+          sessions: entry.sessions,
+          viewUrl: `${clientUrl()}/teacher/exam-schedules`,
+        }),
+      }));
+    } catch (error) {
+      console.error(
+        `Exam schedule ${schedule._id} published, but notifying failed: ${error.message}`,
+      );
+    }
 
     return schedule;
   }

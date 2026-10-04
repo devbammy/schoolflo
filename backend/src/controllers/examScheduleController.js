@@ -1,5 +1,6 @@
 const examScheduleService = require('../services/examScheduleService');
-const { sendSuccess, sendError } = require('../utils/apiResponse');
+const { sendSuccess } = require('../utils/apiResponse');
+const AppError = require('../utils/AppError');
 
 // Create exam schedule
 exports.createSchedule = async (req, res) => {
@@ -11,14 +12,25 @@ exports.createSchedule = async (req, res) => {
 };
 
 // Get all schedules
+const isStaff = (user) => ['Admin', 'Teacher'].includes(user.role);
+
 exports.getSchedules = async (req, res) => {
-  const schedules = await examScheduleService.getSchedules(req.query);
+  const schedules = await examScheduleService.getSchedules({
+    ...req.query,
+    publishedOnly: !isStaff(req.user),
+  });
   sendSuccess(res, 200, 'Schedules retrieved successfully', schedules);
 };
 
 // Get schedule by ID
 exports.getScheduleById = async (req, res) => {
   const schedule = await examScheduleService.getScheduleById(req.params.id);
+
+  // A draft is indistinguishable from a schedule that does not exist.
+  if (!schedule.isPublished && !isStaff(req.user)) {
+    throw AppError.notFound('Exam schedule not found');
+  }
+
   sendSuccess(res, 201, 'Schedule retrieved successfully', schedule);
 };
 

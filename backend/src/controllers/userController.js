@@ -8,6 +8,10 @@ const { BorrowRecord } = require('../models/Library');
 const Task = require('../models/Task');
 const StaffAttendance = require('../models/StaffAttendance');
 const Class = require('../models/Class');
+const Subject = require('../models/Subject');
+const Certificate = require('../models/Certificate');
+const { Assignment, Submission } = require('../models/Assignment');
+const { Exam } = require('../models/Exam');
 const { getCurrentPeriod } = require('../utils/academicPeriod');
 const {
   getTeacherRosterClassIds,
@@ -378,12 +382,111 @@ const updateUser = async (req, res) => {
   return sendSuccess(res, 200, 'User updated', { user });
 };
 
+/**
+ * Refuse to remove the last way into the portal. With no active admin nobody
+ * can reactivate anybody, create accounts or undo the mistake — the school is
+ * locked out of its own system and the fix is editing the database by hand.
+ */
+const assertNotLastAdmin = async (user, verb) => {
+  if (user.role !== 'Admin' || !user.isActive) return;
+
+  const otherAdmins = await User.countDocuments({
+    role: 'Admin',
+    isActive: true,
+    _id: { $ne: user._id },
+  });
+
+  if (otherAdmins === 0) {
+    throw AppError.badRequest(
+      `This is the only active administrator, so it cannot be ${verb}d. Make another administrator first.`,
+    );
+  }
+};
+
+/**
+ * A student or teacher with academic, financial or work records cannot be
+ * deleted: the results, payments, registers and certificates filed under them
+ * would be left pointing at nobody, and the financial report and report cards
+ * would quietly lose rows. Deactivating keeps every record and still stops
+ * the account signing in. People with nothing filed against them — a duplicate
+ * or a typo — can still be removed.
+ */
+const assertNoRecords = async (user) => {
+  const id = user._id;
+  let counts = {};
+
+  if (user.role === 'Student') {
+    const [results, payments, attendance, certificates, submissions] =
+      await Promise.all([
+        Result.countDocuments({ student: id }),
+        Payment.countDocuments({ student: id }),
+        Attendance.countDocuments({ student: id }),
+        Certificate.countDocuments({ student: id }),
+        Submission.countDocuments({ student: id }),
+      ]);
+    counts = { results, payments, attendance, certificates, submissions };
+  } else if (user.role === 'Teacher') {
+    const [assignments, exams, tasks, staffAttendance, gradedResults] =
+      await Promise.all([
+        Assignment.countDocuments({ teacher: id }),
+        Exam.countDocuments({ teacher: id }),
+        Task.countDocuments({ assignedTo: id }),
+        StaffAttendance.countDocuments({ staff: id }),
+        Result.countDocuments({ gradedBy: id }),
+      ]);
+    counts = { assignments, exams, tasks, staffAttendance, gradedResults };
+  }
+
+  const held = Object.entries(counts).filter(([, n]) => n > 0);
+  if (held.length) {
+    throw AppError.conflict(
+      `This ${user.role.toLowerCase()} has records (${held
+        .map(([name, n]) => `${n} ${name}`)
+        .join(', ')}) that would be orphaned. Deactivate the account instead.`,
+    );
+  }
+};
+
+/** Tidy the references other documents keep to a user who is now gone. */
+const removeLinksTo = async (user) => {
+  const id = user._id;
+
+  if (user.role === 'Student') {
+    await User.updateMany(
+      { 'parentProfile.children': id },
+      { $pull: { 'parentProfile.children': id } },
+    );
+  } else if (user.role === 'Teacher') {
+    await Promise.all([
+      Class.updateMany(
+        { 'sections.classTeacher': id },
+        { $set: { 'sections.$[s].classTeacher': null } },
+        { arrayFilters: [{ 's.classTeacher': id }] },
+      ),
+      Subject.updateMany({ teachers: id }, { $pull: { teachers: id } }),
+    ]);
+  } else if (user.role === 'Parent') {
+    await User.updateMany(
+      { 'studentProfile.parentId': id },
+      { $unset: { 'studentProfile.parentId': '' } },
+    );
+  }
+};
+
 // @desc    Activate / deactivate a user
 // @route   PATCH /api/v1/users/:id/toggle-status
 // @access  Admin
 const toggleUserStatus = async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw AppError.notFound('User not found');
+
+  // Only deactivation is dangerous. Reactivating is always fine.
+  if (user.isActive) {
+    if (String(user._id) === String(req.user._id)) {
+      throw AppError.badRequest('You cannot deactivate your own account.');
+    }
+    await assertNotLastAdmin(user, 'deactivate');
+  }
 
   user.isActive = !user.isActive;
   await user.save({ validateBeforeSave: false });
@@ -421,6 +524,9 @@ const deleteUser = async (req, res) => {
     throw AppError.badRequest('You cannot delete your own account.');
   }
 
+  await assertNotLastAdmin(user, 'delete');
+  await assertNoRecords(user);
+
   if (user.avatar?.publicId) {
     await deleteFromCloudinary(user.avatar.publicId, 'image');
   }
@@ -443,6 +549,7 @@ const deleteUser = async (req, res) => {
   });
 
   await user.deleteOne();
+  await removeLinksTo(user);
 
   return sendSuccess(res, 200, 'User deleted');
 };

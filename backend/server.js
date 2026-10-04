@@ -13,6 +13,7 @@ const axios = require('axios');
 
 const connectDB = require('./src/config/db');
 const { getFeatures } = require('./src/config/features');
+const { validateEnv } = require('./src/config/env');
 const MongoRateLimitStore = require('./src/middleware/rateLimitStore');
 const {
   byUserOrIp,
@@ -51,6 +52,10 @@ const auditRoutes = require('./src/routes/audit');
 const taskRoutes = require('./src/routes/tasks');
 const searchRoutes = require('./src/routes/search');
 const configRoutes = require('./src/routes/config');
+
+// Before anything is mounted or listening: a missing secret should stop the
+// deploy here, not surface as a 500 on the first sign-in.
+validateEnv();
 
 const app = express();
 
@@ -318,7 +323,9 @@ app.use((req, res) => {
 // Global Error Handler
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5001;
+// 5000 is what the client's dev proxy and the documentation assume; this said
+// 5001, so a local run with no PORT set was unreachable from the client.
+const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {

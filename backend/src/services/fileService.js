@@ -1,6 +1,7 @@
 const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 const path = require('path');
+const AppError = require('../utils/AppError');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -11,27 +12,36 @@ cloudinary.config({
 // Multer memory storage (files go to Cloudinary directly)
 const storage = multer.memoryStorage();
 
-const fileFilter = (req, file, cb) => {
-  const ALLOWED_TYPES = [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'text/plain',
-    'application/zip',
-  ];
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-  if (ALLOWED_TYPES.includes(file.mimetype)) {
+const DOCUMENT_TYPES = [
+  ...IMAGE_TYPES,
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'application/zip',
+];
+
+// Built per uploader so an avatar route can insist on an image. Every route
+// shared one list, so a profile picture could be a PDF or a zip.
+//
+// A refusal is an AppError, not a bare Error: the global handler reports an
+// unrecognised Error as a generic 500 and logs a stack trace, so the person
+// who picked the wrong file saw "Something went wrong" instead of what was
+// wrong with it.
+const makeFileFilter = (allowedTypes) => (req, file, cb) => {
+  if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error(`File type '${file.mimetype}' is not allowed.`), false);
+    cb(
+      AppError.badRequest(`File type '${file.mimetype}' is not allowed.`),
+      false,
+    );
   }
 };
 
@@ -47,10 +57,10 @@ const UPLOAD_LIMITS = {
   default: 1 * MB,
 };
 
-const makeUploader = (limitKey = 'default') =>
+const makeUploader = (limitKey = 'default', allowedTypes = DOCUMENT_TYPES) =>
   multer({
     storage,
-    fileFilter,
+    fileFilter: makeFileFilter(allowedTypes),
     limits: {
       fileSize: UPLOAD_LIMITS[limitKey] ?? UPLOAD_LIMITS.default,
     },
@@ -63,7 +73,7 @@ const makeUploader = (limitKey = 'default') =>
  */
 const upload = makeUploader('default');
 
-const uploadAvatar = makeUploader('avatar');
+const uploadAvatar = makeUploader('avatar', IMAGE_TYPES);
 const uploadAssignment = makeUploader('assignment');
 const uploadSubmission = makeUploader('submission');
 
@@ -98,7 +108,9 @@ const uploadCsv = multer({
     }
 
     cb(
-      new Error('Upload a .csv file. Save your spreadsheet as CSV first.'),
+      AppError.badRequest(
+        'Upload a .csv file. Save your spreadsheet as CSV first.',
+      ),
       false,
     );
   },

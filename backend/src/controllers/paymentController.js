@@ -332,10 +332,16 @@ const recordManualPayment = async (req, res) => {
   // payment for this student and fee would let a cash entry attach itself to
   // a pending Paystack record, whose transactionRef the gateway would later
   // settle — overwriting the cash amount recorded here.
+  // Matched on the SAME method. This used to match either Cash or Bank
+  // Transfer, so a transfer recorded after a cash payment was folded into the
+  // cash record and took its label — and the report's "by method" totals
+  // credited the school's bank account to the till. Each method keeps its own
+  // record; balances sum across all of them, so what is owed is unaffected.
+  const method = gateway || 'Cash';
   const existing = await Payment.findOne({
     student: studentId,
     feeStructure: feeStructureId,
-    gateway: { $in: ['Cash', 'Bank Transfer'] },
+    gateway: method,
   });
 
   // What this record is answerable for: the cash it has taken, plus whatever
@@ -346,7 +352,12 @@ const recordManualPayment = async (req, res) => {
   if (existing) {
     existing.amountPaid += amount;
     existing.amountDue = existing.amountPaid + remainingAfter;
-    existing.notes = notes;
+    // Appended, not replaced: this record accumulates several receipts, and
+    // overwriting lost the earlier notes (or blanked them when the new entry
+    // had none).
+    if (notes) {
+      existing.notes = [existing.notes, notes].filter(Boolean).join(' | ');
+    }
     existing.processedBy = req.user._id;
     existing.receiptNumber =
       existing.receiptNumber || (await generateReceiptNumber());
@@ -359,7 +370,7 @@ const recordManualPayment = async (req, res) => {
       academicYear: feeStructure.academicYear,
       amountPaid: amount,
       amountDue: amount + remainingAfter,
-      gateway: gateway || 'Cash',
+      gateway: method,
       receiptNumber: await generateReceiptNumber(),
       processedBy: req.user._id,
       notes,

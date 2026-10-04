@@ -125,10 +125,16 @@ const createParent = async (req, res) => {
 const updateParent = async (req, res) => {
   const { password, email, role, ...updateData } = req.body;
 
-  const parent = await User.findByIdAndUpdate(req.params.id, updateData, {
-    new: true,
-    runValidators: true,
-  })
+  // Matched on role as well as id: this route is for parents, and without the
+  // role it would edit any account — a teacher, an admin — handed to it.
+  const parent = await User.findOneAndUpdate(
+    { _id: req.params.id, role: 'Parent' },
+    updateData,
+    {
+      new: true,
+      runValidators: true,
+    },
+  )
     .populate({
       path: 'parentProfile.children',
       select: 'firstName lastName studentProfile avatar',
@@ -196,7 +202,9 @@ const linkChild = async (req, res) => {
 // @access  Admin
 const deleteParent = async (req, res) => {
   const parent = await User.findById(req.params.id);
-  if (!parent) throw AppError.notFound('Parent not found');
+  if (!parent || parent.role !== 'Parent') {
+    throw AppError.notFound('Parent not found');
+  }
 
   // Detach the children before removing the account.
   await User.updateMany(
