@@ -37,8 +37,18 @@ const certificateSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed, // Flexible structure for different certificate types
       required: true,
     },
-    pdfUrl: String, // Cloudinary URL after generation
-    publicId: String, // Cloudinary public ID
+    // The document itself. Kept here and served only through the
+    // authenticated download route, never as a public URL: these are children's
+    // names and grades. `select: false` so no ordinary query carries it, and
+    // the toJSON transform below strips it from any response regardless.
+    pdfData: { type: Buffer, select: false },
+    pdfSize: Number,
+
+    // Documents issued before PDFs moved into the database sit on public
+    // Cloudinary URLs. Kept only so they can be migrated (see
+    // utils/migrateCertificatePdfs.js); new certificates never set these.
+    pdfUrl: String,
+    publicId: String,
     issuedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -60,8 +70,26 @@ const certificateSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (doc, ret) => {
+        delete ret.pdfData;
+        // The legacy public link is not handed out either; downloads go
+        // through GET /certificates/:id/download.
+        delete ret.pdfUrl;
+        delete ret.publicId;
+        delete ret.id;
+        return ret;
+      },
+    },
   },
 );
+
+// Whether there is a document to download — the client shows the button on
+// this, since it no longer receives a URL.
+certificateSchema.virtual('hasPdf').get(function () {
+  return Boolean(this.pdfSize || this.pdfUrl);
+});
 
 // Auto-generate certificate number
 certificateSchema.pre('save', async function (next) {

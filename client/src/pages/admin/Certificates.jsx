@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { certificateService } from '../../services/api';
+import { downloadCertificate } from '../../utils/downloadCertificate';
 import { toast } from 'react-hot-toast';
 import Modal from '../../components/common/Modal';
 import {
@@ -96,8 +97,6 @@ const Certificates = () => {
       resetForms();
       fetchCertificates();
 
-      // Open PDF in new tab
-      // window.open(response.data.data.pdfUrl, '_blank');
     } catch (error) {
       toast.error(
         error.response?.data?.message || 'Failed to generate certificate',
@@ -211,14 +210,15 @@ const Certificates = () => {
             </div>
 
             <div className="cert-actions">
-              <a
-                href={cert.pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-sm btn-secondary"
-              >
-                View PDF
-              </a>
+              {cert.hasPdf && (
+                <button
+                  type="button"
+                  onClick={() => downloadCertificate(cert)}
+                  className="btn btn-sm btn-secondary"
+                >
+                  Download PDF
+                </button>
+              )}
               {cert.status === 'Issued' && (
                 <button
                   className="btn btn-sm btn-danger"

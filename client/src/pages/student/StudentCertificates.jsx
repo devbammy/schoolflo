@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { certificateService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
+import { downloadCertificate } from '../../utils/downloadCertificate';
 import toast from 'react-hot-toast';
 import { Download, FileText, Calendar, Award } from 'lucide-react';
 import { format } from 'date-fns';
@@ -134,16 +135,15 @@ const StudentCertificates = () => {
               </div>
 
               <div className="certificate-actions">
-                {cert.pdfUrl && cert.status === 'Issued' && (
-                  <a
-                    href={cert.pdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                {cert.hasPdf && cert.status === 'Issued' && (
+                  <button
+                    type="button"
+                    onClick={() => downloadCertificate(cert)}
                     className="btn btn-primary btn-sm"
                   >
                     <Download size={16} />
                     Download PDF
-                  </a>
+                  </button>
                 )}
                 {cert.status === 'Revoked' && (
                   <div className="revoked-notice">

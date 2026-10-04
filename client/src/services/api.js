@@ -465,6 +465,10 @@ export const certificateService = {
   getChildrenCertificates: () =>
     api.get('/certificates/parent/children-certificates'),
   revoke: (id, data) => api.put(`/certificates/${id}/revoke`, data),
+  // The document itself. Asked for as a blob: it is a PDF, and it needs the
+  // caller's token, which a plain link cannot carry.
+  download: (id) =>
+    api.get(`/certificates/${id}/download`, { responseType: 'blob' }),
 };
 
 export const taskService = {

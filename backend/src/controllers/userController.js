@@ -370,7 +370,28 @@ const getUserProfile = async (req, res) => {
 const updateUser = async (req, res) => {
   // password, email and role are stripped: each has its own dedicated flow and
   // must not be mass-assignable from a profile edit.
-  const { password, email, role, ...updateData } = req.body;
+  // Beyond those three, nothing the system manages itself may be set from a
+  // profile form: isActive has its own route (with the last-admin and
+  // self-lockout rules), and the reset-token, session and avatar fields belong
+  // to the flows that maintain them.
+  const {
+    password,
+    email,
+    role,
+    isActive,
+    isEmailVerified,
+    passwordResetToken,
+    passwordResetExpire,
+    passwordChangedAt,
+    lastLogin,
+    avatar,
+    ...updateData
+  } = req.body;
+
+  const before = await User.findById(req.params.id)
+    .select('firstName lastName phone studentProfile teacherProfile role')
+    .lean();
+  if (!before) throw AppError.notFound('User not found');
 
   const user = await User.findByIdAndUpdate(req.params.id, updateData, {
     new: true,
@@ -378,6 +399,29 @@ const updateUser = async (req, res) => {
   }).select('-password');
 
   if (!user) throw AppError.notFound('User not found');
+
+  // Moving a child to another class, or marking them Withdrawn, changes what
+  // they are billed and where they are marked present — it should be possible
+  // to say who did it.
+  const tracked = (doc) => ({
+    firstName: doc.firstName,
+    lastName: doc.lastName,
+    phone: doc.phone,
+    class: doc.studentProfile?.class,
+    profileStatus: doc.studentProfile?.profileStatus,
+    parentId: doc.studentProfile?.parentId,
+    classTeacherOf: doc.teacherProfile?.classTeacherOf,
+  });
+
+  await audit.record(req, {
+    action: 'user.update',
+    entity: 'User',
+    entityId: user._id,
+    entityLabel: `${user.firstName} ${user.lastName}`,
+    subject: user.role === 'Student' ? user._id : undefined,
+    changes: audit.diff(tracked(before), tracked(user)),
+    meta: { role: user.role },
+  });
 
   return sendSuccess(res, 200, 'User updated', { user });
 };

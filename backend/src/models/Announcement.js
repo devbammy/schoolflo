@@ -47,6 +47,11 @@ const AnnouncementSchema = new mongoose.Schema(
         resourceType: String,
       },
     ],
+    // NOT YET SUPPORTED. Nothing sets this (createAnnouncement ignores it) and
+    // nothing publishes on a schedule. It is kept because the admin overview's
+    // "stuck announcement" alert reads it, and both will work unchanged the day
+    // a scheduler exists. Until then an announcement is published when it is
+    // created with `publish: true`, or not at all.
     scheduledAt: Date,
     expiresAt: Date,
     isPublished: { type: Boolean, default: false },

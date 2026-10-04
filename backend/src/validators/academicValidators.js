@@ -165,7 +165,6 @@ const createAnnouncementRules = [
   booleanBody('channels.dashboard', 'Dashboard channel'),
   booleanBody('channels.email', 'Email channel'),
   booleanBody('channels.sms', 'SMS channel'),
-  dateBody('scheduledAt', 'Scheduled date'),
   dateBody('expiresAt', 'Expiry date'),
 ];
 

@@ -356,7 +356,9 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 24 suites, 441 tests, Jest, `maxWorkers: 1`.
+`pnpm test` — 28 suites, 475 tests, Jest, `maxWorkers: 1`. The integration
+suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
+and take around ten minutes on a slow machine, mostly bcrypt at cost 12.
 
 The client now has ESLint too (`pnpm lint` from `client/`), and CI runs it.
 The build alone never caught an undefined component — an undefined
@@ -430,6 +432,37 @@ Client code has **no test runner**. The check is that it builds.
 ---
 
 ## Traps
+
+- **Certificate PDFs live in MongoDB, never on a public URL.** They hold a
+  child's name and grades. `Certificate.pdfData` is `select: false` and stripped
+  from every JSON response; the only way to a document is
+  `GET /certificates/:id/download`, which applies `assertStudentAccess` on every
+  request and refuses a revoked certificate to everyone but an admin. Do not put
+  a file link in an email or an API response. `pnpm migrate:certificates` moves
+  any legacy Cloudinary-hosted ones (dry run first).
+- **Build links with `clientUrl()`, never `process.env.CLIENT_URL`.**
+  `CLIENT_URL` may list several origins for CORS; interpolating it raw breaks
+  every reset, welcome and payment-return link.
+- **Email templates escape their arguments centrally** (`escapeDeep` in
+  `notificationService.js`). A template added later is safe by construction;
+  don't `${...}` user text into HTML anywhere else.
+- **`calculateGrade` matches on `min` only.** The bands are whole numbers
+  (60-69, 70-100), so testing `<= max` sent 69.5 to F. Keep it that way.
+- **Email addresses are normalised the same way in two places** —
+  `NORMALIZE_EMAIL_OPTIONS` (validators) and `byLoginTarget` (rate limiter).
+  Change one and the login rate limit gets a per-spelling budget again.
+- **The server refuses to boot on a bad environment** (`config/env.js`).
+  `.env.example` lists every variable. In production a JWT secret under 32
+  characters, or two identical ones, is fatal.
+- **Published results are locked to teachers**; an admin correction recomputes
+  class statistics. A user with records cannot be deleted (deactivate), and the
+  last active admin cannot be deactivated or deleted.
+- **The email queue deletes jobs when done** (`removeOnComplete`) because a
+  welcome email's body is a plaintext password. It retries with backoff; do not
+  add anything to a job that must not sit in the database.
+- **`scheduledAt` on announcements is not supported** — nothing publishes on a
+  schedule. The field and the admin overview's alert on it are kept for the day
+  a scheduler exists.
 
 - **`Fees.totalAmount` is derived in `pre('validate')`, not `pre('save')`.**
   Mongoose validates before save hooks, so a required field computed in

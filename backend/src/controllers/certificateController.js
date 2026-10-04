@@ -68,7 +68,9 @@ const notifyCertificateIssued = async (certificate) => {
     issueDate: new Date(certificate.issueDate).toLocaleDateString('en-NG', {
       dateStyle: 'long',
     }),
-    downloadUrl: certificate.pdfUrl || clientUrl(),
+    // The portal, not the file: the document is only served to someone signed
+    // in and entitled to it, so a link in an email must never be the file.
+    downloadUrl: clientUrl(),
     issuerName: certificate.issuedBy
       ? `${certificate.issuedBy.firstName} ${certificate.issuedBy.lastName}`
       : 'School Administration',
@@ -143,8 +145,8 @@ exports.generateReportCard = async (req, res) => {
     term,
     academicYear,
     data: { term, academicYear },
-    pdfUrl: pdfData.url,
-    publicId: pdfData.publicId,
+    pdfData: pdfData.buffer,
+    pdfSize: pdfData.buffer.length,
     issuedBy: req.user._id,
     status: 'Issued',
   });
@@ -190,8 +192,8 @@ exports.generateLeavingCertificate = async (req, res) => {
     throw error;
   }
 
-  certificate.pdfUrl = pdfData.url;
-  certificate.publicId = pdfData.publicId;
+  certificate.pdfData = pdfData.buffer;
+  certificate.pdfSize = pdfData.buffer.length;
   certificate.status = 'Issued';
   await certificate.save();
 
@@ -240,8 +242,8 @@ exports.generateAdmissionLetter = async (req, res) => {
     throw error;
   }
 
-  certificate.pdfUrl = pdfData.url;
-  certificate.publicId = pdfData.publicId;
+  certificate.pdfData = pdfData.buffer;
+  certificate.pdfSize = pdfData.buffer.length;
   certificate.status = 'Issued';
   await certificate.save();
 
@@ -381,4 +383,60 @@ exports.getChildrenCertificates = async (req, res) => {
     .sort({ createdAt: -1 });
 
   sendSuccess(res, 200, 'Children certificates retrieved', certificates);
+};
+
+// @desc    Download a certificate's PDF
+// @route   GET /api/v1/certificates/:id/download
+// @access  Admin, Teacher, the student it belongs to, that student's parent
+//
+// The only way to obtain the document. It used to be a public Cloudinary URL,
+// so anyone holding the link — forwarded email, browser history, a shared
+// screenshot — could read a child's report card, and revoking a certificate
+// left the file open for ever. Here the same ownership rule as everywhere else
+// applies on every request, and a revoked certificate stops being served.
+exports.downloadCertificate = async (req, res) => {
+  const certificate = await Certificate.findById(req.params.id).select(
+    '+pdfData',
+  );
+
+  if (!certificate) {
+    return sendError(res, 404, 'Certificate not found');
+  }
+
+  assertStudentAccess(req.user, certificate.student, 'certificates');
+
+  const isAdmin = req.user.role === 'Admin';
+
+  // A draft is not an issued document, and a revoked one is not valid. Admins
+  // may still open either, to see what was issued.
+  if (certificate.status === 'Draft' && !isAdmin) {
+    return sendError(res, 404, 'Certificate not found');
+  }
+  if (certificate.status === 'Revoked' && !isAdmin) {
+    return sendError(res, 403, 'This certificate has been revoked.');
+  }
+
+  if (!certificate.pdfData || !certificate.pdfData.length) {
+    // Issued before documents were stored in the portal. See
+    // utils/migrateCertificatePdfs.js, or regenerate it.
+    return sendError(
+      res,
+      404,
+      'This document is not available for download. Ask an administrator to regenerate it.',
+    );
+  }
+
+  const filename = String(certificate.certificateNumber || certificate._id)
+    .replace(/[^\w.-]+/g, '_')
+    .concat('.pdf');
+
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `inline; filename="${filename}"`,
+    'Content-Length': certificate.pdfData.length,
+    // A child's record must not sit in a shared browser or proxy cache.
+    'Cache-Control': 'private, no-store',
+  });
+
+  return res.send(Buffer.from(certificate.pdfData));
 };

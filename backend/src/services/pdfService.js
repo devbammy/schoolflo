@@ -8,8 +8,6 @@
  */
 const mongoose = require('mongoose');
 const PDFDocument = require('pdfkit');
-const cloudinary = require('cloudinary').v2;
-const streamifier = require('streamifier');
 const { Result } = require('../models/Exam');
 const User = require('../models/User');
 const { GRADE_SCALE } = require('../config/constants');
@@ -120,30 +118,11 @@ class PDFService {
         // Collect PDF in buffer
         const chunks = [];
         doc.on('data', (chunk) => chunks.push(chunk));
-        doc.on('end', async () => {
-          const pdfBuffer = Buffer.concat(chunks);
-
-          // Upload to Cloudinary
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder: 'smp/certificates',
-              resource_type: 'raw',
-              format: 'pdf',
-              public_id: `report_card_${student._id}_${term}_${academicYear}_${Date.now()}`,
-            },
-            (error, result) => {
-              if (error) {
-                reject(error);
-              } else {
-                resolve({
-                  url: result.secure_url,
-                  publicId: result.public_id,
-                });
-              }
-            },
-          );
-
-          streamifier.createReadStream(pdfBuffer).pipe(uploadStream);
+        // The bytes are returned, not uploaded: the caller stores them and serves
+        // them only to people allowed to see the document. They used to go to
+        // a public Cloudinary URL that anyone holding the link could open.
+        doc.on('end', () => {
+          resolve({ buffer: Buffer.concat(chunks) });
         });
 
         // --- PDF Content Design ---
@@ -462,29 +441,11 @@ class PDFService {
 
         const chunks = [];
         doc.on('data', (chunk) => chunks.push(chunk));
-        doc.on('end', async () => {
-          const pdfBuffer = Buffer.concat(chunks);
-
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder: 'smp/certificates',
-              resource_type: 'raw',
-              format: 'pdf',
-              public_id: `leaving_cert_${student._id}_${Date.now()}`,
-            },
-            (error, result) => {
-              if (error) {
-                reject(error);
-              } else {
-                resolve({
-                  url: result.secure_url,
-                  publicId: result.public_id,
-                });
-              }
-            },
-          );
-
-          streamifier.createReadStream(pdfBuffer).pipe(uploadStream);
+        // The bytes are returned, not uploaded: the caller stores them and serves
+        // them only to people allowed to see the document. They used to go to
+        // a public Cloudinary URL that anyone holding the link could open.
+        doc.on('end', () => {
+          resolve({ buffer: Buffer.concat(chunks) });
         });
 
         // --- PDF Content ---
@@ -639,29 +600,11 @@ class PDFService {
 
         const chunks = [];
         doc.on('data', (chunk) => chunks.push(chunk));
-        doc.on('end', async () => {
-          const pdfBuffer = Buffer.concat(chunks);
-
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder: 'smp/certificates',
-              resource_type: 'raw',
-              format: 'pdf',
-              public_id: `admission_letter_${student._id}_${Date.now()}`,
-            },
-            (error, result) => {
-              if (error) {
-                reject(error);
-              } else {
-                resolve({
-                  url: result.secure_url,
-                  publicId: result.public_id,
-                });
-              }
-            },
-          );
-
-          streamifier.createReadStream(pdfBuffer).pipe(uploadStream);
+        // The bytes are returned, not uploaded: the caller stores them and serves
+        // them only to people allowed to see the document. They used to go to
+        // a public Cloudinary URL that anyone holding the link could open.
+        doc.on('end', () => {
+          resolve({ buffer: Buffer.concat(chunks) });
         });
 
         // --- PDF Content ---

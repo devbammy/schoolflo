@@ -39,6 +39,7 @@ router.post(
 // Get certificates
 router.get('/', protect, certificateController.getAllCertificates);
 
+router.get('/:id/download', protect, certificateController.downloadCertificate);
 router.get('/:id', protect, certificateController.getCertificateById);
 
 // Student-specific routes
