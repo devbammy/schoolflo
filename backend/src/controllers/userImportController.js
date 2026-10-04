@@ -1,3 +1,4 @@
+const { clientUrl } = require('../config/clientUrl');
 const AppError = require('../utils/AppError');
 const { sendSuccess } = require('../utils/apiResponse');
 const { emailTemplates } = require('../services/notificationService');
@@ -57,7 +58,7 @@ const commitUserImport = async (req, res) => {
         email: person.email,
         password: person.password,
         role: personRole,
-        loginUrl: `${process.env.CLIENT_URL}/login`,
+        loginUrl: `${clientUrl()}/login`,
       }),
     }).catch((err) =>
       console.error(`Welcome email failed for ${person.email}: ${err.message}`),

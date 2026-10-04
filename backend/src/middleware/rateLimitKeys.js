@@ -61,9 +61,14 @@ const byUserOrIp = (req) => {
  * while doing nothing extra against an attacker with a list of addresses.
  */
 const byLoginTarget = (req) => {
+  // The limiter runs before the route's validator, so it sees the address as
+  // typed. It must reduce it exactly as the validator will (see
+  // NORMALIZE_EMAIL_OPTIONS), or one account can be attacked under many
+  // spellings, each with its own budget.
   const email = String(req.body?.email || '')
     .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/@googlemail\.com$/, '@gmail.com');
 
   return email ? `login:${email}` : `login-ip:${normalizeIp(req.ip)}`;
 };

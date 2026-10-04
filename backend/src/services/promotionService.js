@@ -49,6 +49,31 @@ class PromotionService {
 
     const processedStudents = [];
 
+    // Class positions come from one read, ranked once. This used to sit inside
+    // the per-student loop, so a class of 45 ran 45 identical queries.
+    const allResults = await Result.find({
+      class: promotion.fromClass._id,
+      academicYear: promotion.academicYear,
+      isPublished: true,
+    }).select('student totalScore');
+
+    const studentAverages = {};
+    allResults.forEach((result) => {
+      const studentId = String(result.student);
+      if (!studentAverages[studentId]) {
+        studentAverages[studentId] = { total: 0, count: 0 };
+      }
+      studentAverages[studentId].total += result.totalScore;
+      studentAverages[studentId].count += 1;
+    });
+
+    const rankedStudents = Object.entries(studentAverages)
+      .map(([id, data]) => ({
+        studentId: id,
+        average: data.total / data.count,
+      }))
+      .sort((a, b) => b.average - a.average);
+
     for (const student of students) {
       // Get student's yearly performance
       const trackers = await CATracker.find({
@@ -66,9 +91,15 @@ class PromotionService {
             yearlyAverages.length
           : null;
 
-      // Find failed subjects (yearly average < 40)
+      // Find failed subjects (yearly average < 40). A tracker with no average
+      // yet is "not assessed", not a fail: null < 40 is true in JavaScript.
       const failedSubjects = trackers
-        .filter((t) => t.yearlyAverage < 40)
+        .filter(
+          (t) =>
+            t.subject &&
+            typeof t.yearlyAverage === 'number' &&
+            t.yearlyAverage < 40,
+        )
         .map((t) => t.subject._id);
 
       // Check core subjects if required
@@ -116,38 +147,20 @@ class PromotionService {
         comment = 'Congratulations on your graduation!';
       }
 
-      // Get class position
-      const allResults = await Result.find({
-        class: promotion.fromClass._id,
-        academicYear: promotion.academicYear,
-        isPublished: true,
-      }).populate('student');
-
-      // Calculate average per student
-      const studentAverages = {};
-      allResults.forEach((result) => {
-        const studentId = result.student._id.toString();
-        if (!studentAverages[studentId]) {
-          studentAverages[studentId] = { total: 0, count: 0 };
-        }
-        studentAverages[studentId].total += result.totalScore;
-        studentAverages[studentId].count += 1;
-      });
-
-      const averages = Object.entries(studentAverages).map(([id, data]) => ({
-        studentId: id,
-        average: data.total / data.count,
-      }));
-
-      averages.sort((a, b) => b.average - a.average);
+      // 0 means "no published results for this student".
       const position =
-        averages.findIndex((a) => a.studentId === student._id.toString()) + 1;
+        rankedStudents.findIndex((a) => a.studentId === String(student._id)) +
+        1;
 
       processedStudents.push({
         student: student._id,
         status,
         promotedTo,
-        yearlyAverage: parseFloat(overallAverage.toFixed(2)),
+        // A student with no tracker data has no average. That is the case the
+        // "no academic records" branch above handles, and calling toFixed on
+        // its null crashed the whole batch.
+        yearlyAverage:
+          overallAverage === null ? 0 : parseFloat(overallAverage.toFixed(2)),
         yearlyPosition: position,
         totalStudents: students.length,
         failedSubjects,
@@ -217,12 +230,15 @@ class PromotionService {
         student.studentProfile.class = entry.promotedTo;
         await student.save();
       } else if (entry.status === 'Graduated') {
+        // The schema field is `profileStatus`. This wrote `status`, which is
+        // not in the schema, so Mongoose dropped it silently: graduates stayed
+        // Active, kept being billed and kept appearing on registers.
         student.studentProfile.graduationDate = new Date();
-        student.studentProfile.status = 'Graduated';
+        student.studentProfile.profileStatus = 'Graduated';
         await student.save();
       } else if (entry.status === 'Withdrawn') {
         student.isActive = false;
-        student.studentProfile.status = 'Withdrawn';
+        student.studentProfile.profileStatus = 'Withdrawn';
         await student.save();
       }
 

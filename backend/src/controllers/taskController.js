@@ -1,3 +1,4 @@
+const { clientUrl } = require('../config/clientUrl');
 const crypto = require('crypto');
 const Task = require('../models/Task');
 const User = require('../models/User');
@@ -23,9 +24,8 @@ const POPULATE = [
   { path: 'review.reviewedBy', select: 'firstName lastName' },
 ];
 
-const firstUrl = () => (process.env.CLIENT_URL || '').split(',')[0].trim();
-
-const teacherTaskUrl = (taskId) => `${firstUrl()}/teacher/tasks?task=${taskId}`;
+const teacherTaskUrl = (taskId) =>
+  `${clientUrl()}/teacher/tasks?task=${taskId}`;
 
 /**
  * Load a task and confirm the caller is allowed to touch it.

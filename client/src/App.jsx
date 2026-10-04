@@ -94,6 +94,7 @@ const ParentCertificates = lazy(
 const MyLibraryPage = lazy(() => import('./pages/shared/MyLibraryPage'));
 const CalendarViewPage = lazy(() => import('./pages/shared/CalendarViewPage'));
 const ViewResults = lazy(() => import('./pages/shared/ViewResults'));
+const PaymentVerifyPage = lazy(() => import('./pages/shared/PaymentVerifyPage'));
 
 const PageLoader = () => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
@@ -202,6 +203,17 @@ export default function App() {
             <Route
               path="/reset-password/:token"
               element={<ResetPasswordPage />}
+            />
+
+            {/* Where the payment gateways send the payer back to. Any signed-in
+                role can land here; the server checks the payment is theirs. */}
+            <Route
+              path="/payments/verify"
+              element={
+                <ProtectedRoute>
+                  <PaymentVerifyPage />
+                </ProtectedRoute>
+              }
             />
 
             {/* Role redirect */}

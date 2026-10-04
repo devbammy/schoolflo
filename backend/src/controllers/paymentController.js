@@ -222,7 +222,9 @@ const verifyPaystackPayment = async (req, res) => {
   const denied = checkStudentAccess(req.user, existing.student);
   if (denied) return sendError(res, 403, denied);
 
-  const { settled, reason, payment } = await settlePayment({ reference });
+  const { settled, reason, payment, overpaid } = await settlePayment({
+    reference,
+  });
 
   if (!settled) {
     if (reason === 'currency_mismatch') {
@@ -244,6 +246,7 @@ const verifyPaystackPayment = async (req, res) => {
       balance: payment.balance,
       gateway: payment.gateway,
       viaRedirect: true,
+      overpaid: overpaid || undefined,
     },
   });
 
@@ -400,15 +403,11 @@ const getStudentPayments = async (req, res) => {
   const { studentId } = req.params;
   const { term, academicYear } = req.query;
 
-  // Auth checks
-  if (req.user.role === 'Student' && String(req.user._id) !== studentId) {
-    return sendError(res, 403, 'Access denied');
-  }
-  if (req.user.role === 'Parent') {
-    const childIds = req.user.parentProfile?.children?.map(String) || [];
-    if (!childIds.includes(studentId))
-      return sendError(res, 403, 'Access denied');
-  }
+  // The same rule as the balance endpoint. The check here used to name only
+  // Student and Parent, so a Teacher — who is neither — fell straight through
+  // and could read any student's payments and receipts.
+  const denied = checkStudentAccess(req.user, studentId, 'view');
+  if (denied) return sendError(res, 403, denied);
 
   const filter = { student: studentId };
   if (term) filter.term = term;
@@ -521,12 +520,44 @@ const getFeeStructureById = async (req, res) => {
 // @route   PUT /api/v1/fees/:id
 // @access  Admin
 const updateFeeStructure = async (req, res) => {
-  const fee = await Fees.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
+  const fee = await Fees.findById(req.params.id);
+  if (!fee) throw AppError.notFound('Fee structure not found');
+
+  // Loaded and saved rather than findByIdAndUpdate'd: totalAmount is derived
+  // from `items` in a pre('validate') hook, and a query update never runs
+  // document hooks. Editing the items through the old route left the stored
+  // total at its previous value, so balances, receipts and the financial
+  // report all kept using the old fee. It also took the request body whole,
+  // so the total, creator and active flag could be set directly.
+  const editable = [
+    'title',
+    'class',
+    'term',
+    'academicYear',
+    'items',
+    'dueDate',
+    'lateFee',
+    'isActive',
+  ];
+
+  const before = { totalAmount: fee.totalAmount, dueDate: fee.dueDate };
+  editable.forEach((field) => {
+    if (req.body[field] !== undefined) fee[field] = req.body[field];
   });
 
-  if (!fee) throw AppError.notFound('Fee structure not found');
+  await fee.save();
+
+  await audit.record(req, {
+    action: 'fee.update',
+    entity: 'Fees',
+    entityId: fee._id,
+    entityLabel: fee.title,
+    changes: audit.diff(before, {
+      totalAmount: fee.totalAmount,
+      dueDate: fee.dueDate,
+    }),
+    meta: { term: fee.term, academicYear: fee.academicYear },
+  });
 
   return sendSuccess(res, 200, 'Fee structure updated', { fee });
 };

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Certificate = require('../models/Certificate');
 const User = require('../models/User');
 const pdfService = require('../services/pdfService');
+const { clientUrl } = require('../config/clientUrl');
 const audit = require('../services/auditService');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
 const {
@@ -67,7 +68,7 @@ const notifyCertificateIssued = async (certificate) => {
     issueDate: new Date(certificate.issueDate).toLocaleDateString('en-NG', {
       dateStyle: 'long',
     }),
-    downloadUrl: certificate.pdfUrl || process.env.CLIENT_URL,
+    downloadUrl: certificate.pdfUrl || clientUrl(),
     issuerName: certificate.issuedBy
       ? `${certificate.issuedBy.firstName} ${certificate.issuedBy.lastName}`
       : 'School Administration',
@@ -102,7 +103,7 @@ const notifyCertificateRevoked = async (certificate) => {
         dateStyle: 'long',
       },
     ),
-    helpUrl: process.env.CLIENT_URL,
+    helpUrl: clientUrl(),
   };
 
   await Promise.all(
@@ -159,29 +160,40 @@ exports.generateReportCard = async (req, res) => {
 
 // Generate School Leaving Certificate
 exports.generateLeavingCertificate = async (req, res) => {
-  const { studentId, data } = req.body;
+  const { studentId, data = {} } = req.body;
 
   const student = await resolveStudentIdentifier(studentId);
   if (!student || student.role !== 'Student') {
     return sendError(res, 404, 'Student not found');
   }
 
-  // Generate PDF
-  const pdfData = await pdfService.generateLeavingCertificate(
-    student._id,
-    data,
-  );
-
-  // Save certificate record
+  // The record comes first because the certificate number is assigned when it
+  // is saved, and the PDF has to print that number. It used to print whatever
+  // `data.certificateNumber` the request carried — usually nothing, so the
+  // document said "Certificate No: undefined" while the database held another.
   const certificate = await Certificate.create({
     certificateType: 'School Leaving Certificate',
     student: student._id,
     data,
-    pdfUrl: pdfData.url,
-    publicId: pdfData.publicId,
     issuedBy: req.user._id,
-    status: 'Issued',
+    status: 'Draft',
   });
+
+  let pdfData;
+  try {
+    pdfData = await pdfService.generateLeavingCertificate(student._id, {
+      ...data,
+      certificateNumber: certificate.certificateNumber,
+    });
+  } catch (error) {
+    await certificate.deleteOne(); // no PDF, so no certificate
+    throw error;
+  }
+
+  certificate.pdfUrl = pdfData.url;
+  certificate.publicId = pdfData.publicId;
+  certificate.status = 'Issued';
+  await certificate.save();
 
   await certificate.populate('student', 'firstName lastName studentProfile');
 
@@ -199,27 +211,39 @@ exports.generateLeavingCertificate = async (req, res) => {
 
 // Generate Admission Letter
 exports.generateAdmissionLetter = async (req, res) => {
-  const { studentId, data } = req.body;
+  const { studentId, data = {} } = req.body;
 
   const student = await resolveStudentIdentifier(studentId);
   if (!student || student.role !== 'Student') {
     return sendError(res, 404, 'Student not found');
   }
 
-  // Generate PDF
-  const pdfData = await pdfService.generateAdmissionLetter(student._id, data);
-
-  // Save certificate record
+  // Record first, for the same reason as the leaving certificate: the PDF
+  // prints the number the database assigns.
   const certificate = await Certificate.create({
     certificateType: 'Admission Letter',
     student: student._id,
     data,
-    pdfUrl: pdfData.url,
-    publicId: pdfData.publicId,
     issuedBy: req.user._id,
     validUntil: data.validUntil,
-    status: 'Issued',
+    status: 'Draft',
   });
+
+  let pdfData;
+  try {
+    pdfData = await pdfService.generateAdmissionLetter(student._id, {
+      ...data,
+      certificateNumber: certificate.certificateNumber,
+    });
+  } catch (error) {
+    await certificate.deleteOne();
+    throw error;
+  }
+
+  certificate.pdfUrl = pdfData.url;
+  certificate.publicId = pdfData.publicId;
+  certificate.status = 'Issued';
+  await certificate.save();
 
   await certificate.populate('student', 'firstName lastName');
 

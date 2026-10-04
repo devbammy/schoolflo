@@ -116,7 +116,7 @@ const sendSMS = async (to, body) => {
 
 // ─── Email Templates ──────────────────────────────────────────────────────────
 
-const emailTemplates = {
+const rawTemplates = {
   welcome: ({ firstName, email, password, role, loginUrl }) => `
     <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Helvetica, Arial, sans-serif;">
       <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(15, 28, 63, 0.1);">
@@ -508,6 +508,50 @@ const emailTemplates = {
   `;
   },
 };
+
+/**
+ * Every template interpolates its arguments straight into HTML, and several of
+ * those arguments are typed by users: an announcement's title and body, a
+ * task's description, a certificate's revoke reason, a name from a CSV. A
+ * Teacher could therefore put markup — a phishing link, a tracking pixel —
+ * into a message the school's own address then sends to every parent.
+ *
+ * Escaping happens here, once, for every template, rather than at each
+ * `${...}`, so a template added later is safe without anyone remembering to.
+ */
+const escapeHtml = (value) =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const escapeDeep = (value) => {
+  if (typeof value === 'string') return escapeHtml(value);
+  if (Array.isArray(value)) return value.map(escapeDeep);
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, inner]) => [key, escapeDeep(inner)]),
+    );
+  }
+  return value; // numbers, dates, booleans, null
+};
+
+const emailTemplates = Object.fromEntries(
+  Object.entries(rawTemplates).map(([name, render]) => [
+    name,
+    (args = {}) => render(escapeDeep(args)),
+  ]),
+);
+
+// An announcement body is plain text typed into a box, so its line breaks mean
+// something. Escape first, then turn them into <br> — never the other way.
+emailTemplates.announcement = (args = {}) =>
+  rawTemplates.announcement({
+    ...escapeDeep(args),
+    body: escapeHtml(args.body ?? '').replace(/\r?\n/g, '<br>'),
+  });
 
 module.exports = {
   sendEmail,

@@ -47,7 +47,7 @@ const startJobQueue = async () => {
       throw new Error('MongoDB connection is not ready');
     }
 
-    const [{ Agenda }, { MongoBackend }] = await Promise.all([
+    const [{ Agenda, exponential }, { MongoBackend }] = await Promise.all([
       import('agenda'),
       import('@agendajs/mongo-backend'),
     ]);
@@ -64,7 +64,27 @@ const startJobQueue = async () => {
 
     agenda.define(
       SEND_EMAIL,
-      { priority: 'normal', concurrency: 3 },
+      {
+        priority: 'normal',
+        concurrency: 3,
+
+        // Throwing below only marks a job failed. Agenda retries nothing
+        // unless a backoff is configured, and none was — so one SMTP hiccup
+        // dropped the email for good while enqueueEmail had already reported
+        // it as queued. 30s, 2m, 8m, 32m, then give up.
+        backoff: exponential({
+          delay: 30 * 1000,
+          factor: 4,
+          maxRetries: 4,
+          jitter: 0.2,
+        }),
+
+        // The job record holds the whole message, and the welcome email's body
+        // is a temporary password in plain text. Agenda keeps finished jobs
+        // forever by default, which left every credential ever issued sitting
+        // in the `jobs` collection. Delete a job as soon as it has been sent.
+        removeOnComplete: true,
+      },
       async (job) => {
         const { to, subject, html, text } = job.attrs.data || {};
         if (!to) return;
@@ -83,6 +103,21 @@ const startJobQueue = async () => {
       console.error(
         `Email job failed (attempt ${job.attrs.failCount}) for ${job.attrs.data?.to}: ${err.message}`,
       );
+    });
+
+    // A job that has used up its retries is dead, and still carries the
+    // message. Log it for whoever is watching, then drop it with its content.
+    agenda.on('retry exhausted:' + SEND_EMAIL, async (err, job) => {
+      console.error(
+        `Email to ${job.attrs.data?.to} abandoned after ${job.attrs.failCount} attempts: ${err.message}`,
+      );
+      try {
+        await job.remove();
+      } catch (removeError) {
+        console.error(
+          `Could not remove failed email job: ${removeError.message}`,
+        );
+      }
     });
 
     await agenda.start();

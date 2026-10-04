@@ -1,5 +1,10 @@
 const { body, param } = require('express-validator');
-const { stringBody, ROLE_VALUES, optionalObjectIdBody } = require('./common');
+const {
+  stringBody,
+  ROLE_VALUES,
+  optionalObjectIdBody,
+  NORMALIZE_EMAIL_OPTIONS,
+} = require('./common');
 
 const emailRule = (field = 'email') =>
   body(field)
@@ -8,7 +13,7 @@ const emailRule = (field = 'email') =>
     .bail()
     .isEmail()
     .withMessage('Enter a valid email address.')
-    .normalizeEmail({ gmail_remove_dots: false });
+    .normalizeEmail(NORMALIZE_EMAIL_OPTIONS);
 
 /**
  * Password strength. Deliberately length-led rather than a thicket of

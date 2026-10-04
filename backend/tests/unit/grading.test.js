@@ -156,3 +156,18 @@ describe('getPrincipalComment', () => {
     expect(getPrincipalComment(average)).toContain(expected);
   });
 });
+
+describe('calculateGrade between whole-number bands', () => {
+  // The bands are written 60-69 / 70-100, so a fraction such as 69.5 sat in
+  // the gap and used to fall through to F.
+  it.each([
+    [69.5, 'B'],
+    [59.83, 'C'],
+    [49.5, 'D'],
+    [44.5, 'E'],
+    [39.5, 'F'],
+    [99.9, 'A'],
+  ])('grades %f as %s', (score, grade) => {
+    expect(calculateGrade(score).grade).toBe(grade);
+  });
+});

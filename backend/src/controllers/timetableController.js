@@ -2,6 +2,7 @@ const Timetable = require('../models/Timetable');
 const User = require('../models/User');
 const { sendSuccess } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
+const { getCurrentPeriod } = require('../utils/academicPeriod');
 
 const PERIOD_POPULATE = [
   { path: 'periods.subject', select: 'name code' },
@@ -55,12 +56,14 @@ const getMyTimetables = async (req, res) => {
   const { user } = req;
   const { term, academicYear } = req.query;
 
-  const currentYear = new Date().getFullYear();
-  const defaultAcademicYear = `${currentYear}/${currentYear + 1}`;
-
+  // The default session comes from the school calendar. It used to be
+  // `${thisYear}/${thisYear + 1}`, which from January onwards is the NEXT
+  // session — a Nigerian session runs September to July — so in Second and
+  // Third Term every caller that did not send a year saw no timetable.
   const baseFilter = { isPublished: true };
   if (term) baseFilter.term = term;
-  baseFilter.academicYear = academicYear || defaultAcademicYear;
+  baseFilter.academicYear =
+    academicYear || (await getCurrentPeriod()).academicYear;
 
   let timetables = [];
 

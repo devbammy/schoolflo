@@ -125,8 +125,10 @@ export default function ParentPayments() {
         feeStructureId: fee._id,
         amount,
       });
-      window.open(res.data.data.authorizationUrl, '_blank');
       toast.success('Redirecting to Paystack...');
+      // Same tab, not window.open: iPhone Safari blocks a popup opened after
+      // an await. The gateway returns the payer to /payments/verify.
+      window.location.assign(res.data.data.authorizationUrl);
     } catch (err) {
       toast.error(
         err.response?.data?.message || 'Payment initialisation failed',

@@ -8,6 +8,7 @@ const Announcement = require('../models/Announcement');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
 const { getFeeBalances } = require('../services/paymentService');
 const { buildAdminOverview } = require('../services/adminOverviewService');
+const { getCurrentPeriod } = require('../utils/academicPeriod');
 
 // @desc    Admin master dashboard
 // @route   GET /api/v1/dashboard/admin
@@ -221,7 +222,13 @@ const getTeacherDashboard = async (req, res) => {
 
 const getStudentDashboard = async (req, res) => {
   const studentId = req.user._id;
-  const { term, academicYear } = req.query;
+
+  // The school calendar decides the term unless the caller names one. The
+  // client used to send a hard-coded 'First Term', so in Second and Third Term
+  // a student's dashboard kept showing First Term results and attendance.
+  const period = await getCurrentPeriod();
+  const term = req.query.term || period.term;
+  const academicYear = req.query.academicYear || period.academicYear;
 
   const student = await User.findById(studentId)
     .populate('studentProfile.class', 'name level subjects')
@@ -308,6 +315,11 @@ const getParentDashboard = async (req, res) => {
 
   const children = parent.parentProfile?.children || [];
 
+  // Same rule as the student dashboard: the calendar decides unless told.
+  const period = await getCurrentPeriod();
+  const term = req.query.term || period.term;
+  const academicYear = req.query.academicYear || period.academicYear;
+
   // For each child, get latest results + payment status
   const childrenData = await Promise.all(
     children.map(async (child) => {
@@ -322,11 +334,7 @@ const getParentDashboard = async (req, res) => {
             .sort({ createdAt: -1 })
             .populate('feeStructure', 'title totalAmount term'),
 
-          Attendance.getSummary(
-            child._id,
-            req.query.term,
-            req.query.academicYear,
-          ),
+          Attendance.getSummary(child._id, term, academicYear),
         ]);
 
       const avg = latestResults.length

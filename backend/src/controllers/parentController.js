@@ -6,6 +6,7 @@ const {
   sendPaginated,
   getPaginationParams,
 } = require('../utils/apiResponse');
+const { clientUrl } = require('../config/clientUrl');
 const AppError = require('../utils/AppError');
 const { emailTemplates } = require('../services/notificationService');
 const { enqueueEmail } = require('../services/jobQueue');
@@ -100,7 +101,7 @@ const createParent = async (req, res) => {
       email: parent.email,
       password,
       role: 'Parent',
-      loginUrl: `${process.env.CLIENT_URL}/login`,
+      loginUrl: `${clientUrl()}/login`,
     }),
   }).catch((err) =>
     console.error(
@@ -248,9 +249,10 @@ const getUnlinkedStudents = async (req, res) => {
 // @route   GET /api/v1/parents/children/assignments
 // @access  Parent
 const getChildrenAssignments = async (req, res) => {
-  const parent = await User.findById(req.user._id).populate(
-    'parentProfile.children',
-  );
+  const parent = await User.findById(req.user._id).populate({
+    path: 'parentProfile.children',
+    populate: { path: 'studentProfile.class', select: 'name' },
+  });
 
   const children = parent?.parentProfile?.children || [];
 
@@ -259,12 +261,19 @@ const getChildrenAssignments = async (req, res) => {
   }
 
   const childrenIds = children.map((child) => child._id);
+  // The class is populated so the child list below can show its name; the
+  // query needs the id.
   const childClasses = children
-    .map((child) => child.studentProfile?.class)
+    .map((child) => child.studentProfile?.class?._id)
     .filter(Boolean);
 
   const [assignments, submissions] = await Promise.all([
-    Assignment.find({ class: { $in: childClasses }, isActive: true })
+    // Published only: a draft is the teacher's, not the family's.
+    Assignment.find({
+      class: { $in: childClasses },
+      isActive: true,
+      isPublished: true,
+    })
       .populate('class', 'name')
       .populate('subject', 'name code')
       .populate('teacher', 'firstName lastName')

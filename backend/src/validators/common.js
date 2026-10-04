@@ -105,6 +105,33 @@ const amountBody = (
     .toFloat();
 };
 
+/**
+ * How an email address is normalised before it is looked up or stored.
+ *
+ * validator's default also strips "+tags" (and dots, `-tags` and so on) for a
+ * list of providers, which silently merged `parent+kid@gmail.com` into
+ * `parent@gmail.com` — and gave login rate limiting a hole, because the limiter
+ * counts the address as typed while the lookup used the stripped one, so
+ * `victim+1@`, `victim+2@`, … each got a fresh budget against one account.
+ *
+ * Lowercasing and googlemail.com → gmail.com are all that remains. The rate
+ * limiter (middleware/rateLimitKeys.js) applies the same two rules, so both see
+ * the same account.
+ */
+const NORMALIZE_EMAIL_OPTIONS = {
+  all_lowercase: true,
+  gmail_lowercase: true,
+  gmail_remove_dots: false,
+  gmail_remove_subaddress: false,
+  gmail_convert_googlemaildotcom: true,
+  outlookdotcom_lowercase: true,
+  outlookdotcom_remove_subaddress: false,
+  yahoo_lowercase: true,
+  yahoo_remove_subaddress: false,
+  icloud_lowercase: true,
+  icloud_remove_subaddress: false,
+};
+
 const booleanBody = (field, label = field) =>
   body(field)
     .optional()
@@ -154,4 +181,5 @@ module.exports = {
   booleanBody,
   dateBody,
   paginationQuery,
+  NORMALIZE_EMAIL_OPTIONS,
 };

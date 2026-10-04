@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const ms = require('../utils/ms');
 const User = require('../models/User');
 const Session = require('../models/Session');
+const { clientUrl } = require('../config/clientUrl');
 const AppError = require('../utils/AppError');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
 const { emailTemplates } = require('../services/notificationService');
@@ -94,7 +95,7 @@ const register = async (req, res) => {
       email: user.email,
       password,
       role: user.role,
-      loginUrl: `${process.env.CLIENT_URL}/login`,
+      loginUrl: `${clientUrl()}/login`,
     }),
   }).catch((err) =>
     console.error(`Welcome email failed for ${user.email}: ${err.message}`),
@@ -230,9 +231,26 @@ const updatePassword = async (req, res) => {
   user.password = newPassword;
   await user.save();
 
+  // A password change already makes every older refresh token fail, but it
+  // does so lazily and leaves dead session rows behind. End them now, and give
+  // this device a session of its own — otherwise the person who just changed
+  // their password is signed out as soon as their access token expires.
+  await Session.deleteMany({ user: user._id });
+
   const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+  await createSession(user, refreshToken, req);
+
+  await audit.record(req, {
+    action: 'auth.password_change',
+    entity: 'User',
+    entityId: user._id,
+    entityLabel: user.email,
+  });
+
   return sendSuccess(res, 200, 'Password updated successfully', {
     accessToken,
+    refreshToken,
   });
 };
 
@@ -264,7 +282,7 @@ const forgotPassword = async (req, res) => {
   user.passwordResetExpire = Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000;
   await user.save({ validateBeforeSave: false });
 
-  const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+  const resetUrl = `${clientUrl()}/reset-password/${resetToken}`;
 
   const { success } = await enqueueEmail({
     to: user.email,

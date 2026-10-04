@@ -14,6 +14,7 @@ const {
 } = require('../services/gradingService');
 const { emailTemplates } = require('../services/notificationService');
 const caTrackingService = require('../services/caTrackingService');
+const { clientUrl } = require('../config/clientUrl');
 const { enqueueEmail } = require('../services/jobQueue');
 const audit = require('../services/auditService');
 const {
@@ -383,7 +384,7 @@ const notifyParentsOfResults = async (studentIds, term, academicYear) => {
           academicYear,
           average,
           position: `${overallPosition} of ${totalStudentsInClass}`,
-          loginUrl: `${process.env.CLIENT_URL}/login`,
+          loginUrl: `${clientUrl()}/login`,
         }),
       });
 

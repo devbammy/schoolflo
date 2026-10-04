@@ -24,10 +24,11 @@ const UserSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      match: [
-        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-        'Please provide a valid email',
-      ],
+      // Deliberately loose: the real test of an address is whether the welcome
+      // email arrives. The previous pattern capped the TLD at three letters,
+      // so `.info`, `.school`, `.africa` and `.online` were refused (and
+      // `parent+kid@gmail.com` too), after the CSV preview had passed them.
+      match: [/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, 'Please provide a valid email'],
     },
     password: {
       type: String,
@@ -80,6 +81,7 @@ const UserSchema = new mongoose.Schema(
         enum: ['Active', 'Graduated', 'Withdrawn', 'Suspended'],
         default: 'Active',
       },
+      graduationDate: Date,
     },
 
     // Teacher-specific fields

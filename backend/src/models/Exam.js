@@ -175,9 +175,21 @@ ResultSchema.pre('save', function (next) {
 function calculateGrade(score) {
   const value = Number(score) || 0;
 
+  // Matched on `min` alone, highest band first. The bands are written as
+  // whole numbers (B is 60-69, A starts at 70), so testing `value <= max` left
+  // a gap for every fraction between them: 69.5 matched no band and fell
+  // through to F, as did an average of 59.83. The first band whose floor the
+  // score reaches is the right one; anything below every floor is the lowest.
+  const lowest = GRADE_SCALE[GRADE_SCALE.length - 1];
+  const ceiling = Math.max(...GRADE_SCALE.map((b) => b.max));
+
+  // A score above the scale's own ceiling is corrupt input, not a distinction.
   const band =
-    GRADE_SCALE.find((b) => value >= b.min && value <= b.max) ||
-    GRADE_SCALE[GRADE_SCALE.length - 1]; // out of range scores fall to the lowest band
+    value > ceiling
+      ? lowest
+      : [...GRADE_SCALE]
+          .sort((a, b) => b.min - a.min)
+          .find((b) => value >= b.min) || lowest;
 
   return {
     grade: band.grade,

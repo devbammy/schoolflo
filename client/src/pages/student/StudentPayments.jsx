@@ -60,8 +60,11 @@ export default function StudentPayments() {
         feeStructureId: fee._id,
         amount,
       });
-      window.open(res.data.data.authorizationUrl, '_blank');
       toast.success('Redirecting to payment gateway...');
+      // Same tab, not window.open: a popup opened after an await is blocked by
+      // iPhone Safari, so the payer never saw the checkout. The gateway sends
+      // them back to /payments/verify when they are done.
+      window.location.assign(res.data.data.authorizationUrl);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Payment init failed');
     } finally {

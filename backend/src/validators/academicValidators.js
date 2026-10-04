@@ -9,6 +9,7 @@ const {
   academicYearBody,
   dateBody,
   booleanBody,
+  NORMALIZE_EMAIL_OPTIONS,
 } = require('./common');
 
 const CLASS_LEVELS = ['JSS', 'SS', 'Primary', 'College'];
@@ -222,7 +223,7 @@ const createParentRules = [
     .bail()
     .isEmail()
     .withMessage('Enter a valid email address.')
-    .normalizeEmail({ gmail_remove_dots: false }),
+    .normalizeEmail(NORMALIZE_EMAIL_OPTIONS),
   body('password')
     .exists({ checkFalsy: true })
     .withMessage('Password is required.')

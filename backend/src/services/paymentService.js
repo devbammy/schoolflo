@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
+const { clientUrl } = require('../config/clientUrl');
 const AppError = require('../utils/AppError');
 const { Payment } = require('../models/Fees');
 const { buildFeeLedger } = require('./feeLedgerService');
@@ -28,8 +29,7 @@ const initializePaystack = async ({ email, amount, metadata, callbackUrl }) => {
         email,
         amount: Math.round(amount * 100), // Convert to kobo
         reference: `SMP-${uuidv4().split('-')[0].toUpperCase()}`,
-        callback_url:
-          callbackUrl || `${process.env.CLIENT_URL}/payments/verify`,
+        callback_url: callbackUrl || `${clientUrl()}/payments/verify`,
         metadata,
       }),
     },
@@ -93,13 +93,13 @@ const initializeFlutterwave = async ({
       tx_ref: txRef,
       amount,
       currency: 'NGN',
-      redirect_url: redirectUrl || `${process.env.CLIENT_URL}/payments/verify`,
+      redirect_url: redirectUrl || `${clientUrl()}/payments/verify`,
       customer: { email, name, phone_number: phone },
       meta: metadata,
       customizations: {
         title: 'School Management Portal',
         description: 'Fee Payment',
-        logo: `${process.env.CLIENT_URL}/logo.png`,
+        logo: `${clientUrl()}/logo.png`,
       },
     }),
   });
@@ -377,6 +377,34 @@ const settlePayment = async ({ reference }) => {
     return { settled: false, reason: 'invalid_amount', payment };
   }
 
+  // Was this more than the fee still needed? Two checkouts opened for the same
+  // fee can both succeed — an attempt only counts once it is settled, so the
+  // second was priced against a balance the first had not yet reduced. The
+  // money has already left the payer's account, so it is recorded rather than
+  // refused; what must not happen is for it to vanish into a fee that reads
+  // "Paid" with nobody aware the school is holding extra.
+  const feeId = payment.feeStructure?._id || payment.feeStructure;
+  const payerId = payment.student?._id || payment.student;
+  let overpaid = 0;
+  if (feeId && payerId) {
+    const paidBefore = await getAmountPaidSoFar(payerId, feeId);
+    const feeTotal = Math.round(Number(payment.feeStructure?.totalAmount) || 0);
+    const stillOwed = Math.max(0, feeTotal - paidBefore);
+    overpaid = feeTotal > 0 ? Math.max(0, Math.round(amount) - stillOwed) : 0;
+  }
+
+  if (overpaid > 0) {
+    payment.notes = [
+      payment.notes,
+      `Overpayment of ₦${overpaid.toLocaleString()} received on ${reference} — refund or credit due.`,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    console.warn(
+      `Overpayment: ${reference} exceeded the balance owed by ₦${overpaid}`,
+    );
+  }
+
   payment.amountPaid = amount;
   payment.paymentDate = verification.paidAt
     ? new Date(verification.paidAt)
@@ -408,6 +436,7 @@ const settlePayment = async ({ reference }) => {
   return {
     settled: true,
     alreadySettled: false,
+    overpaid,
     payment: publicPayment(payment),
   };
 };

@@ -28,11 +28,13 @@ import {
   UserRoundCheck,
   Timer,
   Zap,
+  KeyRound,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import useFeatureStore from '../../store/featureStore';
 import GlobalSearch from '../common/GlobalSearch';
 import QuickActionsModal from '../common/QuickActionsModal';
+import ChangePasswordModal from '../common/ChangePasswordModal';
 
 const NAV_CONFIG = {
   Admin: [
@@ -281,6 +283,7 @@ export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const features = useFeatureStore((s) => s.features);
@@ -371,6 +374,26 @@ export default function DashboardLayout() {
               </div>
               <div className="sidebar__user-role">{user?.role}</div>
             </div>
+          )}
+          {!collapsed && (
+            <button
+              onClick={() => {
+                setMobileOpen(false);
+                setPasswordOpen(true);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255,255,255,0.4)',
+                cursor: 'pointer',
+                padding: '4px',
+                flexShrink: 0,
+              }}
+              title="Change password"
+              aria-label="Change password"
+            >
+              <KeyRound size={16} />
+            </button>
           )}
           {!collapsed && (
             <button
@@ -506,6 +529,11 @@ export default function DashboardLayout() {
         open={quickActionsOpen}
         onClose={() => setQuickActionsOpen(false)}
         role={user?.role}
+      />
+
+      <ChangePasswordModal
+        open={passwordOpen}
+        onClose={() => setPasswordOpen(false)}
       />
     </div>
   );

@@ -14,6 +14,39 @@ const { Result } = require('../models/Exam');
 const User = require('../models/User');
 const { GRADE_SCALE } = require('../config/constants');
 const { computeCumulative } = require('./gradingService');
+const AppError = require('../utils/AppError');
+
+/**
+ * Who the document is from.
+ *
+ * The letterheads used to be hard-coded placeholders ("SCHOOL NAME HERE",
+ * "Tel: +234-XXX-XXX-XXXX"), so every report card, leaving certificate and
+ * admission letter went out looking like a template. Read at call time so a
+ * missing setting is reported when someone asks for a document, with a message
+ * that says what to set, and never printed on one.
+ */
+const schoolIdentity = () => {
+  const name = (process.env.SCHOOL_NAME || '').trim();
+
+  if (!name) {
+    throw AppError.badRequest(
+      'School details are not configured. Set SCHOOL_NAME (and ' +
+        'SCHOOL_ADDRESS, SCHOOL_PHONE, SCHOOL_EMAIL) before generating documents.',
+    );
+  }
+
+  const address = (process.env.SCHOOL_ADDRESS || '').trim();
+  const phone = (process.env.SCHOOL_PHONE || '').trim();
+  const email = (process.env.SCHOOL_EMAIL || '').trim();
+
+  return {
+    name,
+    address,
+    contact: [phone && `Tel: ${phone}`, email && `Email: ${email}`]
+      .filter(Boolean)
+      .join(' | '),
+  };
+};
 
 // Rendered from GRADE_SCALE so the legend printed on a report card can never
 // disagree with the grades printed above it.
@@ -27,6 +60,7 @@ class PDFService {
     return new Promise(async (resolve, reject) => {
       try {
         // Fetch student data
+        const school = schoolIdentity();
         const student = await this._resolveStudent(studentId, true);
 
         if (!student || student.role !== 'Student') {
@@ -58,11 +92,11 @@ class PDFService {
           });
 
           if (unpublishedResults.length > 0) {
-            throw new Error(
+            throw AppError.badRequest(
               `No published results found for this term. Found ${unpublishedResults.length} unpublished results. Please publish the results first.`,
             );
           } else {
-            throw new Error(
+            throw AppError.badRequest(
               `No results found for term "${term}" and academic year "${academicYear}". Please check if results exist for this student.`,
             );
           }
@@ -118,10 +152,12 @@ class PDFService {
         doc
           .fontSize(22)
           .font('Helvetica-Bold')
-          .text('SCHOOL NAME HERE', { align: 'center' })
+          .text(school.name.toUpperCase(), { align: 'center' })
           .fontSize(10)
           .font('Helvetica')
-          .text('School Address | Phone | Email', { align: 'center' })
+          .text([school.address, school.contact].filter(Boolean).join(' | '), {
+            align: 'center',
+          })
           .moveDown(0.5);
 
         // Horizontal line
@@ -412,6 +448,7 @@ class PDFService {
   async generateLeavingCertificate(studentId, data) {
     return new Promise(async (resolve, reject) => {
       try {
+        const school = schoolIdentity();
         const student = await this._resolveStudent(studentId, true);
 
         if (!student || student.role !== 'Student') {
@@ -462,13 +499,11 @@ class PDFService {
         doc
           .fontSize(24)
           .font('Helvetica-Bold')
-          .text('SCHOOL NAME', { align: 'center' })
+          .text(school.name.toUpperCase(), { align: 'center' })
           .fontSize(12)
           .font('Helvetica')
-          .text('School Address, City, State', { align: 'center' })
-          .text('Tel: +234-XXX-XXX-XXXX | Email: info@school.ng', {
-            align: 'center',
-          })
+          .text(school.address, { align: 'center' })
+          .text(school.contact, { align: 'center' })
           .moveDown(2);
 
         // Certificate Title
@@ -590,6 +625,7 @@ class PDFService {
   async generateAdmissionLetter(studentId, data) {
     return new Promise(async (resolve, reject) => {
       try {
+        const school = schoolIdentity();
         const student = await this._resolveStudent(studentId);
 
         if (!student) {
@@ -634,13 +670,11 @@ class PDFService {
         doc
           .fontSize(20)
           .font('Helvetica-Bold')
-          .text('SCHOOL NAME', { align: 'center' })
+          .text(school.name.toUpperCase(), { align: 'center' })
           .fontSize(10)
           .font('Helvetica')
-          .text('School Address, City, State', { align: 'center' })
-          .text('Tel: +234-XXX-XXX-XXXX | Email: admissions@school.ng', {
-            align: 'center',
-          })
+          .text(school.address, { align: 'center' })
+          .text(school.contact, { align: 'center' })
           .moveDown(2);
 
         // Reference Number and Date
@@ -743,7 +777,7 @@ class PDFService {
         doc
           .text('_____________________')
           .text('Principal')
-          .text('For: School Name');
+          .text(`For: ${school.name}`);
 
         doc.end();
       } catch (error) {

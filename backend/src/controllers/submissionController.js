@@ -25,6 +25,12 @@ const createSubmission = async (req, res) => {
     throw AppError.forbidden('Assignment is not published yet');
   }
 
+  // Only the class the assignment was set for may hand work in. Nothing
+  // checked this, so any student could submit to any class's assignment.
+  if (String(req.user.studentProfile?.class) !== String(assignment.class)) {
+    throw AppError.forbidden('This assignment was not set for your class');
+  }
+
   // One submission per student per assignment (also enforced by a unique index)
   const existingSubmission = await Submission.findOne({
     assignment: assignmentId,

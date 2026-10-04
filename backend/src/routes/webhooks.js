@@ -97,4 +97,71 @@ router.post(
   },
 );
 
+/**
+ * @desc    Flutterwave payment webhook
+ * @route   POST /webhooks/flutterwave
+ * @access  Public (verified by the shared secret hash, not by JWT)
+ *
+ * Flutterwave does not sign the body. It echoes the "secret hash" you set in
+ * its dashboard back in a `verif-hash` header, so that is what is compared
+ * here (FLUTTERWAVE_WEBHOOK_HASH). This route did not exist before, so a
+ * Flutterwave payment could only ever settle if the payer's browser made it
+ * back to the site.
+ *
+ * The header only proves the call is Flutterwave's. settlePayment() still asks
+ * Flutterwave's API what actually happened to the reference, so nothing in the
+ * body is trusted for the amount.
+ */
+router.post(
+  '/flutterwave',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const secret = process.env.FLUTTERWAVE_WEBHOOK_HASH;
+    if (!secret) {
+      console.error(
+        'Flutterwave webhook received but FLUTTERWAVE_WEBHOOK_HASH is unset',
+      );
+      return res.sendStatus(500);
+    }
+
+    const received = req.headers['verif-hash'];
+    if (
+      typeof received !== 'string' ||
+      received.length !== secret.length ||
+      !crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(received))
+    ) {
+      return res.sendStatus(401);
+    }
+
+    if (!Buffer.isBuffer(req.body)) return res.sendStatus(400);
+
+    let event;
+    try {
+      event = JSON.parse(req.body.toString('utf8'));
+    } catch {
+      return res.sendStatus(200);
+    }
+
+    const reference = event?.data?.tx_ref;
+    if (event?.event !== 'charge.completed' || !reference) {
+      return res.sendStatus(200); // Not an event we act on — acknowledge it.
+    }
+
+    try {
+      const { settled, reason } = await settlePayment({ reference });
+      if (!settled) {
+        console.error(
+          `Flutterwave webhook: ${reference} not settled (${reason})`,
+        );
+      }
+      return res.sendStatus(200);
+    } catch (error) {
+      console.error(
+        `Flutterwave webhook error for ${reference}: ${error.message}`,
+      );
+      return res.sendStatus(500);
+    }
+  },
+);
+
 module.exports = router;

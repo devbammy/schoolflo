@@ -4,7 +4,6 @@ import { BookOpen, FileText, Award, TrendingUp } from 'lucide-react';
 import { dashboardService } from '../../services/api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import { getCurrentAcademicYear } from '../../utils/academicYear';
 import { CA_MAX, caTotal } from '../../utils/scoreComponents';
 
 export default function StudentDashboard() {
@@ -13,10 +12,8 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     dashboardService
-      .getStudent({
-        term: 'First Term',
-        academicYear: getCurrentAcademicYear(),
-      })
+      // No term or year: the server resolves them from the school calendar.
+      .getStudent()
       .then((r) => {
         setData(r.data.data);
       })

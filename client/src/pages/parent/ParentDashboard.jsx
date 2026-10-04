@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Users, TrendingUp, DollarSign, CalendarCheck } from 'lucide-react';
 import { dashboardService } from '../../services/api';
 import toast from 'react-hot-toast';
-import { getCurrentAcademicYear } from '../../utils/academicYear';
 
 export default function ParentDashboard() {
   const [data, setData] = useState(null);
@@ -10,7 +9,9 @@ export default function ParentDashboard() {
 
   useEffect(() => {
     dashboardService
-      .getParent({ term: 'First Term', academicYear: getCurrentAcademicYear() })
+      // No term or year: the server resolves them from the school calendar.
+      // A hard-coded 'First Term' here froze the dashboard on First Term.
+      .getParent()
       .then((r) => setData(r.data.data))
       .catch(() => toast.error('Failed to load'))
       .finally(() => setLoading(false));

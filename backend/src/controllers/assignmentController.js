@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { Assignment } = require('../models/Assignment');
+const User = require('../models/User');
 const { sendSuccess, getPaginationParams } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
 const { processUploadedFiles } = require('../services/fileService');
@@ -30,6 +31,42 @@ const assertCanManage = (user, assignment) => {
   }
 };
 
+/**
+ * The classes whose assignments this account may read as a learner or parent,
+ * or `null` for staff, who are not narrowed by class.
+ *
+ * Both endpoints below used to return every assignment in the school to every
+ * signed-in account — drafts included, which hold instructions and attachments
+ * a teacher has not released. The search service already applied this rule;
+ * the list and by-id endpoints did not.
+ */
+const audienceClassIds = async (user) => {
+  if (user.role === 'Student') {
+    return user.studentProfile?.class
+      ? [String(user.studentProfile.class)]
+      : [];
+  }
+
+  if (user.role === 'Parent') {
+    const children = await User.find({
+      _id: { $in: user.parentProfile?.children || [] },
+    })
+      .select('studentProfile.class')
+      .lean();
+
+    return [
+      ...new Set(
+        children
+          .map((child) => child.studentProfile?.class)
+          .filter(Boolean)
+          .map(String),
+      ),
+    ];
+  }
+
+  return null;
+};
+
 // @desc    List assignments
 // @route   GET /api/v1/assignments
 // @access  Any authenticated user (teachers see only their own)
@@ -42,16 +79,34 @@ const getAssignments = async (req, res) => {
   // Teacher sees only their assignments
   if (req.user.role === 'Teacher') filter.teacher = req.user._id;
 
+  // Learners and parents see published work for their own classes only, and
+  // nothing in the query string can widen that.
+  const allowedClasses = await audienceClassIds(req.user);
+  const isAudience = allowedClasses !== null;
+  if (isAudience) {
+    if (!allowedClasses.length) {
+      return sendSuccess(res, 200, 'Assignments fetched successfully', {
+        assignments: [],
+        pagination: { total: 0, page: 1, limit: 0, pages: 0 },
+      });
+    }
+    filter.isPublished = true;
+    filter.class = { $in: allowedClasses };
+  }
+
   if (classId && mongoose.Types.ObjectId.isValid(classId)) {
-    filter.class = classId;
+    if (!isAudience) filter.class = classId;
+    else if (allowedClasses.includes(String(classId))) filter.class = classId;
   }
   if (subjectId && mongoose.Types.ObjectId.isValid(subjectId)) {
     filter.subject = subjectId;
   }
   if (term) filter.term = term;
   if (academicYear) filter.academicYear = academicYear;
-  if (status === 'published') filter.isPublished = true;
-  if (status === 'draft') filter.isPublished = false;
+  if (!isAudience) {
+    if (status === 'published') filter.isPublished = true;
+    if (status === 'draft') filter.isPublished = false;
+  }
 
   if (search) {
     const pattern = new RegExp(escapeRegex(search), 'i');
@@ -94,6 +149,16 @@ const getAssignmentById = async (req, res) => {
     .populate('submissionCount');
 
   if (!assignment) throw AppError.notFound('Assignment not found');
+
+  // Not-found rather than forbidden: a draft or another class's assignment
+  // should be indistinguishable from one that does not exist.
+  const allowedClasses = await audienceClassIds(req.user);
+  if (allowedClasses !== null) {
+    const classId = String(assignment.class?._id || assignment.class);
+    if (!assignment.isPublished || !allowedClasses.includes(classId)) {
+      throw AppError.notFound('Assignment not found');
+    }
+  }
 
   return sendSuccess(res, 200, 'Assignment fetched successfully', {
     assignment,
