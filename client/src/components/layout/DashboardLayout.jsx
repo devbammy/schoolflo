@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
+  LayoutGrid,
   LayoutDashboard,
   Users,
   GraduationCap,
@@ -11,7 +12,6 @@ import {
   Calendar,
   FileText,
   BarChart3,
-  LogOut,
   Menu,
   School,
   CreditCard,
@@ -27,14 +27,13 @@ import {
   CheckSquare,
   UserRoundCheck,
   Timer,
-  Zap,
-  KeyRound,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import useFeatureStore from '../../store/featureStore';
 import GlobalSearch from '../common/GlobalSearch';
 import QuickActionsModal from '../common/QuickActionsModal';
 import ChangePasswordModal from '../common/ChangePasswordModal';
+import UserMenu from './UserMenu';
 
 const NAV_CONFIG = {
   Admin: [
@@ -272,13 +271,6 @@ const NAV_CONFIG = {
   ],
 };
 
-const ROLE_COLORS = {
-  Admin: '#7C3AED',
-  Teacher: '#0891B2',
-  Student: '#1A4FAB',
-  Parent: '#059669',
-};
-
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -287,6 +279,8 @@ export default function DashboardLayout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const features = useFeatureStore((s) => s.features);
+  const schoolName = useFeatureStore((s) => s.school?.name);
+  const roleHome = user?.role ? `/${user.role.toLowerCase()}` : '/';
 
   // Drop entries this school does not run, and any section left empty by
   // that — a heading over nothing reads as a broken page.
@@ -298,7 +292,6 @@ export default function DashboardLayout() {
       ),
     }))
     .filter((section) => section.items.length > 0);
-  const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : '?';
 
   const handleLogout = async () => {
     // Awaited so the server-side session is revoked before we navigate away.
@@ -311,10 +304,7 @@ export default function DashboardLayout() {
       <div className="sidebar__logo">
         <div className="sidebar__logo-icon">S</div>
         {!collapsed && (
-          <div className="sidebar__logo-text">
-            SchoolPortal
-            <span>Management System</span>
-          </div>
+          <div className="sidebar__logo-text">SchoolFlo</div>
         )}
       </div>
 
@@ -342,76 +332,6 @@ export default function DashboardLayout() {
           </div>
         ))}
       </nav>
-
-      <div className="sidebar__footer">
-        <div className="sidebar__user">
-          <div
-            className="sidebar__avatar"
-            style={{ background: ROLE_COLORS[user?.role] || '#1A4FAB' }}
-          >
-            {user?.avatar?.url ? (
-              <img
-                src={user.avatar.url}
-                alt={initials}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                }}
-              />
-            ) : (
-              initials
-            )}
-          </div>
-          {!collapsed && (
-            <div
-              className="sidebar__user-info"
-              style={{ flex: 1, overflow: 'hidden' }}
-            >
-              <div className="sidebar__user-name">
-                {user?.firstName} {user?.lastName}
-              </div>
-              <div className="sidebar__user-role">{user?.role}</div>
-            </div>
-          )}
-          {!collapsed && (
-            <button
-              onClick={() => {
-                setMobileOpen(false);
-                setPasswordOpen(true);
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255,255,255,0.4)',
-                cursor: 'pointer',
-                padding: '4px',
-                flexShrink: 0,
-              }}
-              title="Change password"
-              aria-label="Change password"
-            >
-              <KeyRound size={16} />
-            </button>
-          )}
-          {!collapsed && (
-            <button
-              onClick={handleLogout}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255,255,255,0.4)',
-                cursor: 'pointer',
-                padding: '4px',
-              }}
-              title="Logout"
-            >
-              <LogOut size={16} />
-            </button>
-          )}
-        </div>
-      </div>
     </>
   );
 
@@ -475,45 +395,43 @@ export default function DashboardLayout() {
               <Menu size={20} />
             </button>
 
+            <div className="topbar__school">
+              <span className="topbar__school-mark" aria-hidden="true">
+                {(schoolName || 'SchoolFlo')[0]}
+              </span>
+              <span className="topbar__school-name">
+                {schoolName || 'SchoolFlo'}
+              </span>
+            </div>
+
             <GlobalSearch />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="topbar__actions">
             {user?.role && (
               <button
-                className="btn btn--primary btn--sm"
+                type="button"
+                className="topbar__icon-btn"
                 onClick={() => setQuickActionsOpen(true)}
+                aria-label="Quick actions"
+                title="Quick actions"
               >
-                <Zap size={15} />{' '}
-                <span className="hidden-mobile">Quick Actions</span>
+                <LayoutGrid size={18} />
               </button>
             )}
-            <span
-              className="badge"
-              style={{
-                background: `${ROLE_COLORS[user?.role]}20`,
-                color: ROLE_COLORS[user?.role],
-              }}
+            <NavLink
+              to={`${roleHome}/announcements`}
+              className="topbar__icon-btn"
+              aria-label="Announcements"
+              title="Announcements"
             >
-              {user?.role}
-            </span>
-            {/* Desktop only. On a phone this name competed with the menu
-                button for the same row and won, squeezing the button to zero
-                width — the icon was still "there" and still clickable, just
-                0px wide, which read as an invisible button. The avatar and
-                role badge already identify who is signed in. */}
-            <div className="hidden-mobile" style={{ textAlign: 'right' }}>
-              <div
-                style={{
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: 'var(--clr-text-1)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {user?.firstName} {user?.lastName}
-              </div>
-            </div>
+              <Bell size={18} />
+            </NavLink>
+            <UserMenu
+              user={user}
+              onChangePassword={() => setPasswordOpen(true)}
+              onLogout={handleLogout}
+            />
           </div>
         </header>
 

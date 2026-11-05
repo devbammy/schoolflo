@@ -1,0 +1,740 @@
+// The dashboards' shared parts. Layout follows the rules in CLAUDE.md: grid
+// tracks can collapse (`min(…, 100%)`), rows of controls wrap, and nothing here
+// is hidden with an inline style.
+
+.dash-header {
+  &__school {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--clr-primary);
+    margin-bottom: 2px;
+  }
+}
+
+// Shortcuts: six across on a desktop, three on a phone.
+.quick-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+
+  // Three across below the width six fit at, rather than five and a stray one.
+  @media (max-width: 1040px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  @media (max-width: 640px) {
+    gap: var(--space-2);
+  }
+}
+
+.quick-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 92px;
+  padding: var(--space-3) var(--space-2);
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  color: var(--clr-text-1);
+  text-align: center;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+
+  &:hover {
+    border-color: var(--clr-primary-lt);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--clr-primary-lt);
+    outline-offset: 2px;
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--clr-primary);
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  &__label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.25;
+    overflow-wrap: break-word;
+    max-width: 100%;
+
+    @media (max-width: 640px) {
+      font-size: 0.71875rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    padding: var(--space-3) var(--space-1);
+  }
+}
+
+// Noticeboard and tiles on the left, what needs doing and the calendar on the
+// right.
+.dash-main {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+  margin-bottom: var(--space-5);
+
+  @media (max-width: 1100px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  &__column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    min-width: 0;
+  }
+}
+
+.dash-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr));
+  gap: var(--space-5);
+  margin-bottom: var(--space-5);
+
+  // Between one column and three, two, with an odd card taking the full row
+  // rather than leaving a hole beside it.
+  @media (min-width: 641px) and (max-width: 1240px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    > :last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+.dash-card {
+  min-width: 0;
+  border-radius: var(--radius-lg);
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+}
+
+.dash-round-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--clr-border);
+  background: var(--clr-surface);
+  color: var(--clr-primary);
+
+  &:hover {
+    background: var(--clr-bg);
+  }
+
+  &--solid {
+    background: var(--clr-primary);
+    border-color: var(--clr-primary);
+    color: #fff;
+
+    &:hover {
+      background: var(--clr-primary-dk);
+    }
+  }
+}
+
+.dash-empty {
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--clr-text-3);
+}
+
+.dash-footnote {
+  margin-top: var(--space-3);
+  font-size: 0.8125rem;
+  color: var(--clr-text-3);
+}
+
+// ─── Stat tiles ───────────────────────────────────────────────────────────────
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(118px, 100%), 1fr));
+  gap: var(--space-3);
+
+  @media (max-width: 640px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+
+    // An odd tile out takes the whole row rather than leaving a hole.
+    > :last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  text-align: left;
+
+  @media (max-width: 640px) {
+    padding: var(--space-3);
+  }
+
+  color: var(--clr-text-1);
+
+  &--link {
+    transition:
+      border-color var(--transition-fast),
+      box-shadow var(--transition-fast);
+
+    &:hover {
+      border-color: var(--clr-primary-lt);
+      box-shadow: var(--shadow-sm);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--clr-primary-lt);
+      outline-offset: 2px;
+    }
+  }
+
+  // A figure is never split across lines: "₦22,0 / 00" reads as two numbers.
+  &__value {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+
+    @media (max-width: 640px) {
+      font-size: 1.1875rem;
+    }
+  }
+
+  &__label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--clr-primary);
+
+    svg {
+      flex-shrink: 0;
+    }
+  }
+
+  &__chevron {
+    margin-left: auto;
+  }
+
+  &__sub {
+    font-size: 0.75rem;
+    color: var(--clr-text-3);
+  }
+}
+
+// ─── Noticeboard ──────────────────────────────────────────────────────────────
+.noticeboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 360px;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+
+  &--green {
+    background: #e3f4ea;
+  }
+  &--blue {
+    background: #dfe9fb;
+  }
+  &--high {
+    background: #fdf0d5;
+  }
+  &--urgent {
+    background: #fde4e4;
+  }
+
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  &__title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--clr-text-1);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  &__priority {
+    flex-shrink: 0;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--clr-text-1);
+  }
+
+  &__date {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--clr-text-2);
+    margin-bottom: var(--space-1);
+  }
+
+  &__body {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--clr-text-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+}
+
+// ─── Mini calendar ────────────────────────────────────────────────────────────
+.mini-calendar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+
+  &__month {
+    min-width: 0;
+    padding: var(--space-3);
+    background: var(--clr-bg);
+    border-radius: var(--radius-md);
+  }
+
+  &__nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 2px;
+    justify-items: center;
+  }
+
+  &__weekday {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--clr-text-3);
+    padding: 2px 0;
+  }
+
+  &__day {
+    position: relative;
+    width: 100%;
+    max-width: 34px;
+    aspect-ratio: 1;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    font-size: 0.8125rem;
+    color: var(--clr-text-1);
+
+    &:hover {
+      background: var(--clr-bg-alt);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--clr-primary-lt);
+      outline-offset: 1px;
+    }
+
+    &.is-outside {
+      color: var(--clr-text-3);
+      opacity: 0.55;
+    }
+
+    &.has-event::after {
+      content: '';
+      position: absolute;
+      bottom: 3px;
+      left: 50%;
+      width: 4px;
+      height: 4px;
+      margin-left: -2px;
+      border-radius: 50%;
+      background: var(--clr-primary);
+    }
+
+    &.is-selected {
+      box-shadow: inset 0 0 0 1.5px var(--clr-primary);
+    }
+
+    &.is-today {
+      background: var(--clr-primary);
+      color: #fff;
+      font-weight: 600;
+
+      &.has-event::after {
+        background: #fff;
+      }
+    }
+  }
+
+  &__events {
+    min-width: 0;
+  }
+
+  &__events-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: var(--space-3);
+  }
+
+  &__list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-6) 0;
+    font-size: 0.875rem;
+    color: var(--clr-text-3);
+  }
+}
+
+.mini-event {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+
+  &__date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    width: 46px;
+    padding: var(--space-1) 0;
+    border-radius: var(--radius-md);
+    background: #dfe9fb;
+    font-size: 0.6875rem;
+    color: var(--clr-text-2);
+    line-height: 1.25;
+
+    strong {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      color: var(--clr-primary-dk);
+    }
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  &__type {
+    font-size: 0.75rem;
+    color: var(--clr-text-3);
+  }
+}
+
+// ─── Doughnut ─────────────────────────────────────────────────────────────────
+.donut {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+
+  &__ring {
+    position: relative;
+    width: 148px;
+    height: 148px;
+    flex-shrink: 0;
+  }
+
+  &__center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    text-align: center;
+
+    strong {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      line-height: 1.2;
+    }
+
+    span {
+      font-size: 0.6875rem;
+      color: var(--clr-text-3);
+    }
+  }
+
+  &__legend {
+    list-style: none;
+    flex: 1 1 130px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: 0.8125rem;
+    }
+  }
+
+  &__swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  &__label {
+    color: var(--clr-text-2);
+    min-width: 0;
+  }
+
+  &__value {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--clr-text-1);
+    white-space: nowrap;
+  }
+}
+
+// ─── Meter ────────────────────────────────────────────────────────────────────
+.meter {
+  &__value {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  &__caption {
+    font-size: 0.8125rem;
+    color: var(--clr-text-3);
+    margin-bottom: var(--space-3);
+  }
+
+  &__track {
+    height: 10px;
+    border-radius: var(--radius-full);
+    background: var(--clr-bg-alt);
+    overflow: hidden;
+    margin-bottom: var(--space-4);
+  }
+
+  &__fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    background: var(--clr-primary);
+  }
+
+  &__rows {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+
+    li {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      font-size: 0.875rem;
+      color: var(--clr-text-2);
+    }
+
+    strong {
+      color: var(--clr-text-1);
+      font-weight: 600;
+    }
+  }
+}
+
+// ─── Attention, in a narrower column than it was designed for ─────────────────
+.dash-attention {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+
+  // The link wraps under the text when there is no room beside it. Sharing one
+  // row on a phone squeezed the sentence into a column a word wide.
+  .attention-item {
+    flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .attention-item__body {
+    flex: 1 1 180px;
+    min-width: 0;
+  }
+
+  .attention-item__cta {
+    margin-left: auto;
+  }
+}
+
+// ─── Children, on a parent's dashboard ────────────────────────────────────────
+.child-card {
+  &__who {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  &__avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #dfe9fb;
+    color: var(--clr-primary-dk);
+    font-weight: 700;
+  }
+
+  &__name {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  &__meta {
+    font-size: 0.8125rem;
+    color: var(--clr-text-3);
+  }
+
+  &__subjects-title {
+    margin: var(--space-4) 0 var(--space-2);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--clr-text-2);
+  }
+
+  &__subjects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  &__subject {
+    min-width: 90px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-md);
+
+    span {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--clr-text-3);
+    }
+
+    strong {
+      font-family: var(--font-display);
+      font-size: 1.125rem;
+    }
+  }
+}
+
+.due-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+
+  li {
+    padding: var(--space-3);
+    background: var(--clr-bg);
+    border-radius: var(--radius-md);
+  }
+
+  &__title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-2);
+    font-size: 0.8125rem;
+    color: var(--clr-text-3);
+  }
+
+  &__due {
+    font-weight: 600;
+    color: var(--clr-text-2);
+  }
+}

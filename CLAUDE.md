@@ -387,6 +387,28 @@ combinations scrolled before this was fixed. Five rules keep it at zero.
    its computed `color` was correct, so it reads as a colour bug. It was a
    layout bug one level up.
 
+7. **A flex item that holds text needs `min-width: 0` too**, not just the
+   page column. `.global-search` lacked it, so on a phone the search box kept
+   its full width and slid over the quick-actions button beside it.
+
+8. **Figures never wrap.** A stat tile's number is `white-space: nowrap` and
+   shrinks on phones instead: `₦22,0` over `00` reads as two numbers.
+
+### Dashboards
+
+The four dashboards share `components/dashboard/DashboardParts.jsx`. Two rules:
+
+- **Shortcut tiles come from the Quick Actions list** (`useQuickActionItems`),
+  picked by destination. Never write a second list of shortcuts: the modal's
+  `feature` and `fallback` handling is what turns "Make a Payment" into
+  "Fee Balance" at an office-fees school, and a copy would not.
+- **Show real figures or nothing.** The reference design had income and expense
+  charts; SchoolFlo records no expenses, so those panels show fee collection
+  and payment methods instead. An empty state beats an invented number.
+
+The school's name in the topbar comes from `SCHOOL_NAME` via `GET /config`, the
+same value printed on report cards. On a phone it moves into the page heading.
+
 A tab strip that will not fit **scrolls** (`overflow-x: auto` plus
 `flex-shrink: 0` on the tabs) rather than wrapping — tabs on two lines under
 one shared underline read as broken.
@@ -417,7 +439,7 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 31 suites, 523 tests, Jest, `maxWorkers: 1`. The integration
+`pnpm test` — 32 suites, 529 tests, Jest, `maxWorkers: 1`. The integration
 suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
 and take from about three minutes to ten on a slow machine, mostly bcrypt at
 cost 12. Tests that exercise failures log to the console by design, so judge a
@@ -492,6 +514,8 @@ Client code has **no test runner**. The check is that it lints and builds.
 | Printable timetable grid | `client/src/components/common/PrintableTimetable.jsx` |
 | Bulk import UI | `client/src/components/common/BulkImportModal.jsx` |
 | Axios interceptors + auth bridge | `client/src/services/api.js` |
+| Dashboard building blocks (tiles, noticeboard, calendar, charts) | `client/src/components/dashboard/DashboardParts.jsx` |
+| Account menu (change password, sign out) | `client/src/components/layout/UserMenu.jsx` |
 | Persisted auth state | `client/src/store/authStore.js` |
 
 ---

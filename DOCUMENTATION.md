@@ -130,7 +130,7 @@ schoolflo/
 │   │       ├── schoolTime.js      # school wall clock (staff attendance)
 │   │       ├── reconcilePayments.js
 │   │       └── ms.js
-│   └── tests/                     # 31 suites, 523 tests
+│   └── tests/                     # 32 suites, 529 tests
 │       ├── unit/                  # grading, validation, error handling
 │       ├── integration/           # real in-memory MongoDB
 │       └── setup/                 # one shared MongoDB, a database per suite
@@ -992,7 +992,7 @@ Enter navigation.
 | `/ca-tracking`      | 6      | `caTrackingController`      |
 | `/promotions`       | 8      | `promotionController`       |
 | `/certificates`     | 9      | `certificateController`     |
-| `/config`           | 1      | Public: the feature set     |
+| `/config`           | 1      | Public: the feature set and the school's name |
 | `/webhooks`         | 2      | Paystack by HMAC, Flutterwave by shared hash; no JWT |
 
 **180 routes total.**
@@ -1220,6 +1220,37 @@ assignee, grouped by `batchId`), `StaffAttendance` (unique `{staff, date}`).
 
 ---
 
+## 11b. Dashboards
+
+Each role's dashboard is built from shared parts in
+`client/src/components/dashboard/DashboardParts.jsx`: a row of shortcut tiles,
+a noticeboard of announcements, a month calendar with what is coming up, stat
+tiles, and charts. The shell around every page has a light sidebar, the school's
+name in the topbar (from `SCHOOL_NAME`, served by `GET /config`), and an account
+menu holding Change password and Sign out.
+
+| Role | Shortcuts | Below the noticeboard and calendar |
+| --- | --- | --- |
+| Admin | Add Student, Add Teacher, New Fee Structure, Record Payment, Assign Task, New Announcement | Roster tiles; what needs attention; attendance today; fees this term; fee collection by method; recent payments; enrollments |
+| Teacher | Mark Attendance, Enter Grades, Create Assignment, My Tasks, Clock In / Out, Exam Schedules | Class, assignment and grading tiles; assignments; today's register |
+| Student | Results, Assignments, Payment, Timetable, Exam Schedules, Library | Score and attendance tiles; attendance this term; fees; due assignments; recent results |
+| Parent | Payment, Results, Assignments, Timetables, Exam Schedules, Certificates | One card per child: score, attendance and fees |
+
+Shortcut tiles are drawn from the Quick Actions list, so a feature the school
+does not run drops out of both, and its fallback label is used in both.
+
+Two figures come from the server for the dashboards specifically:
+
+- `GET /dashboard/admin` returns `feeModes`: this term's money grouped by how
+  it arrived. Abandoned checkouts carry no money and are left out.
+- `GET /dashboard/parent` returns `feeBalance` per child: what this term's fee
+  still owes, from `getFeeBalances()`. The Fees tile used to show the latest
+  payment's status, so a part-payment read as "Paid".
+
+Doughnuts are used only for a whole split into a few parts (attendance, payment
+methods), always with their values listed beside them. One amount against a
+total (fees collected) is a progress meter.
+
 ## 11a. Printing
 
 Report cards and timetables are printed from the browser with
@@ -1372,7 +1403,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 31 suites, 523 tests
+pnpm test              # 32 suites, 529 tests
 pnpm test:coverage
 ```
 
@@ -1403,6 +1434,7 @@ pnpm test:coverage
 | `integration/enrolment.test.js` | Fees across promotion, arrears, rosters, applying a batch once |
 | `integration/scoreScope.test.js` | Who may enter and read scores, and for which class    |
 | `integration/accountability.test.js` | Settlement audit, cash instalments, parent links, certificate numbers |
+| `integration/dashboardData.test.js` | A parent's fee status from the balance, payment methods, the school's name |
 | `integration/studentAccess.test.js` | Who may read one student's records                 |
 | `integration/hardening.test.js` | Locks, library, fee edits and certificate downloads    |
 | `integration/features.test.js` | A disabled feature's routes really close                |

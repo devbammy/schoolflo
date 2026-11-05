@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const { Result } = require('../models/Exam');
 const Attendance = require('../models/Attendance');
-const { Payment } = require('../models/Fees');
+const { Fees, Payment } = require('../models/Fees');
 const { Assignment, Submission } = require('../models/Assignment');
 const Announcement = require('../models/Announcement');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
@@ -73,6 +73,18 @@ const getAdminDashboard = async (req, res) => {
     ]),
   ]);
 
+  // How this term's money arrived, for the admin's collection-modes chart.
+  const feeModeRows = await Payment.aggregate([
+    {
+      $match: {
+        term: overview.context.term,
+        academicYear: overview.context.academicYear,
+        amountPaid: { $gt: 0 },
+      },
+    },
+    { $group: { _id: '$gateway', amount: { $sum: '$amountPaid' } } },
+  ]);
+
   // Enrollment trend (last 6 months)
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -118,6 +130,10 @@ const getAdminDashboard = async (req, res) => {
     recentPayments,
     announcements,
     enrollmentTrend,
+    feeModes: feeModeRows.map((row) => ({
+      gateway: row._id,
+      amount: row.amount,
+    })),
     generatedAt: new Date(),
   });
 };
@@ -323,7 +339,7 @@ const getParentDashboard = async (req, res) => {
   // For each child, get latest results + payment status
   const childrenData = await Promise.all(
     children.map(async (child) => {
-      const [latestResults, latestPayment, attendanceSummary] =
+      const [latestResults, latestPayment, attendanceSummary, currentFee] =
         await Promise.all([
           Result.find({ student: child._id, isPublished: true })
             .populate('subject', 'name')
@@ -335,7 +351,20 @@ const getParentDashboard = async (req, res) => {
             .populate('feeStructure', 'title totalAmount term'),
 
           Attendance.getSummary(child._id, term, academicYear),
+
+          Fees.findOne({
+            class: child.studentProfile?.class?._id,
+            term,
+            academicYear,
+            isActive: true,
+          }),
         ]);
+
+      // What the fee owes, from everything received against it. No single
+      // Payment answers that: a part-payment is itself Paid while the fee is not.
+      const [feeBalance] = currentFee
+        ? await getFeeBalances(child._id, [currentFee])
+        : [];
 
       const avg = latestResults.length
         ? (
@@ -349,6 +378,7 @@ const getParentDashboard = async (req, res) => {
         averageScore: avg,
         latestResults,
         latestPayment,
+        feeBalance: feeBalance || null,
         attendance: attendanceSummary,
       };
     }),

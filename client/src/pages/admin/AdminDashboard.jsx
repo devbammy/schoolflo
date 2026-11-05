@@ -1,49 +1,49 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   AlertCircle,
   ArrowRight,
-  Bell,
-  CalendarDays,
   CheckCircle2,
   ChevronRight,
+  GraduationCap,
+  Heart,
   Info,
   RefreshCw,
-  TrendingDown,
-  TrendingUp,
-  UserCheck,
+  School,
   Users,
-  Wallet,
 } from 'lucide-react';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
-  LineElement,
-  PointElement,
-  Title,
   Tooltip,
-  Legend,
-  ArcElement,
 } from 'chart.js';
-import { Line, Doughnut } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
 import { dashboardService } from '../../services/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import {
+  DashHeader,
+  DonutCard,
+  MeterCard,
+  MiniCalendar,
+  Noticeboard,
+  QuickTiles,
+  StatTile,
+} from '../../components/dashboard/DashboardParts';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
+
+const TILES = [
+  '/admin/students',
+  '/admin/teachers',
+  '/admin/fees',
+  '/admin/payments',
+  '/admin/tasks',
+  '/admin/announcements',
+];
 
 const MONTHS = [
   '',
@@ -61,6 +61,14 @@ const MONTHS = [
   'Dec',
 ];
 
+// A method keeps its colour whichever others are present that term.
+const MODE_COLORS = {
+  Paystack: '#1A4FAB',
+  Flutterwave: '#0891B2',
+  Cash: '#E8590C',
+  'Bank Transfer': '#7C3AED',
+};
+
 // Colour lives in the stylesheet (`.attention-item--{severity}`); only the
 // glyph has to be chosen in JS.
 const SEVERITY_ICON = {
@@ -76,12 +84,6 @@ const compactNaira = (n) => {
   if (v >= 1_000_000) return `₦${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `₦${Math.round(v / 1_000)}K`;
   return `₦${v}`;
-};
-
-const dayLabel = (daysAway) => {
-  if (daysAway <= 0) return 'Today';
-  if (daysAway === 1) return 'Tomorrow';
-  return `In ${daysAway} days`;
 };
 
 /**
@@ -110,52 +112,6 @@ function AttentionItem({ item, onAct }) {
         <ArrowRight size={14} />
       </span>
     </button>
-  );
-}
-
-/**
- * A pulse tile is a number plus the thing that makes it mean something — a
- * trend, a denominator, or a share. A figure with no comparison is a figure an
- * admin cannot act on.
- */
-function PulseTile({ label, value, meta, delta, icon: Icon, color, onClick }) {
-  const hasDelta = typeof delta === 'number' && Number.isFinite(delta);
-  const TrendIcon = hasDelta && delta < 0 ? TrendingDown : TrendingUp;
-
-  return (
-    <div
-      className={`pulse-tile${onClick ? ' pulse-tile--link' : ''}`}
-      style={{ '--accent-color': color }}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={(e) => {
-        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-    >
-      <div className="pulse-tile__head">
-        <span className="pulse-tile__label">{label}</span>
-        <span className="pulse-tile__icon">
-          <Icon size={16} />
-        </span>
-      </div>
-      <div className="pulse-tile__value">{value}</div>
-      <div className="pulse-tile__foot">
-        {hasDelta && (
-          <span
-            className={`pulse-tile__delta ${delta < 0 ? 'is-down' : 'is-up'}`}
-          >
-            <TrendIcon size={13} />
-            {delta > 0 ? '+' : ''}
-            {delta} pts
-          </span>
-        )}
-        <span className="pulse-tile__meta">{meta}</span>
-      </div>
-    </div>
   );
 }
 
@@ -202,11 +158,11 @@ export default function AdminDashboard() {
     context = {},
     pulse = {},
     attention = [],
-    upcoming = [],
     stats = {},
     enrollmentTrend = [],
     recentPayments = [],
     announcements = [],
+    feeModes = [],
     generatedAt,
   } = data || {};
 
@@ -228,20 +184,16 @@ export default function AdminDashboard() {
     attendance.isSchoolDay &&
     attendance.classesMarked < attendance.classesTotal;
 
-  const attendanceChartData = {
-    labels: ['Present', 'Absent', 'Late', 'Excused'],
-    datasets: [
-      {
-        data: [
-          attendance.Present || 0,
-          attendance.Absent || 0,
-          attendance.Late || 0,
-          attendance.Excused || 0,
-        ],
-        backgroundColor: ['#10B981', '#EF4444', '#F59E0B', '#7889A8'],
-        borderWidth: 0,
-      },
-    ],
+  const attendanceFootnote = () => {
+    if (attendance.marked > 0) {
+      const inSchool = attendance.Present + attendance.Late;
+      const trend =
+        typeof attendance.delta === 'number'
+          ? ` · ${attendance.delta > 0 ? '+' : ''}${attendance.delta} pts on the recent average`
+          : '';
+      return `${inSchool} of ${attendance.marked} in school${trend}`;
+    }
+    return null;
   };
 
   const enrollmentChartData = {
@@ -250,276 +202,178 @@ export default function AdminDashboard() {
     ),
     datasets: [
       {
-        label: 'New Enrollments',
+        label: 'New enrollments',
         data: enrollmentTrend.map((e) => e.count),
-        backgroundColor: 'rgba(26,79,171,0.15)',
-        borderColor: '#1A4FAB',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4,
-        pointBackgroundColor: '#1A4FAB',
-        pointRadius: 3,
+        backgroundColor: '#1A4FAB',
+        borderRadius: 4,
+        maxBarThickness: 36,
       },
     ],
   };
 
   return (
     <>
-      <div className="page-header">
-        <div>
-          <h1 className="page-header__title">School Overview</h1>
-          <p className="page-header__subtitle">
+      <DashHeader
+        title="School Overview"
+        subtitle={
+          <>
             {subtitle || 'No active academic calendar'}
-            {generatedAt && (
-              <span style={{ color: 'var(--clr-text-3)' }}>
-                {' '}
-                • as of {format(new Date(generatedAt), 'HH:mm')}
-              </span>
-            )}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-          <button
-            className="btn btn--ghost"
-            onClick={() => load({ silent: true })}
-            disabled={refreshing}
-          >
-            <RefreshCw
-              size={16}
-              style={{
-                animation: refreshing ? 'spin 800ms linear infinite' : 'none',
-              }}
+            {generatedAt && ` • as of ${format(new Date(generatedAt), 'HH:mm')}`}
+          </>
+        }
+      >
+        <button
+          className="btn btn--ghost"
+          onClick={() => load({ silent: true })}
+          disabled={refreshing}
+        >
+          <RefreshCw
+            size={16}
+            style={{
+              animation: refreshing ? 'spin 800ms linear infinite' : 'none',
+            }}
+          />
+          Refresh
+        </button>
+      </DashHeader>
+
+      <QuickTiles role="Admin" paths={TILES} />
+
+      <div className="dash-main">
+        <div className="dash-main__column">
+          <Noticeboard announcements={announcements} role="Admin" canPost />
+
+          <div className="stat-tiles">
+            <StatTile
+              label="Students"
+              value={(stats.totalStudents || 0).toLocaleString()}
+              sub={`${(stats.activeStudents || 0).toLocaleString()} active`}
+              icon={Users}
+              to="/admin/students"
             />
-            Refresh
-          </button>
-          <button
-            className="btn btn--primary"
-            onClick={() => navigate('/admin/announcements')}
-          >
-            <Bell size={16} /> New Announcement
-          </button>
+            <StatTile
+              label="Teachers"
+              value={(stats.totalTeachers || 0).toLocaleString()}
+              icon={GraduationCap}
+              to="/admin/teachers"
+            />
+            <StatTile
+              label="Parents"
+              value={(stats.totalParents || 0).toLocaleString()}
+              icon={Heart}
+              to="/admin/parents"
+            />
+            <StatTile
+              label="Registers"
+              value={`${attendance.classesMarked || 0}/${attendance.classesTotal || 0}`}
+              sub={
+                registerIncomplete
+                  ? `${(attendance.classesTotal || 0) - (attendance.classesMarked || 0)} outstanding`
+                  : 'All reported'
+              }
+              icon={School}
+              to="/admin/classes"
+            />
+          </div>
+        </div>
+
+        <div className="dash-main__column">
+          {/* Kept above the calendar: an admin's attention should land on the
+              exceptions before the schedule. */}
+          <section className="card dash-card">
+            <div className="card__header">
+              <h2 className="card__title">Needs your attention</h2>
+              {attention.length > 0 && (
+                <span className="attention-panel__count">
+                  {attention.length} item{attention.length === 1 ? '' : 's'}
+                </span>
+              )}
+            </div>
+            <div className="dash-attention">
+              {attention.length === 0 ? (
+                <div className="attention-clear">
+                  <CheckCircle2 size={22} />
+                  <div>
+                    <div className="attention-clear__title">
+                      Nothing needs you
+                    </div>
+                    <div className="attention-clear__detail">
+                      Registers are in, fees are on track and results are
+                      released.
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="attention-list">
+                  {attention.map((item) => (
+                    <AttentionItem key={item.id} item={item} onAct={navigate} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <MiniCalendar role="Admin" />
         </div>
       </div>
 
-      {/* ── What needs my attention ─────────────────────────────────────────
-          Deliberately above the numbers: an admin opening this page has a
-          finite amount of attention, and it should land on the exceptions
-          before it lands on the metrics. */}
-      <section className="attention-panel">
-        <div className="attention-panel__head">
-          <h2 className="attention-panel__title">Needs your attention</h2>
-          {attention.length > 0 && (
-            <span className="attention-panel__count">
-              {attention.length} item{attention.length === 1 ? '' : 's'}
-            </span>
-          )}
-        </div>
-
-        {attention.length === 0 ? (
-          <div className="attention-clear">
-            <CheckCircle2 size={22} />
-            <div>
-              <div className="attention-clear__title">Nothing needs you</div>
-              <div className="attention-clear__detail">
-                Registers are in, fees are on track and results are released.
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="attention-list">
-            {attention.map((item) => (
-              <AttentionItem key={item.id} item={item} onAct={navigate} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ── Roster: the size of the school, one glance ─────────────────── */}
-      <section className="dash-section">
-        <h2 className="section-title">Roster</h2>
-        <div className="overview-strip">
-          <button
-            type="button"
-            className="overview-stat overview-stat--link"
-            onClick={() => navigate('/admin/students')}
-          >
-            <span className="overview-stat__value">
-              {(stats.totalStudents || 0).toLocaleString()}
-            </span>
-            <span className="overview-stat__label">Students</span>
-            <span className="overview-stat__sub">
-              {(stats.activeStudents || 0).toLocaleString()} active
-            </span>
-          </button>
-          <button
-            type="button"
-            className="overview-stat overview-stat--link"
-            onClick={() => navigate('/admin/teachers')}
-          >
-            <span className="overview-stat__value">
-              {(stats.totalTeachers || 0).toLocaleString()}
-            </span>
-            <span className="overview-stat__label">Teachers</span>
-          </button>
-          <button
-            type="button"
-            className="overview-stat overview-stat--link"
-            onClick={() => navigate('/admin/parents')}
-          >
-            <span className="overview-stat__value">
-              {(stats.totalParents || 0).toLocaleString()}
-            </span>
-            <span className="overview-stat__label">Parents</span>
-          </button>
-        </div>
-      </section>
-
-      {/* ── Today: what is happening right now ─────────────────────────── */}
-      <section className="dash-section">
-        <h2 className="section-title">Today</h2>
-        <div className="pulse-grid">
-        <PulseTile
-          label="Attendance today"
-          value={
-            attendance.marked > 0
-              ? `${attendance.rate}%`
-              : attendance.isSchoolDay
-                ? 'Not marked'
-                : '—'
+      <div className="dash-row">
+        <DonutCard
+          title="Attendance today"
+          centerValue={attendance.marked > 0 ? `${attendance.rate}%` : undefined}
+          centerLabel="in school"
+          emptyText={
+            attendance.isSchoolDay
+              ? 'No register submitted yet today'
+              : 'School is closed today'
           }
-          delta={attendance.marked > 0 ? attendance.delta : null}
-          meta={
-            attendance.marked > 0
-              ? `${attendance.Present + attendance.Late} of ${attendance.marked} in school`
-              : attendance.isSchoolDay
-                ? 'No register submitted yet'
-                : 'Not a school day'
-          }
-          icon={UserCheck}
-          color="var(--clr-success)"
-          onClick={() => navigate('/admin/students')}
+          footnote={attendanceFootnote()}
+          segments={[
+            { label: 'Present', value: attendance.Present || 0, color: '#10B981' },
+            { label: 'Late', value: attendance.Late || 0, color: '#F59E0B' },
+            { label: 'Excused', value: attendance.Excused || 0, color: '#3B82F6' },
+            { label: 'Absent', value: attendance.Absent || 0, color: '#EF4444' },
+          ]}
         />
-        <PulseTile
-          label="Registers in"
-          value={`${attendance.classesMarked || 0}/${attendance.classesTotal || 0}`}
-          meta={
-            registerIncomplete
-              ? `${(attendance.classesTotal || 0) - (attendance.classesMarked || 0)} classes outstanding`
-              : 'All classes reported'
-          }
-          icon={Users}
-          color={registerIncomplete ? 'var(--clr-warning)' : 'var(--clr-info)'}
-          onClick={() => navigate('/admin/classes')}
-        />
-        <PulseTile
-          label="Fees collected"
-          value={fees.hasStructures ? `${fees.collectionRate}%` : '—'}
-          meta={
-            fees.hasStructures
-              ? `${compactNaira(fees.collected)} of ${compactNaira(fees.billed)} billed`
-              : 'No fee structure this term'
-          }
-          icon={Wallet}
-          color="var(--clr-primary)"
-          onClick={() => navigate('/admin/fees')}
-        />
-        <PulseTile
-          label="Outstanding"
-          value={compactNaira(fees.outstanding)}
-          meta={
-            fees.studentsOwing
-              ? `${fees.studentsOwing} students owing`
-              : 'Everyone is settled'
-          }
-          icon={AlertCircle}
-          color={
-            fees.overdue?.students ? 'var(--clr-danger)' : 'var(--clr-text-3)'
-          }
-          onClick={() => navigate('/admin/payments')}
-        />
-        </div>
-      </section>
 
-      {/* ── Trends & schedule ─────────────────────────────────────────── */}
-      <section className="dash-section">
-        <h2 className="section-title">Trends &amp; schedule</h2>
-        <div className="dashboard-grid">
-        <div className="card">
-          <div className="card__header">
-            <span className="card__title">Enrollment trend (6 months)</span>
-            <span style={{ fontSize: '0.8125rem', color: 'var(--clr-text-3)' }}>
-              {stats.activeStudents || 0} active of {stats.totalStudents || 0}
-            </span>
-          </div>
-          <div className="card__body">
-            <Line
-              data={enrollmentChartData}
-              options={{
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } },
-                  x: { grid: { display: false } },
-                },
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card__header">
-            <span className="card__title">Next 14 days</span>
+        <MeterCard
+          title="Fees this term"
+          isEmpty={!fees.hasStructures}
+          emptyText="No fee structure this term"
+          value={`${fees.collectionRate || 0}%`}
+          caption={`collected: ${compactNaira(fees.collected)} of ${compactNaira(fees.billed)} billed`}
+          percent={fees.collectionRate}
+          rows={[
+            { label: 'Outstanding', value: naira(fees.outstanding) },
+            { label: 'Students owing', value: fees.studentsOwing || 0 },
+          ]}
+          action={
             <button
+              type="button"
               className="btn btn--ghost btn--sm"
-              onClick={() => navigate('/admin/calendar')}
+              onClick={() => navigate('/admin/fees')}
             >
-              Calendar
+              Open
             </button>
-          </div>
-          <div className="card__body" style={{ padding: 0 }}>
-            {upcoming.length === 0 ? (
-              <div className="empty-state" style={{ padding: 32 }}>
-                <CalendarDays size={32} className="empty-state__icon" />
-                <p className="empty-state__text">
-                  Nothing scheduled in the next fortnight
-                </p>
-              </div>
-            ) : (
-              <ul className="upcoming-list">
-                {upcoming.map((e, i) => (
-                  <li key={`${e.title}-${i}`} className="upcoming-item">
-                    <span
-                      className="upcoming-item__marker"
-                      style={{ background: e.color || 'var(--clr-primary)' }}
-                    />
-                    <div className="upcoming-item__body">
-                      <div className="upcoming-item__title">{e.title}</div>
-                      <div className="upcoming-item__meta">
-                        {e.type} • {format(new Date(e.startDate), 'EEE d MMM')}
-                      </div>
-                    </div>
-                    <span
-                      className={`upcoming-item__when${e.daysAway <= 1 ? ' is-soon' : ''}`}
-                    >
-                      {dayLabel(e.daysAway)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-        </div>
-      </section>
+          }
+        />
 
-      {/* ── Recent activity ──────────────────────────────────────────── */}
-      <section className="dash-section">
-        <h2 className="section-title">Recent activity</h2>
-        <div className="dashboard-grid">
-        {/* Recent Payments */}
-        <div className="card">
+        <DonutCard
+          title="Fee collection modes"
+          emptyText="No money received this term yet"
+          formatValue={compactNaira}
+          segments={Object.keys(MODE_COLORS).map((gateway) => ({
+            label: gateway,
+            value: feeModes.find((m) => m.gateway === gateway)?.amount || 0,
+            color: MODE_COLORS[gateway],
+          }))}
+        />
+      </div>
+
+      <div className="dashboard-grid">
+        <section className="card dash-card">
           <div className="card__header">
-            <span className="card__title">Recent payments</span>
+            <h2 className="card__title">Recent payments</h2>
             <button
               className="btn btn--ghost btn--sm"
               onClick={() => navigate('/admin/payments')}
@@ -594,107 +448,37 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
 
-        {/* Attendance breakdown + announcements */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-6)',
-          }}
-        >
-          <div className="card">
-            <div className="card__header">
-              <span className="card__title">Today's register</span>
-            </div>
-            <div className="card__body">
-              {attendance.marked > 0 ? (
-                <Doughnut
-                  data={attendanceChartData}
-                  options={{
-                    responsive: true,
-                    cutout: '65%',
-                    plugins: {
-                      legend: {
-                        position: 'bottom',
-                        labels: { padding: 12, font: { family: 'DM Sans' } },
-                      },
+        <section className="card dash-card">
+          <div className="card__header">
+            <h2 className="card__title">New enrollments, 6 months</h2>
+          </div>
+          <div className="card__body">
+            {enrollmentTrend.length === 0 ? (
+              <div className="dash-empty">
+                No students enrolled in the last 6 months
+              </div>
+            ) : (
+              <Bar
+                data={enrollmentChartData}
+                options={{
+                  responsive: true,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: { precision: 0 },
+                      grid: { color: 'rgba(0,0,0,0.04)' },
                     },
-                  }}
-                />
-              ) : (
-                <div className="empty-state" style={{ padding: 24 }}>
-                  <UserCheck size={28} className="empty-state__icon" />
-                  <p className="empty-state__text">
-                    {attendance.isSchoolDay
-                      ? 'No attendance marked yet today'
-                      : 'School is closed today'}
-                  </p>
-                </div>
-              )}
-            </div>
+                    x: { grid: { display: false } },
+                  },
+                }}
+              />
+            )}
           </div>
-
-          <div className="card">
-            <div className="card__header">
-              <span className="card__title">Latest announcements</span>
-              <button
-                className="btn btn--ghost btn--sm"
-                onClick={() => navigate('/admin/announcements')}
-              >
-                New
-              </button>
-            </div>
-            <div
-              className="card__body"
-              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
-            >
-              {announcements.length === 0 ? (
-                <div className="empty-state" style={{ padding: 24 }}>
-                  <Bell size={28} className="empty-state__icon" />
-                  <p className="empty-state__text">No announcements yet</p>
-                </div>
-              ) : (
-                announcements.map((ann) => (
-                  <div key={ann._id} className="announcement-row">
-                    <div
-                      className="announcement-row__icon"
-                      style={{
-                        background:
-                          ann.priority === 'Urgent'
-                            ? '#fee2e2'
-                            : 'var(--clr-bg)',
-                        color:
-                          ann.priority === 'Urgent'
-                            ? '#ef4444'
-                            : 'var(--clr-primary)',
-                      }}
-                    >
-                      <Bell size={15} />
-                    </div>
-                    <div style={{ flex: 1, overflow: 'hidden' }}>
-                      <div className="announcement-row__title">{ann.title}</div>
-                      <div className="announcement-row__meta">
-                        {ann.author?.firstName} •{' '}
-                        {ann.publishedAt
-                          ? format(new Date(ann.publishedAt), 'dd MMM')
-                          : 'Draft'}
-                      </div>
-                    </div>
-                    <span
-                      className={`badge badge--${ann.priority === 'Urgent' ? 'danger' : ann.priority === 'High' ? 'warning' : 'neutral'}`}
-                    >
-                      {ann.priority}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </>
   );
 }

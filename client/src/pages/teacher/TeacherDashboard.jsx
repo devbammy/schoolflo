@@ -5,13 +5,28 @@ import {
   Users,
   BookOpen,
   CheckSquare,
-  Bell,
   ChevronRight,
   AlertTriangle,
 } from 'lucide-react';
 import { dashboardService } from '../../services/api';
 import { format, isValid, isPast, differenceInCalendarDays } from 'date-fns';
 import toast from 'react-hot-toast';
+import {
+  DashHeader,
+  MiniCalendar,
+  Noticeboard,
+  QuickTiles,
+  StatTile,
+} from '../../components/dashboard/DashboardParts';
+
+const TILES = [
+  '/teacher/attendance',
+  '/teacher/grades',
+  '/teacher/assignments',
+  '/teacher/tasks',
+  '/teacher/clock',
+  '/teacher/exam-schedules',
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -250,65 +265,36 @@ export default function TeacherDashboard() {
   return (
     <>
       {/* ── Page header ───────────────────────────────────────────────── */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-header__title">
-            {getGreeting()}, {firstName}!
-          </h1>
-          <p className="page-header__subtitle">
-            {className
-              ? `Class ${className} · ${format(new Date(), 'EEEE, dd MMMM yyyy')}`
-              : format(new Date(), 'EEEE, dd MMMM yyyy')}
-          </p>
-        </div>
-      </div>
+      <DashHeader
+        title={`${getGreeting()}, ${firstName}!`}
+        subtitle={
+          className
+            ? `Class ${className} · ${format(new Date(), 'EEEE, dd MMMM yyyy')}`
+            : format(new Date(), 'EEEE, dd MMMM yyyy')
+        }
+      />
 
-      {/* ── Stat cards ────────────────────────────────────────────────── */}
-      <div className="stats-grid">
-        {/* .stat-card already lifts on hover, which promised a click that
-            never happened. Now the ones with somewhere to go actually take you
-            there, by mouse or by keyboard. */}
-        {statCards.map((s) => (
-          <div
-            key={s.label}
-            className="stat-card"
-            style={{
-              '--accent-color': s.color,
-              cursor: s.to ? 'pointer' : 'default',
-            }}
-            role={s.to ? 'button' : undefined}
-            tabIndex={s.to ? 0 : undefined}
-            onClick={s.to ? () => navigate(s.to) : undefined}
-            onKeyDown={
-              s.to
-                ? (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      navigate(s.to);
-                    }
-                  }
-                : undefined
-            }
-          >
-            <div className="stat-card__icon">
-              <s.icon size={22} />
-            </div>
-            <div className="stat-card__content">
-              <div className="stat-card__label">{s.label}</div>
-              {/* Truncate long class names gracefully */}
-              <div
-                className="stat-card__value"
-                style={{
-                  fontSize: String(s.value).length > 6 ? '1.25rem' : '1.875rem',
-                  wordBreak: 'break-word',
-                }}
-              >
-                {s.value}
-              </div>
-              <div className="stat-card__meta">{s.sub}</div>
-            </div>
+      <QuickTiles role="Teacher" paths={TILES} />
+
+      <div className="dash-main">
+        <div className="dash-main__column">
+          <Noticeboard announcements={announcements} role="Teacher" canPost />
+          <div className="stat-tiles">
+            {statCards.map((s) => (
+              <StatTile
+                key={s.label}
+                label={s.label}
+                value={s.value}
+                sub={s.sub}
+                icon={s.icon}
+                to={s.to}
+              />
+            ))}
           </div>
-        ))}
+        </div>
+        <div className="dash-main__column">
+          <MiniCalendar role="Teacher" />
+        </div>
       </div>
 
       {/* ── Subjects taught strip ─────────────────────────────────────── */}
@@ -643,92 +629,6 @@ export default function TeacherDashboard() {
             </div>
           </div>
 
-          {/* ── Recent announcements ─────────────────────────────────── */}
-          {announcements.length > 0 && (
-            <div className="card">
-              <div className="card__header">
-                <span className="card__title">Announcements</span>
-                <button
-                  className="btn btn--ghost btn--sm"
-                  onClick={() => navigate('/teacher/announcements')}
-                >
-                  View all
-                </button>
-              </div>
-              <div
-                className="card__body"
-                style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
-              >
-                {announcements.map((ann) => (
-                  <div
-                    key={ann._id}
-                    style={{
-                      display: 'flex',
-                      gap: 10,
-                      alignItems: 'flex-start',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        flexShrink: 0,
-                        background:
-                          ann.priority === 'Urgent'
-                            ? '#fee2e2'
-                            : 'var(--clr-bg)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Bell
-                        size={14}
-                        color={
-                          ann.priority === 'Urgent'
-                            ? '#ef4444'
-                            : 'var(--clr-primary)'
-                        }
-                      />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          fontSize: '0.875rem',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {ann.title}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '0.75rem',
-                          color: 'var(--clr-text-3)',
-                          marginTop: 2,
-                        }}
-                      >
-                        {ann.publishedAt
-                          ? safeFormat(ann.publishedAt, 'dd MMM yyyy')
-                          : 'Draft'}
-                      </div>
-                    </div>
-                    {ann.priority && ann.priority !== 'Normal' && (
-                      <span
-                        className={`badge badge--${ann.priority === 'Urgent' ? 'danger' : 'warning'}`}
-                        style={{ fontSize: '0.7rem', flexShrink: 0 }}
-                      >
-                        {ann.priority}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </>

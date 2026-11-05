@@ -40,7 +40,11 @@ const fetchFeatures = (set, { force }) => {
   inFlight = api
     .get('/config')
     .then(({ data }) => {
-      set({ features: data.data.features, loaded: true });
+      set({
+        features: data.data.features,
+        school: data.data.school || null,
+        loaded: true,
+      });
     })
     .catch(() => {
       // Keep whatever we already had and let the server be the authority.
@@ -58,6 +62,8 @@ const useFeatureStore = create((set) => ({
     onlinePayments: true,
     staffAttendance: true,
   },
+  // Who this deployment is, so a school's name is set once, in its environment.
+  school: null,
   loaded: false,
 
   /** First read, at app mount. Gates the initial render. */

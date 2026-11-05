@@ -303,6 +303,18 @@ const CONFIG = {
   ],
 };
 
+/** Every action this role has at this school, without the headings. */
+export const useQuickActionItems = (role) => {
+  const features = useFeatureStore((s) => s.features);
+
+  return (CONFIG[role] || []).flatMap((group) =>
+    group.actions.flatMap((item) => {
+      if (!item.feature || features[item.feature] !== false) return [item];
+      return item.fallback ? [{ ...item, ...item.fallback }] : [];
+    }),
+  );
+};
+
 export default function QuickActionsModal({ open, onClose, role }) {
   const features = useFeatureStore((s) => s.features);
   const navigate = useNavigate();

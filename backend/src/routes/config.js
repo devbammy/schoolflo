@@ -18,6 +18,9 @@ const { sendSuccess } = require('../utils/apiResponse');
 router.get('/', (req, res) =>
   sendSuccess(res, 200, 'Configuration fetched', {
     features: getFeatures(),
+    // The same SCHOOL_NAME printed on its report cards. Public, like the rest of
+    // this: the login page shows it before anyone has signed in.
+    school: { name: (process.env.SCHOOL_NAME || '').trim() || null },
   }),
 );
 

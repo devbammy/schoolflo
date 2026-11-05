@@ -1,14 +1,36 @@
 // ─── StudentDashboard.jsx ─────────────────────────────────────────────────────
-import React, { useEffect, useState } from 'react';
-import { BookOpen, FileText, Award, TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Award, BookOpen, FileText, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { dashboardService } from '../../services/api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { CA_MAX, caTotal } from '../../utils/scoreComponents';
+import {
+  DashHeader,
+  DonutCard,
+  MeterCard,
+  MiniCalendar,
+  Noticeboard,
+  QuickTiles,
+  StatTile,
+} from '../../components/dashboard/DashboardParts';
+
+const TILES = [
+  '/student/results',
+  '/student/assignments',
+  '/student/payments',
+  '/student/timetable',
+  '/student/exam-schedules',
+  '/student/library',
+];
+
+const naira = (value) => `₦${Math.round(value || 0).toLocaleString()}`;
 
 export default function StudentDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     dashboardService
@@ -31,276 +53,173 @@ export default function StudentDashboard() {
 
   const {
     student,
-    stats,
-    recentResults,
-    pendingAssignments,
-    announcements,
+    stats = {},
+    recentResults = [],
+    pendingAssignments = [],
+    announcements = [],
     feeBalance,
   } = data || {};
   const attendance = stats.attendance || {};
   const attendancePct = attendance.percentage || 0;
 
-  const statCards = [
-    {
-      label: 'Average Score',
-      value: stats.averageScore ? `${stats.averageScore}%` : '—',
-      icon: TrendingUp,
-      color: '#1A4FAB',
-    },
-    {
-      label: 'Attendance',
-      value: `${attendancePct}%`,
-      icon: Award,
-      color: attendancePct >= 75 ? '#10B981' : '#F59E0B',
-    },
-    {
-      label: 'Subjects',
-      value: stats.subjectCount || 0,
-      icon: BookOpen,
-      color: '#0891B2',
-    },
-    {
-      label: 'Pending Tasks',
-      value: stats.pendingAssignmentsCount || 0,
-      icon: FileText,
-      color: '#F59E0B',
-    },
-  ];
-
-  const getGradeClass = (score) => {
-    if (score >= 70) return 'A';
-    if (score >= 60) return 'B';
-    if (score >= 50) return 'C';
-    if (score >= 45) return 'D';
-    if (score >= 40) return 'E';
-    return 'F';
-  };
-
   return (
     <>
-      <div className="page-header">
-        <div>
-          <h1 className="page-header__title">Welcome, {student?.firstName}!</h1>
-          <p className="page-header__subtitle">
-            {student?.studentProfile?.class?.name} •{' '}
-            {student?.studentProfile?.admissionNumber}
-          </p>
+      <DashHeader
+        title={`Welcome, ${student?.firstName || ''}!`}
+        subtitle={[
+          student?.studentProfile?.class?.name,
+          student?.studentProfile?.admissionNumber,
+        ]
+          .filter(Boolean)
+          .join(' • ')}
+      />
+
+      <QuickTiles role="Student" paths={TILES} />
+
+      <div className="dash-main">
+        <div className="dash-main__column">
+          <Noticeboard announcements={announcements} role="Student" />
+          <div className="stat-tiles">
+            <StatTile
+              label="Average score"
+              value={stats.averageScore ? `${stats.averageScore}%` : '—'}
+              icon={TrendingUp}
+              to="/student/results"
+            />
+            <StatTile
+              label="Attendance"
+              value={`${attendancePct}%`}
+              icon={Award}
+            />
+            <StatTile
+              label="Subjects"
+              value={stats.subjectCount || 0}
+              icon={BookOpen}
+            />
+            <StatTile
+              label="Pending tasks"
+              value={stats.pendingAssignmentsCount || 0}
+              icon={FileText}
+              to="/student/assignments"
+            />
+          </div>
+        </div>
+        <div className="dash-main__column">
+          <MiniCalendar role="Student" />
         </div>
       </div>
 
-      <div className="stats-grid">
-        {statCards.map((s) => (
-          <div
-            key={s.label}
-            className="stat-card"
-            style={{ '--accent-color': s.color }}
-          >
-            <div className="stat-card__icon">
-              <s.icon size={22} />
-            </div>
-            <div className="stat-card__content">
-              <div className="stat-card__label">{s.label}</div>
-              <div className="stat-card__value">{s.value}</div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <div className="dash-row">
+        <DonutCard
+          title="My attendance this term"
+          centerValue={`${attendancePct}%`}
+          centerLabel="attended"
+          emptyText="No register has been marked for you this term"
+          segments={[
+            { label: 'Present', value: attendance.Present || 0, color: '#10B981' },
+            { label: 'Late', value: attendance.Late || 0, color: '#F59E0B' },
+            { label: 'Excused', value: attendance.Excused || 0, color: '#3B82F6' },
+            { label: 'Absent', value: attendance.Absent || 0, color: '#EF4444' },
+          ]}
+        />
 
-      <div className="dashboard-grid">
-        {/* Recent Results */}
-        <div className="card">
+        <MeterCard
+          title="My fees"
+          isEmpty={!feeBalance}
+          emptyText="No fee payments recorded yet"
+          value={naira(feeBalance?.paidTotal)}
+          caption={`paid of ${naira(feeBalance?.totalAmount)}, ${feeBalance?.feeStructure?.title || ''}`}
+          percent={feeBalance?.percentPaid}
+          rows={[
+            { label: 'Status', value: feeBalance?.status },
+            { label: 'Still owed', value: naira(feeBalance?.outstanding) },
+          ]}
+          action={
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => navigate('/student/payments')}
+            >
+              Open
+            </button>
+          }
+        />
+
+        <section className="card dash-card">
           <div className="card__header">
-            <span className="card__title">Recent Results</span>
+            <h2 className="card__title">Due assignments</h2>
           </div>
-          {recentResults.length === 0 ? (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <p className="empty-state__text">No published results yet</p>
-            </div>
-          ) : (
-            <div
-              className="table-wrapper"
-              style={{ border: 'none', borderRadius: 0 }}
-            >
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Subject</th>
-                    <th>CA Total /{CA_MAX}</th>
-                    <th>Exam</th>
-                    <th>Total</th>
-                    <th>Grade</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentResults.map((r) => {
-                    const g = getGradeClass(r.totalScore);
-                    return (
-                      <tr key={r._id}>
-                        <td style={{ fontWeight: 600 }}>{r.subject?.name}</td>
-                        <td>{caTotal(r.scores)}</td>
-                        <td>{r.scores?.exam || 0}</td>
-                        <td
-                          style={{
-                            fontWeight: 700,
-                            fontFamily: 'var(--font-display)',
-                          }}
-                        >
-                          {r.totalScore}
-                        </td>
-                        <td>
-                          <span className={`grade grade-${g}`}>{g}</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Pending Assignments */}
-          <div className="card">
-            <div className="card__header">
-              <span className="card__title">Due Assignments</span>
-            </div>
-            <div
-              className="card__body"
-              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-            >
-              {pendingAssignments.length === 0 ? (
-                <p
-                  style={{
-                    color: 'var(--clr-text-3)',
-                    fontSize: '0.9rem',
-                    textAlign: 'center',
-                    padding: 16,
-                  }}
-                >
-                  All caught up! 🎉
-                </p>
-              ) : (
-                pendingAssignments.map((a) => (
-                  <div
-                    key={a._id}
-                    style={{
-                      padding: 12,
-                      background: 'var(--clr-bg)',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--clr-border)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        fontSize: '0.9375rem',
-                        marginBottom: 4,
-                      }}
-                    >
-                      {a.title}
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: '0.8125rem',
-                          color: 'var(--clr-text-3)',
-                        }}
-                      >
-                        {a.subject?.name}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '0.8125rem',
-                          fontWeight: 600,
-                          color: 'var(--clr-warning)',
-                        }}
-                      >
-                        Due {format(new Date(a.dueDate), 'dd MMM')}
+          <div className="card__body">
+            {pendingAssignments.length === 0 ? (
+              <div className="dash-empty">All caught up!</div>
+            ) : (
+              <ul className="due-list">
+                {pendingAssignments.map((assignment) => (
+                  <li key={assignment._id}>
+                    <div className="due-list__title">{assignment.title}</div>
+                    <div className="due-list__meta">
+                      <span>{assignment.subject?.name}</span>
+                      <span className="due-list__due">
+                        Due {format(new Date(assignment.dueDate), 'dd MMM')}
                       </span>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-
-          {/* Fee Status */}
-          {feeBalance && (
-            <div className="card">
-              <div className="card__header">
-                <span className="card__title">Fee Status</span>
-              </div>
-              <div className="card__body">
-                <div style={{ marginBottom: 12 }}>
-                  <div
-                    style={{
-                      fontSize: '0.875rem',
-                      color: 'var(--clr-text-3)',
-                      marginBottom: 4,
-                    }}
-                  >
-                    {feeBalance.feeStructure?.title}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '1.5rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    ₦{(feeBalance.paidTotal || 0).toLocaleString()}
-                    <span
-                      style={{
-                        fontSize: '0.875rem',
-                        fontWeight: 400,
-                        color: 'var(--clr-text-3)',
-                      }}
-                    >
-                      {' '}
-                      / ₦{(feeBalance.totalAmount || 0).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    height: 8,
-                    borderRadius: 4,
-                    background: 'var(--clr-bg-alt)',
-                    marginBottom: 12,
-                  }}
-                >
-                  <div
-                    style={{
-                      height: '100%',
-                      borderRadius: 4,
-                      width: `${feeBalance.percentPaid || 0}%`,
-                      background:
-                        feeBalance.status === 'Paid'
-                          ? 'var(--clr-success)'
-                          : 'var(--clr-warning)',
-                    }}
-                  />
-                </div>
-                <span
-                  className={`badge badge--${feeBalance.status === 'Paid' ? 'success' : 'warning'}`}
-                >
-                  {feeBalance.status}
-                  {feeBalance.outstanding > 0 &&
-                    ` — ₦${feeBalance.outstanding.toLocaleString()} left`}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
+        </section>
       </div>
+
+      <section className="card dash-card">
+        <div className="card__header">
+          <h2 className="card__title">Recent results</h2>
+        </div>
+        {recentResults.length === 0 ? (
+          <div className="dash-empty">No published results yet</div>
+        ) : (
+          <div
+            className="table-wrapper"
+            style={{ border: 'none', borderRadius: 0 }}
+          >
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>CA Total /{CA_MAX}</th>
+                  <th>Exam</th>
+                  <th>Total</th>
+                  <th>Grade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentResults.map((result) => (
+                  <tr key={result._id}>
+                    <td style={{ fontWeight: 600 }}>{result.subject?.name}</td>
+                    <td>{caTotal(result.scores)}</td>
+                    <td>{result.scores?.exam || 0}</td>
+                    <td
+                      style={{
+                        fontWeight: 700,
+                        fontFamily: 'var(--font-display)',
+                      }}
+                    >
+                      {result.totalScore}
+                    </td>
+                    <td>
+                      {/* The server's grade. This page used to hold its own copy
+                          of the ladder, which GRADE_SCALE exists to prevent. */}
+                      <span className={`grade grade-${result.grade}`}>
+                        {result.grade}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </>
   );
 }
