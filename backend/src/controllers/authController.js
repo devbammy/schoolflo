@@ -80,9 +80,9 @@ const register = async (req, res) => {
     parentProfile: role === 'Parent' ? parentProfile : undefined,
   });
 
-  const accessToken = user.generateAccessToken();
-  const refreshToken = user.generateRefreshToken();
-  await createSession(user, refreshToken, req);
+  // No tokens and no session. The caller is an admin creating someone else's
+  // account, so tokens here gave the admin a live, unaudited sign-in as that
+  // person, and left a session row for a device the user never used.
 
   // Welcome email carrying the credentials the admin just set. Sent before
   // `password` is cleared below, and never allowed to fail the registration —
@@ -117,11 +117,7 @@ const register = async (req, res) => {
     },
   });
 
-  return sendSuccess(res, 201, 'User registered successfully', {
-    user,
-    accessToken,
-    refreshToken,
-  });
+  return sendSuccess(res, 201, 'User registered successfully', { user });
 };
 
 // @desc    Login
@@ -139,10 +135,6 @@ const login = async (req, res) => {
   const user = await User.findOne({ email }).select('+password');
   if (!user) return sendError(res, 401, 'Invalid credentials');
 
-  if (!user.isActive) {
-    return sendError(res, 401, 'Account deactivated. Contact admin.');
-  }
-
   const isMatch = await user.comparePassword(password);
   if (!isMatch) {
     await audit.recordAnonymous(req, {
@@ -154,6 +146,13 @@ const login = async (req, res) => {
       reason: 'Incorrect password',
     });
     return sendError(res, 401, 'Invalid credentials');
+  }
+
+  // Checked after the password. Answering first told anyone who typed an address
+  // that it belonged to a deactivated account, which this endpoint otherwise
+  // refuses to reveal.
+  if (!user.isActive) {
+    return sendError(res, 401, 'Account deactivated. Contact admin.');
   }
 
   // 🕒 Update last login

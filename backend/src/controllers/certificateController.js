@@ -9,6 +9,7 @@ const {
   assertStudentAccess,
   scopeQueryToStudents,
 } = require('../utils/studentAccess');
+const { parentsOfStudent } = require('../utils/parentLookup');
 const {
   sendEmail,
   emailTemplates,
@@ -19,10 +20,6 @@ const getCertificateNotificationRecipients = async (certificate) => {
   await certificate.populate({
     path: 'student',
     select: 'firstName lastName email studentProfile.parentId',
-    populate: {
-      path: 'studentProfile.parentId',
-      select: 'firstName lastName email',
-    },
   });
 
   const student = certificate.student;
@@ -35,13 +32,15 @@ const getCertificateNotificationRecipients = async (certificate) => {
     },
   ];
 
-  const parent = student.studentProfile?.parentId;
-  if (parent?.email) {
-    recipients.push({
-      name: `${parent.firstName} ${parent.lastName}`,
-      email: parent.email,
-    });
-  }
+  const parents = await parentsOfStudent(student);
+  parents
+    .filter((parent) => parent.email)
+    .forEach((parent) =>
+      recipients.push({
+        name: `${parent.firstName} ${parent.lastName}`,
+        email: parent.email,
+      }),
+    );
 
   return recipients;
 };
@@ -54,6 +53,23 @@ const resolveStudentIdentifier = async (identifier) => {
   }
   return await User.findOne({ 'studentProfile.admissionNumber': identifier });
 };
+
+// A document with the school's name on it left the building. Only revocation
+// used to be recorded, so the log could say one was withdrawn but not who issued
+// it. The student is the subject, so it appears in their history.
+const auditIssue = (req, certificate) =>
+  audit.record(req, {
+    action: 'certificate.issue',
+    entity: 'Certificate',
+    entityId: certificate._id,
+    entityLabel: certificate.certificateType,
+    subject: certificate.student?._id || certificate.student,
+    meta: {
+      certificateNumber: certificate.certificateNumber,
+      term: certificate.term,
+      academicYear: certificate.academicYear,
+    },
+  });
 
 const notifyCertificateIssued = async (certificate) => {
   await certificate.populate('issuedBy', 'firstName lastName');
@@ -152,6 +168,7 @@ exports.generateReportCard = async (req, res) => {
   });
 
   await certificate.populate('student', 'firstName lastName studentProfile');
+  await auditIssue(req, certificate);
 
   notifyCertificateIssued(certificate).catch((err) =>
     console.error('Certificate issuance notification failed:', err.message),
@@ -198,6 +215,7 @@ exports.generateLeavingCertificate = async (req, res) => {
   await certificate.save();
 
   await certificate.populate('student', 'firstName lastName studentProfile');
+  await auditIssue(req, certificate);
 
   notifyCertificateIssued(certificate).catch((err) =>
     console.error('Certificate issuance notification failed:', err.message),
@@ -248,6 +266,7 @@ exports.generateAdmissionLetter = async (req, res) => {
   await certificate.save();
 
   await certificate.populate('student', 'firstName lastName');
+  await auditIssue(req, certificate);
 
   notifyCertificateIssued(certificate).catch((err) =>
     console.error('Certificate issuance notification failed:', err.message),

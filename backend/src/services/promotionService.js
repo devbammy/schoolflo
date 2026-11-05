@@ -3,6 +3,8 @@ const User = require('../models/User');
 const CATracker = require('../models/CATracker');
 const { Result } = require('../models/Exam');
 const AppError = require('../utils/AppError');
+const { assignCompetitionRanks } = require('./gradingService');
+const { ENROLLED_FILTER, recordEnrolment } = require('../utils/enrolment');
 
 class PromotionService {
   // Create promotion batch
@@ -11,8 +13,6 @@ class PromotionService {
       ...data,
       createdBy: userId,
     });
-
-    console.log(promotion);
 
     await promotion.populate([
       { path: 'fromClass', select: 'name level' },
@@ -41,7 +41,10 @@ class PromotionService {
     const students = await User.find({
       role: 'Student',
       'studentProfile.class': promotion.fromClass._id,
-      isActive: true,
+      // Last year's graduates still carry this class. Without this they were
+      // processed again every year, and came out as "Repeated" for having no
+      // records.
+      ...ENROLLED_FILTER,
     });
 
     promotion.status = 'Processing';
@@ -70,9 +73,16 @@ class PromotionService {
     const rankedStudents = Object.entries(studentAverages)
       .map(([id, data]) => ({
         studentId: id,
-        average: data.total / data.count,
+        // Rounded before ranking so float noise reads as the tie it is, the
+        // same as every other position in the system.
+        average: parseFloat((data.total / data.count).toFixed(2)),
       }))
       .sort((a, b) => b.average - a.average);
+
+    const yearlyPositions = assignCompetitionRanks(
+      rankedStudents,
+      (entry) => entry.average,
+    );
 
     for (const student of students) {
       // Get student's yearly performance
@@ -148,9 +158,10 @@ class PromotionService {
       }
 
       // 0 means "no published results for this student".
-      const position =
-        rankedStudents.findIndex((a) => a.studentId === String(student._id)) +
-        1;
+      const ranked = rankedStudents.find(
+        (a) => a.studentId === String(student._id),
+      );
+      const position = ranked ? yearlyPositions.get(ranked) : 0;
 
       processedStudents.push({
         student: student._id,
@@ -187,6 +198,12 @@ class PromotionService {
       throw AppError.notFound('Promotion batch not found');
     }
 
+    if (promotion.appliedAt) {
+      throw AppError.conflict(
+        'This batch has already been applied and can no longer be changed.',
+      );
+    }
+
     const studentIndex = promotion.students.findIndex(
       (s) => s.student.toString() === studentId,
     );
@@ -221,10 +238,26 @@ class PromotionService {
       throw AppError.badRequest('Promotion must be completed before applying');
     }
 
-    const updatePromises = promotion.students.map(async (entry) => {
-      const student = await User.findById(entry.student._id);
+    // Claimed atomically, so a double click cannot apply it twice. Applying an
+    // old batch again would move a cohort back to classes they left a year ago.
+    const claimed = await Promotion.findOneAndUpdate(
+      { _id: promotionId, status: 'Completed', appliedAt: null },
+      { $set: { appliedAt: new Date(), appliedBy: userId } },
+      { new: true },
+    );
+
+    if (!claimed) {
+      throw AppError.conflict('This batch has already been applied.');
+    }
+
+    const applyEntry = async (entry) => {
+      const student = entry.student && (await User.findById(entry.student._id));
 
       if (!student) return null;
+
+      // Written before the class changes: this is what keeps the session they
+      // are leaving, and any debt from it, attached to them.
+      recordEnrolment(student, promotion.fromClass, promotion.academicYear);
 
       if (entry.status === 'Promoted' || entry.status === 'Repeated') {
         student.studentProfile.class = entry.promotedTo;
@@ -243,11 +276,32 @@ class PromotionService {
       }
 
       return student;
-    });
+    };
 
-    await Promise.all(updatePromises);
+    try {
+      await Promise.all(promotion.students.map(applyEntry));
+    } catch (error) {
+      // Applying again is safe at this point, since every entry only sets the
+      // same values, so release the claim rather than strand a part-moved batch.
+      await Promotion.updateOne(
+        { _id: promotionId },
+        { $unset: { appliedAt: '', appliedBy: '' } },
+      );
+      throw error;
+    }
 
-    return { message: 'Promotions applied successfully', promotion };
+    const countOf = (status) =>
+      promotion.students.filter((entry) => entry.status === status).length;
+
+    return {
+      message: 'Promotions applied successfully',
+      promotion: claimed,
+      promoted: countOf('Promoted'),
+      repeated: countOf('Repeated'),
+      graduated: countOf('Graduated'),
+      withdrawn: countOf('Withdrawn'),
+      total: promotion.students.length,
+    };
   }
 
   // Get promotion batch

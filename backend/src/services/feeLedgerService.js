@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const { Fees, Payment } = require('../models/Fees');
+const { isBilledFor } = require('../utils/enrolment');
 
 /**
  * The one definition of what the school is owed.
@@ -59,22 +60,31 @@ const buildFeeLedger = async ({ term, academicYear, classId } = {}) => {
   ];
   const feeIds = feeStructures.map((f) => f._id);
 
-  const [rosterRows, paidRows] = await Promise.all([
-    User.aggregate([
-      {
-        $match: {
-          role: 'Student',
+  const classObjectIds = classIds.map((id) => new mongoose.Types.ObjectId(id));
+
+  const [candidates, paidRows] = await Promise.all([
+    // Everyone who is, or has ever been, in one of these classes. Whether each
+    // owes a particular fee depends on its session, so that is decided per fee
+    // below: reading the current roster alone billed a closed session's fees to
+    // whoever had since moved into the class, and let the debts of those who
+    // moved out, or left, disappear.
+    User.find({
+      role: 'Student',
+      $or: [
+        {
           // profileStatus is absent on students created through an update
           // rather than a create — findByIdAndUpdate does not apply schema
           // defaults — and those students are still enrolled.
           'studentProfile.profileStatus': { $in: ['Active', null] },
-          'studentProfile.class': {
-            $in: classIds.map((id) => new mongoose.Types.ObjectId(id)),
-          },
+          'studentProfile.class': { $in: classObjectIds },
         },
-      },
-      { $group: { _id: '$studentProfile.class', students: { $push: '$_id' } } },
-    ]),
+        { 'studentProfile.enrolments.class': { $in: classObjectIds } },
+      ],
+    })
+      .select(
+        'studentProfile.class studentProfile.enrolments studentProfile.profileStatus',
+      )
+      .lean(),
     Payment.aggregate([
       { $match: { feeStructure: { $in: feeIds } } },
       {
@@ -86,9 +96,6 @@ const buildFeeLedger = async ({ term, academicYear, classId } = {}) => {
     ]),
   ]);
 
-  const rosterByClass = new Map(
-    rosterRows.map((row) => [String(row._id), row.students]),
-  );
   const paidByPair = new Map(
     paidRows.map((row) => [
       `${row._id.feeStructure}:${row._id.student}`,
@@ -102,7 +109,13 @@ const buildFeeLedger = async ({ term, academicYear, classId } = {}) => {
   let collected = 0;
 
   const structures = feeStructures.map((fee) => {
-    const roster = rosterByClass.get(String(fee.class)) || [];
+    const roster = candidates
+      .filter((student) =>
+        isBilledFor(student, fee, {
+          excluding: ['Graduated', 'Withdrawn', 'Suspended'],
+        }),
+      )
+      .map((student) => student._id);
     const amount = Math.round(Number(fee.totalAmount) || 0);
     let structureCollected = 0;
     let structureOutstanding = 0;

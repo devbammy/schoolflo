@@ -35,4 +35,17 @@ SequenceSchema.statics.next = async function (key) {
   return doc.seq;
 };
 
+/**
+ * Make sure the next value for `key` lands above `floor`, for numbering that
+ * existed before its sequence did. $max can only raise the value, so a stale
+ * floor from a slower caller cannot take the sequence backwards.
+ */
+SequenceSchema.statics.atLeast = async function (key, floor) {
+  await this.updateOne(
+    { key },
+    { $max: { seq: floor } },
+    { upsert: true, setDefaultsOnInsert: true },
+  );
+};
+
 module.exports = mongoose.model('Sequence', SequenceSchema);

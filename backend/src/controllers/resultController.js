@@ -3,6 +3,12 @@ const User = require('../models/User');
 const { GRADE_SCALE } = require('../config/constants');
 const { checkStudentAccess } = require('../utils/studentAccess');
 const {
+  canEnterScores,
+  getVisibleSubjectIds,
+} = require('../utils/teacherScope');
+const { inClassDuring } = require('../utils/enrolment');
+const { parentsOfStudent } = require('../utils/parentLookup');
+const {
   sendSuccess,
   sendError,
   getPaginationParams,
@@ -50,52 +56,26 @@ const checkResultAccess = (user, studentId) =>
   checkStudentAccess(user, studentId, 'results');
 
 /**
- * May this teacher enter or amend scores for a subject in a class?
- *
- * A teacher is scoped to the subjects they actually teach, plus full access to
- * the class they are form teacher of. Previously any Teacher account could
- * write scores for any subject in any class, and read any class's results.
- *
- * Returns an error message, or null when permitted.
+ * May this teacher enter or amend scores for a subject in a class? The rule
+ * itself lives in utils/teacherScope.js. Returns a message, or null if permitted.
  */
-const checkTeacherSubjectAccess = (user, { classId, subjectId }) => {
-  if (user.role === 'Admin') return null;
-  if (user.role !== 'Teacher') return 'Access denied.';
-
-  const profile = user.teacherProfile || {};
-
-  // Form teacher of this class — full access to it.
-  if (
-    classId &&
-    profile.classTeacherOf &&
-    String(profile.classTeacherOf) === String(classId)
-  ) {
-    return null;
-  }
-
-  const taught = (profile.subjectsTaught || []).map(String);
-  if (subjectId && taught.includes(String(subjectId))) return null;
-
-  return 'You can only manage results for the subjects you teach.';
-};
+const checkTeacherSubjectAccess = async (user, { classId, subjectId }) =>
+  (await canEnterScores(user, { classId, subjectId }))
+    ? null
+    : 'You can only manage results for the subjects you teach in this class.';
 
 /**
- * Subjects a teacher may see results for in a given class.
- * `null` means unrestricted (Admin, or the class's form teacher).
+ * Is this student someone whose score belongs under this class and session?
+ * Nothing used to check, so a score could be filed under a class the student was
+ * never in, where it then moved that class's averages and positions. A row that
+ * already sits under the class passes, so a correction to last year's mark still
+ * works after the student has been promoted.
  */
-const visibleSubjectsForTeacher = (user, classId) => {
-  if (user.role === 'Admin') return null;
-
-  const profile = user.teacherProfile || {};
-  if (
-    profile.classTeacherOf &&
-    String(profile.classTeacherOf) === String(classId)
-  ) {
-    return null;
-  }
-
-  return (profile.subjectsTaught || []).map(String);
-};
+const belongsToClass = (student, classId, academicYear, existing) =>
+  student?.role === 'Student' &&
+  (inClassDuring(student, classId, academicYear) ||
+    String(student.studentProfile?.class) === String(classId) ||
+    String(existing?.class) === String(classId));
 
 // @desc    Enter/update scores for a student subject
 // @route   POST /api/v1/results
@@ -112,7 +92,7 @@ const upsertResult = async (req, res) => {
     teacherComment,
   } = req.body;
 
-  const scopeDenied = checkTeacherSubjectAccess(req.user, {
+  const scopeDenied = await checkTeacherSubjectAccess(req.user, {
     classId,
     subjectId: subject,
   });
@@ -139,8 +119,12 @@ const upsertResult = async (req, res) => {
     term,
     academicYear,
   })
-    .select('scores totalScore grade isPublished')
+    .select('class scores totalScore grade isPublished')
     .lean();
+
+  if (!belongsToClass(studentUser, classId, academicYear, previous)) {
+    return sendError(res, 400, 'This student is not in the selected class.');
+  }
 
   // Once published, a score is on a report card a family may already have
   // seen. A teacher can no longer change it quietly; an admin can, with the
@@ -212,7 +196,7 @@ const bulkUpsertResults = async (req, res) => {
     return sendError(res, 400, 'Results array is required');
   }
 
-  const scopeDenied = checkTeacherSubjectAccess(req.user, {
+  const scopeDenied = await checkTeacherSubjectAccess(req.user, {
     classId,
     subjectId: subject,
   });
@@ -233,6 +217,38 @@ const bulkUpsertResults = async (req, res) => {
       400,
       `${batch.errors.length} invalid score${batch.errors.length === 1 ? '' : 's'} — no results were saved.`,
       batch.errors,
+    );
+  }
+
+  // Every row must belong under this class, or none are saved, for the same
+  // reason as an invalid score.
+  const studentIds = batch.rows.map((row) => row.student);
+  const [batchStudents, existingRows] = await Promise.all([
+    User.find({ _id: { $in: studentIds } }).select('role studentProfile'),
+    Result.find({ student: { $in: studentIds }, subject, term, academicYear })
+      .select('student class')
+      .lean(),
+  ]);
+  const studentById = new Map(batchStudents.map((s) => [String(s._id), s]));
+  const existingByStudent = new Map(
+    existingRows.map((row) => [String(row.student), row]),
+  );
+
+  const foreign = studentIds.filter(
+    (id) =>
+      !belongsToClass(
+        studentById.get(String(id)),
+        classId,
+        academicYear,
+        existingByStudent.get(String(id)),
+      ),
+  );
+
+  if (foreign.length) {
+    return sendError(
+      res,
+      400,
+      `${foreign.length} student(s) are not in the selected class — no results were saved.`,
     );
   }
 
@@ -406,12 +422,16 @@ const notifyParentsOfResults = async (studentIds, term, academicYear) => {
         continue;
       }
 
-      const student = await User.findById(studentId)
-        .select('firstName lastName studentProfile.parentId')
-        .populate('studentProfile.parentId', 'email firstName');
+      const student = await User.findById(studentId).select(
+        'firstName lastName studentProfile.parentId',
+      );
 
-      const parent = student?.studentProfile?.parentId;
-      if (!parent?.email) {
+      const parents = student
+        ? (await parentsOfStudent(student, 'email firstName')).filter(
+            (parent) => parent.email,
+          )
+        : [];
+      if (!parents.length) {
         skipped += 1;
         continue;
       }
@@ -419,21 +439,23 @@ const notifyParentsOfResults = async (studentIds, term, academicYear) => {
       const { average, overallPosition, totalStudentsInClass } =
         reportCard.summary;
 
-      const { success } = await enqueueEmail({
-        to: parent.email,
-        subject: `${term} results for ${student.firstName} ${student.lastName}`,
-        html: emailTemplates.resultPublished({
-          studentName: `${student.firstName} ${student.lastName}`,
-          term,
-          academicYear,
-          average,
-          position: `${overallPosition} of ${totalStudentsInClass}`,
-          loginUrl: `${clientUrl()}/login`,
-        }),
-      });
+      for (const parent of parents) {
+        const { success } = await enqueueEmail({
+          to: parent.email,
+          subject: `${term} results for ${student.firstName} ${student.lastName}`,
+          html: emailTemplates.resultPublished({
+            studentName: `${student.firstName} ${student.lastName}`,
+            term,
+            academicYear,
+            average,
+            position: `${overallPosition} of ${totalStudentsInClass}`,
+            loginUrl: `${clientUrl()}/login`,
+          }),
+        });
 
-      if (success) sent += 1;
-      else skipped += 1;
+        if (success) sent += 1;
+        else skipped += 1;
+      }
     } catch (error) {
       skipped += 1;
       console.error(
@@ -494,7 +516,7 @@ const getClassResults = async (req, res) => {
 
   // A subject teacher sees only their own subjects here; the class's form
   // teacher and Admins see everything.
-  const allowedSubjects = visibleSubjectsForTeacher(req.user, classId);
+  const allowedSubjects = await getVisibleSubjectIds(req.user, classId);
 
   if (allowedSubjects) {
     if (!allowedSubjects.length) {

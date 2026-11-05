@@ -361,8 +361,11 @@ const settlePayment = async ({ reference }) => {
 
   if (!payment) return { settled: false, reason: 'not_found' };
 
-  // Idempotency: the redirect and the webhook routinely both fire.
-  if (payment.status === PAYMENT_STATUS.PAID) {
+  // Idempotency: the redirect and the webhook routinely both fire. Checked on
+  // the money, not just the status: a gateway record only ever holds one
+  // transaction, so an underpayment that landed as Partial is just as settled,
+  // and treating it as new emailed a second receipt on every retry.
+  if (payment.status === PAYMENT_STATUS.PAID || payment.amountPaid > 0) {
     return {
       settled: true,
       alreadySettled: true,
@@ -472,7 +475,10 @@ const publicPayment = (payment) => {
  * its amountPaid is the running total: a parent who paid ₦10,000 and then
  * ₦5,000 would otherwise be e-mailed a receipt for ₦15,000 the second time.
  */
-const sendReceiptEmail = async (payment, { amount, outstanding } = {}) => {
+const sendReceiptEmail = async (
+  payment,
+  { amount, outstanding, receiptNumber = payment.receiptNumber } = {},
+) => {
   try {
     const student = payment.student;
     if (!student?.email) return;
@@ -484,11 +490,11 @@ const sendReceiptEmail = async (payment, { amount, outstanding } = {}) => {
       to: student.email,
       subject:
         stillOwed > 0
-          ? `Part-Payment Receipt — ${payment.receiptNumber}`
-          : `Payment Receipt — ${payment.receiptNumber}`,
+          ? `Part-Payment Receipt — ${receiptNumber}`
+          : `Payment Receipt — ${receiptNumber}`,
       html: emailTemplates.paymentReceipt({
         studentName: `${student.firstName} ${student.lastName}`,
-        receiptNumber: payment.receiptNumber,
+        receiptNumber,
         amount: paidNow,
         term: payment.term,
         academicYear: payment.academicYear,

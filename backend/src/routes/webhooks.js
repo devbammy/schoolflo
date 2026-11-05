@@ -2,6 +2,34 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { settlePayment } = require('../services/paymentService');
+const audit = require('../services/auditService');
+
+/**
+ * A payer who never returns to the site is settled here and nowhere else, so
+ * without this the most reliable path to the money was the one the audit log
+ * never saw. Only the call that actually settled records it: gateways retry.
+ */
+const auditSettlement = async (req, reference, settlement) => {
+  const { settled, alreadySettled, payment, overpaid } = settlement;
+  if (!settled || alreadySettled) return;
+
+  await audit.recordAnonymous(req, {
+    action: 'payment.settle',
+    entity: 'Payment',
+    entityId: payment._id,
+    entityLabel: payment.receiptNumber,
+    subject: payment.student?._id || payment.student,
+    meta: {
+      reference,
+      amountPaid: payment.amountPaid,
+      status: payment.status,
+      balance: payment.balance,
+      gateway: payment.gateway,
+      viaWebhook: true,
+      overpaid: overpaid || undefined,
+    },
+  });
+};
 
 /**
  * Constant-time comparison of two hex signatures.
@@ -72,7 +100,10 @@ router.post(
     if (!reference) return res.sendStatus(200);
 
     try {
-      const { settled, reason } = await settlePayment({ reference });
+      const settlement = await settlePayment({ reference });
+      const { settled, reason } = settlement;
+
+      await auditSettlement(req, reference, settlement);
 
       if (!settled && reason === 'not_found') {
         // No local record for this reference — retrying will not help.
@@ -148,7 +179,11 @@ router.post(
     }
 
     try {
-      const { settled, reason } = await settlePayment({ reference });
+      const settlement = await settlePayment({ reference });
+      const { settled, reason } = settlement;
+
+      await auditSettlement(req, reference, settlement);
+
       if (!settled) {
         console.error(
           `Flutterwave webhook: ${reference} not settled (${reason})`,

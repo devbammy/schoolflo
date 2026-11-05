@@ -23,6 +23,11 @@ import api, { userService } from '../../services/api';
 
 const STEP = { CHOOSE: 'choose', REVIEW: 'review', DONE: 'done' };
 
+// Sent a few at a time. Every account costs a bcrypt hash, so one request for a
+// large file outlasted the client's timeout: the admin was told the import had
+// failed while the server carried on creating accounts and emailing passwords.
+const IMPORT_BATCH_SIZE = 20;
+
 const Pill = ({ tone, children }) => (
   <span
     className={`badge badge--${tone}`}
@@ -38,6 +43,7 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef(null);
 
@@ -102,19 +108,63 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
   const commit = async () => {
     const rows = preview.rows.filter((r) => r.valid).map((r) => r.raw);
 
+    const merged = {
+      created: [],
+      failed: [],
+      parentsCreated: [],
+      summary: {
+        requested: rows.length,
+        created: 0,
+        failed: 0,
+        parentsCreated: 0,
+        parentsLinked: 0,
+      },
+    };
+
     setBusy(true);
-    try {
-      const { data } = await userService.importCommit(rows, role);
-      setResult(data.data);
-      setStep(STEP.DONE);
-      if (data.data.summary.created > 0) onImported?.();
-    } catch (err) {
-      toast.error(
-        err.response?.data?.message || 'The import did not go through',
-      );
-    } finally {
-      setBusy(false);
+
+    for (let start = 0; start < rows.length; start += IMPORT_BATCH_SIZE) {
+      const batch = rows.slice(start, start + IMPORT_BATCH_SIZE);
+      setProgress({ done: start, total: rows.length });
+
+      try {
+        const { data } = await userService.importCommit(batch, role);
+        merged.created.push(...data.data.created);
+        merged.failed.push(...data.data.failed);
+        merged.parentsCreated.push(...data.data.parentsCreated);
+        merged.summary.parentsLinked += data.data.summary.parentsLinked;
+      } catch (err) {
+        // Stop rather than press on: this may be a connection that has gone.
+        // A batch with no answer may still have been created, so say so, or the
+        // admin retries the file and is told those addresses are taken.
+        const unanswered = err.response
+          ? err.response.data?.message || 'The server refused this batch.'
+          : 'No answer from the server. Check whether this account exists before importing it again.';
+
+        rows.slice(start).forEach((row, index) => {
+          merged.failed.push({
+            line: row._line,
+            email: row.email,
+            errors: [
+              index < batch.length
+                ? unanswered
+                : 'Not attempted, because an earlier batch did not finish.',
+            ],
+          });
+        });
+        break;
+      }
     }
+
+    merged.summary.created = merged.created.length;
+    merged.summary.failed = merged.failed.length;
+    merged.summary.parentsCreated = merged.parentsCreated.length;
+
+    setResult(merged);
+    setStep(STEP.DONE);
+    setProgress(null);
+    setBusy(false);
+    if (merged.summary.created > 0) onImported?.();
   };
 
   const onDrop = (e) => {
@@ -429,7 +479,7 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
         >
           <Upload size={14} />
           {busy
-            ? 'Importing…'
+            ? `Importing ${progress?.done ?? 0} of ${progress?.total ?? 0}…`
             : `Import ${preview?.summary.valid ?? 0} ${label}${
                 preview?.summary.valid === 1 ? '' : 's'
               }`}

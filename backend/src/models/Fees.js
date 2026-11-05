@@ -146,6 +146,19 @@ const PaymentSchema = new mongoose.Schema(
       ref: 'User',
     },
     notes: String,
+    // One entry per sum of money taken over the counter. An office record
+    // accumulates, so its amountPaid is a running total and could not say what
+    // was handed over when, by whom, or on which receipt.
+    instalments: [
+      {
+        _id: false,
+        amount: Number,
+        receiptNumber: String,
+        date: Date,
+        processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        notes: String,
+      },
+    ],
   },
   {
     timestamps: true,

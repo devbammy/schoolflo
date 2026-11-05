@@ -85,10 +85,13 @@ schoolflo/
 │   ├── src/
 │   │   ├── config/
 │   │   │   ├── db.js
+│   │   │   ├── env.js             # refuses to boot on a bad environment
+│   │   │   ├── features.js        # which features this school runs
+│   │   │   ├── clientUrl.js       # the one address for links
 │   │   │   └── constants.js       # roles, terms, GRADE_SCALE, score caps
-│   │   ├── models/                # 21 Mongoose models
-│   │   ├── controllers/           # 24 controllers, one per domain
-│   │   ├── services/              # 13 services
+│   │   ├── models/                # 25 Mongoose models in 21 files
+│   │   ├── controllers/           # 25 controllers
+│   │   ├── services/              # 14 services
 │   │   │   ├── gradingService.js      # class stats, ranking, report cards
 │   │   │   ├── paymentService.js      # gateways + settlement
 │   │   │   ├── feeLedgerService.js    # what the school is owed (see §7)
@@ -101,12 +104,15 @@ schoolflo/
 │   │   │   ├── pdfService.js          # report cards, certificates
 │   │   │   ├── caTrackingService.js
 │   │   │   ├── examScheduleService.js
-│   │   │   └── promotionService.js
+│   │   │   ├── promotionService.js
+│   │   │   └── userImportService.js   # CSV validation and account creation
 │   │   ├── middleware/
 │   │   │   ├── auth.js            # protect()
 │   │   │   ├── rbac.js            # authorize(), ownDataOnly()
+│   │   │   ├── requireFeature.js  # 404 for a feature this school does not run
 │   │   │   ├── validate.js        # express-validator runner
 │   │   │   ├── rateLimitStore.js  # Mongo-backed, shared across instances
+│   │   │   ├── rateLimitKeys.js   # what each limit counts
 │   │   │   └── errorHandler.js
 │   │   ├── validators/            # request schemas, grouped by domain
 │   │   ├── routes/                # thin routers, one file per domain
@@ -115,17 +121,24 @@ schoolflo/
 │   │       ├── apiResponse.js
 │   │       ├── scoreValidation.js
 │   │       ├── teacherScope.js    # the one definition of a teacher's scope
+│   │       ├── studentAccess.js   # who may see a student's records
+│   │       ├── enrolment.js       # who is enrolled, class in a past session
+│   │       ├── parentLookup.js    # every parent of a student
+│   │       ├── csv.js             # hand-written CSV reader and writer
+│   │       ├── migrateEnrolments.js
+│   │       ├── migrateCertificatePdfs.js
 │   │       ├── schoolTime.js      # school wall clock (staff attendance)
 │   │       ├── reconcilePayments.js
 │   │       └── ms.js
-│   └── tests/                     # 18 suites, 316 tests
+│   └── tests/                     # 31 suites, 523 tests
 │       ├── unit/                  # grading, validation, error handling
-│       ├── integration/           # payments, auth (real in-memory MongoDB)
-│       └── setup/db.js
+│       ├── integration/           # real in-memory MongoDB
+│       └── setup/                 # one shared MongoDB, a database per suite
 └── client/                        # NOTE: "client", not "frontend"
     ├── src/
     │   ├── App.jsx                # routes, lazy loading, ErrorBoundary
     │   ├── store/authStore.js     # Zustand, persisted
+    │   ├── store/featureStore.js  # the feature set, read from the server
     │   ├── services/api.js        # axios + auth bridge + service modules
     │   ├── components/
     │   ├── pages/{auth,admin,teacher,student,parent,shared}/
@@ -164,11 +177,25 @@ pnpm dev                # starts on :5173
 
 ### First admin account
 
-Registration requires an existing Admin, so the first one is seeded:
+Registration requires an existing Admin, so the first one is seeded. Set
+`SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` first:
 
 ```bash
 cd backend && pnpm seed
 ```
+
+### Windows
+
+The tests need the Microsoft Visual C++ Redistributable:
+
+```powershell
+winget install --id Microsoft.VCRedist.2015+.x64 --exact
+```
+
+Without it `pnpm test` reports `Module <rootDir>/tests/setup/globalSetup.js in the
+globalSetup option was not found`, about a file that exists. Jest's native
+resolver cannot load, and its WebAssembly fallback cannot see Windows paths.
+`mongod` needs the same runtime and exits with code `3221225781`.
 
 ---
 
@@ -189,8 +216,13 @@ inconsistent.
 | Format            | `pnpm format`              |
 | Audit payments    | `pnpm reconcile`           |
 | Repair payments   | `pnpm reconcile:apply`     |
+| Report missing class history | `pnpm migrate:enrolments` |
+| Write class history | `pnpm migrate:enrolments:apply` |
+| Report public certificate PDFs | `pnpm migrate:certificates` |
+| Move them into the database | `pnpm migrate:certificates:apply` |
 
-CI runs lint, format check, tests and the client build on every push and pull
+CI runs lint, a dependency audit, the format check and tests for the backend, and
+lint, a dependency audit and the build for the client, on every push and pull
 request to `main`.
 
 ---
@@ -466,9 +498,17 @@ GET /api/v1/payments/balance/:studentId?feeStructureId=   ← one named fee
   a balance behind, never to a payment that clears the fee — otherwise a ₦40
   remainder could never be paid off. Cash is exempt entirely
   (`enforceMinimum: false`).
-- Each e-receipt reports **that instalment** and the balance left after it.
-  Over-the-counter payments accumulate onto one record, so its `amountPaid` is
-  a running total and callers pass the instalment amount explicitly.
+- Each e-receipt reports **that instalment** and the balance left after it, under
+  **its own receipt number**. Over-the-counter payments accumulate onto one
+  record per method, so its `amountPaid` is a running total. `Payment.instalments`
+  holds each sum: amount, receipt, date, who took it and any note. It always adds
+  up to `amountPaid`; a record from before instalments were kept has what it
+  already held written as the first entry the next time money is added.
+- **A fee follows the session, not the current class.** A student owes a fee if
+  they were in its class that session (`utils/enrolment.js`), so promotion cannot
+  make a debt disappear. Asking about a term also returns `arrears` and
+  `arrearsTotal`: what is still owed from earlier terms and sessions, shown on
+  the parent and student pages as "Earlier balances".
 
 **Webhook setup:** register `https://<your-api-host>/webhooks/paystack` in the
 Paystack dashboard. Without it, a payment is only confirmed if the payer
@@ -481,7 +521,7 @@ in `services/feeLedgerService.js` is the one definition of expected revenue,
 and it derives it from the fee structures and the roster they apply to:
 
 ```
-billed      = Σ over active fee structures of (fee.totalAmount × students enrolled in its class)
+billed      = Σ over active fee structures of (fee.totalAmount × students in its class that session)
 collected   = Σ min(what that student paid toward that fee, the fee total)
 outstanding = billed − collected
 ```
@@ -495,6 +535,13 @@ reported a 100% collection rate against ₦0 expected.
 
 Collection is capped per student per fee, so a duplicate payment on one child
 cannot subsidise another child's debt in the headline rate.
+
+"In its class that session" comes from `studentProfile.enrolments`, falling back
+to the current class for sessions after the last recorded one. Reading the current
+roster alone meant applying a promotion rewrote the report for a closed session:
+last year's JSS2 fee was billed to this year's JSS2, and the cohort who actually
+owed it dropped out of the figure. A graduate's final-year debt stays in the
+ledger; later sessions do not bill them.
 
 Both `GET /payments/report` and the admin overview card read from this one
 function, so the two screens cannot drift into disagreeing about the same
@@ -630,9 +677,16 @@ someone who teaches one period a week.
 | May this teacher **act on** this class? | `getTeacherClassIds` / `assertClassAccess` | Form teacher of it, or class teacher of one of its sections. Marking a register, running its attendance report. |
 | May this teacher **see the students of** this class? | `getTeacherRosterClassIds` / `assertRosterAccess` | The above, plus every class a subject they teach is offered in. Loading a roster to enter grades. |
 
-A teacher may manage results for subjects in their
-`teacherProfile.subjectsTaught`, plus everything in the class they are form
-teacher of (`classTeacherOf`).
+**Scores** have their own rule, `canEnterScores`. Whoever owns the class (form
+teacher, or class teacher of a section) may enter any subject in it. Anyone else
+must teach the subject, recorded on either `teacherProfile.subjectsTaught` or
+`Subject.teachers`, **and** the subject must be offered in that class
+(`Subject.classes`). Reading results follows the same rule. A subject with no
+classes assigned accepts scores only from the class's owner and an admin.
+
+A score must also belong under its class: the student is in it, was in it that
+session, or the row is already filed there, which keeps a correction to last
+year's mark possible after the student has been promoted.
 
 **Student data ownership** is a separate question with one answer:
 `utils/studentAccess.js`. `assertStudentAccess` guards reading one student's
@@ -665,7 +719,7 @@ Base URL: `/api/v1`. All routes require a Bearer token unless marked Public.
 | Method | Endpoint                 | Access | Notes                                        |
 | ------ | ------------------------ | ------ | -------------------------------------------- |
 | POST   | `/login`                 | Public | Returns `{ user, accessToken, refreshToken }`|
-| POST   | `/register`              | Admin  | Sends a welcome email with the credentials   |
+| POST   | `/register`              | Admin  | Sends a welcome email with the credentials. Returns `{ user }`, never tokens: the caller is not that person |
 | GET    | `/me`                    | Any    | Fully populated profile                      |
 | PUT    | `/update-password`       | Any    | New password must differ from the current one|
 | POST   | `/forgot-password`       | Public | Always 200 — never reveals whether an account exists |
@@ -885,6 +939,12 @@ address between preview and commit — is reported without abandoning the rest.
 
 Capped at 1,000 rows and 2 MB per file.
 
+The client commits **20 rows at a time** and shows its progress. Each account
+costs a bcrypt hash, so one request for a large file outlasted the timeout, and the
+admin was told it had failed while the server kept creating accounts. If a batch
+gets no answer the import stops there: those rows are reported as unconfirmed,
+since they may have been created, and the rest as not attempted.
+
 ### Search — `/search` (2 routes)
 
 | Method | Endpoint   | Returns                                          |
@@ -915,7 +975,7 @@ Enter navigation.
 
 | Base                | Routes | Controller                  |
 | ------------------- | ------ | --------------------------- |
-| `/users`            | 8      | `userController`            |
+| `/users`            | 12     | `userController`, `userImportController` |
 | `/parents`          | 7      | `parentController`          |
 | `/classes`          | 5      | `classController`           |
 | `/subjects`         | 4      | `subjectController`         |
@@ -931,10 +991,11 @@ Enter navigation.
 | `/exam-schedules`   | 10     | `examScheduleController`    |
 | `/ca-tracking`      | 6      | `caTrackingController`      |
 | `/promotions`       | 8      | `promotionController`       |
-| `/certificates`     | 8      | `certificateController`     |
-| `/webhooks`         | 1      | HMAC-verified, no JWT       |
+| `/certificates`     | 9      | `certificateController`     |
+| `/config`           | 1      | Public: the feature set     |
+| `/webhooks`         | 2      | Paystack by HMAC, Flutterwave by shared hash; no JWT |
 
-**173 routes total.**
+**180 routes total.**
 
 ### Attendance — `/attendance` (5 routes)
 
@@ -991,14 +1052,15 @@ matter of opinion.
 | `result.bulk_upsert`                          | Class, subject, student count        |
 | `result.publish`                              | Class, term, records published       |
 | `payment.manual`                              | Amount, gateway, resulting balance   |
-| `payment.settle`                              | Reference, amount, resulting status  |
+| `payment.settle`                              | Reference, amount, status, and whether the webhook or the redirect settled it. Recorded once |
 | `fee.create`                                  | Fee total, class, term               |
-| `user.create` / `user.delete`                 | Email, role, admission or staff number |
+| `user.create` / `user.delete`                 | Email, role, admission or staff number. Includes parents |
 | `user.activate` / `user.deactivate`           | Role, whether sessions were revoked  |
 | `auth.login`                                  | Success **and** failure, with reason |
 | `auth.password_reset`, `auth.logout_all`      | Account, sessions ended              |
-| `certificate.revoke`                          | Certificate number, reason           |
+| `certificate.issue` / `certificate.revoke`    | Certificate number, and the reason for a revocation |
 | `promotion.apply`                             | Promoted / repeated / graduated counts |
+| `parent.link_child` / `parent.unlink_child`   | Parent and child. A link decides who can read a child's records |
 | `attendance.mark`                             | Class, date, term, how many absent, created vs updated |
 | `task.assign`                                 | Batch, assignees, due date, priority |
 | `task.submit`                                 | Attempt number, whether it was late  |
@@ -1042,7 +1104,7 @@ await audit.record(req, {
 
 ## 11. Database schema
 
-21 models. The ones with non-obvious behaviour:
+25 models in 21 files. The ones with non-obvious behaviour:
 
 ### User
 
@@ -1050,13 +1112,22 @@ await audit.record(req, {
 firstName, lastName, email (unique), password (bcrypt, select:false), role,
 phone, avatar{url,publicId}, isActive, lastLogin, passwordChangedAt
 studentProfile: { admissionNumber (auto), class→Class, section, parentId→User,
-                  dateOfBirth, gender, profileStatus }
+                  dateOfBirth, gender, profileStatus,
+                  enrolments[{ class→Class, academicYear }] }
 teacherProfile: { staffId (auto), classTeacherOf→Class, subjectsTaught→[Subject] }
 parentProfile:  { occupation, relationship, children→[User] }
 ```
 
 Admission numbers and staff IDs are generated in a `pre('save')` hook from the
 `Counter` collection.
+
+`class` is where a student is now, and a graduate keeps their last one, so it is
+neither history nor proof of enrolment. `enrolments` is the history: a promotion
+writes the session being left when it is applied. `utils/enrolment.js` reads both.
+
+`parentId` holds one parent and a child can have two, with each listing the child
+in `parentProfile.children`. Anything sent to parents goes through
+`parentsOfStudent()`.
 
 ### Result
 
@@ -1078,7 +1149,8 @@ Fees:    title, class→Class, term, academicYear, items[{label,amount,isCompuls
          totalAmount (derived), dueDate, lateFee
 Payment: student→User, feeStructure→Fees, amountPaid, amountDue,
          balance (derived), status (derived), gateway, transactionRef (unique),
-         receiptNumber (unique), gatewayResponse (select:false), processedBy
+         receiptNumber (unique), gatewayResponse (select:false), processedBy,
+         instalments[{amount,receiptNumber,date,processedBy,notes}]
 ```
 
 `Fees.totalAmount` is summed from `items` in **`pre('validate')`**, not
@@ -1112,7 +1184,19 @@ distinguish a refresh that raced a rotation from a token being replayed — see
 
 Named atomic counters (`Sequence.next('receipt-25')`). Deliberately separate
 from `Counter`, which numbers admissions — changing that model's query shape
-would risk reissuing duplicate admission numbers.
+would risk reissuing duplicate admission numbers. Certificate numbers use it too,
+seeded with `Sequence.atLeast` so numbering carries on from what has been printed.
+
+### Promotion
+
+A batch runs `Draft → Processing → Completed`. `Completed` only means the
+decisions are made; `appliedAt` means students have moved. It is claimed atomically,
+so a batch applies once, and an applied batch can no longer be edited.
+
+### Certificate
+
+The PDF is stored in `pdfData` (`select: false`, stripped from JSON) and served
+only by `GET /certificates/:id/download`, which checks ownership on every request.
 
 ### AuditLog
 
@@ -1161,7 +1245,8 @@ clone, which prints as a collapsed table.
 
 ## 12. File storage
 
-Multer memory storage → streamed to Cloudinary.
+Multer memory storage → streamed to Cloudinary. Certificate PDFs are not here:
+they hold a child's name and grades, so they live in MongoDB.
 
 | Content       | Folder                | Max size |
 | ------------- | --------------------- | -------- |
@@ -1196,7 +1281,11 @@ a payment receipt is never silently dropped.
 
 **Emails sent:** welcome (user + parent creation), password reset, payment
 receipt (gateway and manual), results published, announcements, certificate
-issued, certificate revoked.
+issued, certificate revoked. Results and certificate notices go to every parent
+linked to the child.
+
+Finished jobs are deleted (`removeOnComplete`), because a welcome email's body is
+a plaintext password. Failed sends retry with backoff, then are removed.
 
 **SMS** via Twilio is wired for announcements and skipped when unconfigured.
 
@@ -1219,7 +1308,16 @@ JWT_EXPIRE=1h                # keep short — access tokens cannot be revoked
 JWT_REFRESH_SECRET=          # different from JWT_SECRET
 JWT_REFRESH_EXPIRE=30d
 
-CLIENT_URL=https://yourschool.ng   # exact origin; comma-separate for several
+CLIENT_URL=https://yourschool.ng   # exact origin; comma-separate for several.
+                                   # The only origins CORS allows in production
+
+SCHOOL_NAME=Your School Name       # required for report cards and certificates
+SCHOOL_ADDRESS=
+SCHOOL_PHONE=
+SCHOOL_EMAIL=
+
+SEED_ADMIN_EMAIL=                  # for `pnpm seed`
+SEED_ADMIN_PASSWORD=
 
 RATE_LIMIT_WINDOW_MINUTES=15       # window for every limiter below
 RATE_LIMIT_MAX=600                 # API calls per ACCOUNT per window
@@ -1241,6 +1339,7 @@ CLOUDINARY_API_SECRET=
 
 PAYSTACK_SECRET_KEY=sk_live_...    # also verifies webhook signatures
 FLUTTERWAVE_SECRET_KEY=
+FLUTTERWAVE_WEBHOOK_HASH=          # the secret hash set in Flutterwave's dashboard
 
 SMTP_HOST=
 SMTP_PORT=587                      # 465 switches to implicit TLS
@@ -1254,8 +1353,11 @@ TWILIO_ACCOUNT_SID=                # optional
 TWILIO_AUTH_TOKEN=                 # optional
 TWILIO_PHONE_NUMBER=               # optional
 
-KEEP_ALIVE=true                    # optional: self-ping for free-tier hosts
-PING_URL=
+KEEP_ALIVE=true                    # on by default in production
+PING_URL=https://api.yourschool.ng/keep-alive
+                                   # this deployment's own address. Render's
+                                   # RENDER_EXTERNAL_URL is used if unset; with
+                                   # neither, nothing is pinged
 ```
 
 ### Client `.env.local`
@@ -1270,7 +1372,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 18 suites, 316 tests
+pnpm test              # 31 suites, 523 tests
 pnpm test:coverage
 ```
 
@@ -1294,6 +1396,19 @@ pnpm test:coverage
 | `integration/reconcile.test.js` | Drift detection, and that `--apply` is idempotent      |
 | `unit/cumulative.test.js`    | Folding terms into a cumulative, and the missing-term rule |
 | `unit/adminOverview.test.js` | The overview's pulse, attention items and fee maths       |
+| `unit/csv.test.js`           | Quoted fields, embedded newlines, CRLF, Excel's BOM       |
+| `unit/env.test.js`           | What stops the server booting, and what only warns        |
+| `unit/emailTemplates.test.js` | User text is escaped in every template                   |
+| `unit/clientUrlAndLoginKey.test.js` | One link address; one login budget per account     |
+| `integration/enrolment.test.js` | Fees across promotion, arrears, rosters, applying a batch once |
+| `integration/scoreScope.test.js` | Who may enter and read scores, and for which class    |
+| `integration/accountability.test.js` | Settlement audit, cash instalments, parent links, certificate numbers |
+| `integration/studentAccess.test.js` | Who may read one student's records                 |
+| `integration/hardening.test.js` | Locks, library, fee edits and certificate downloads    |
+| `integration/features.test.js` | A disabled feature's routes really close                |
+| `integration/userImport.test.js` | Bulk import, parents and siblings                      |
+| `integration/importDocs.test.js` | `CSV_IMPORT.md` against the real validator           |
+| `integration/jobQueue.test.js` | The inline fallback, and that the module is safe to require |
 
 Integration tests run against a **real MongoDB in memory**
 (`mongodb-memory-server`). Mocking Mongoose would defeat the purpose — the
@@ -1324,7 +1439,10 @@ Set `VITE_API_URL` in the dashboard.
 ### Production checklist
 
 - [ ] `NODE_ENV=production`
-- [ ] `CLIENT_URL` set to the exact frontend origin
+- [ ] `CLIENT_URL` set to the exact frontend origin. Nothing else is allowed by
+      CORS in production
+- [ ] `PING_URL` set to this deployment's own `/keep-alive`, unless on Render
+- [ ] `SCHOOL_NAME` set, or report cards and certificates cannot be generated
 - [ ] `JWT_EXPIRE=1h` (a leftover `30d` silently keeps long-lived tokens)
 - [ ] JWT secrets ≥ 32 random characters, and different from each other
 - [ ] Paystack webhook registered at `/webhooks/paystack`
@@ -1335,6 +1453,10 @@ Set `VITE_API_URL` in the dashboard.
 - [ ] Backup retention enabled (7 days minimum)
 - [ ] `pnpm reconcile` run against production and its report read (see
       [Known gaps](#17-known-gaps)) before trusting any financial figure
+- [ ] `pnpm migrate:enrolments` reviewed, then `:apply`, so students promoted
+      earlier keep that year's fees
+- [ ] Every subject has its classes assigned, or subject teachers cannot enter
+      scores for it
 
 Running more than one backend instance is supported: rate-limit counters are
 shared through MongoDB, and sessions were already in the database. The one
@@ -1364,6 +1486,29 @@ Recorded honestly so nobody rediscovers them the hard way.
   the one item on this list that code cannot close: it is an operational step
   against the live database. Run `pnpm reconcile` first — it is read-only —
   and read the report before applying anything.
+- **Students promoted before enrolments existed** have no record of the class they
+  left until `pnpm migrate:enrolments:apply` has been run. It works from results
+  and registers, so a student with neither has nothing to recover.
+- **Moving a student by editing their class writes no history.** That edit is as
+  often a correction as a transfer, and recording a typo would bill two classes.
+  A real mid-year transfer therefore drops the old class's fee from the ledger,
+  unless money was paid towards it, in which case it stays on the student's own
+  balance.
+- **A new student can be billed for sessions before they joined.** With no history
+  the current class speaks for later sessions, and the ledger does not compare
+  against `admissionDate`, so a report over all years includes them. Filter by
+  session.
+- **A batch applied before `appliedAt` existed can be applied again.** It carries no
+  flag to refuse on.
+- **`Class.name` is unique on its own**, which makes the `{ name, academicYear }`
+  index redundant: a class is one row for all time, and its `academicYear` is
+  decorative. Changing it means an index migration on live data.
+- **The redirect and the webhook can race.** Both can pass the already-settled
+  check at the same moment. Neither double-counts money, because the amount is
+  assigned rather than added, but the payer can get two receipt emails.
+- **Payment receipts go to the student's address only**, not to parents.
+- **A revoked certificate still appears in `GET /certificates`** for its student
+  and parent, though it can no longer be downloaded.
 - **Overpayments are reported, never corrected.** More collected than a fee is
   worth is usually a duplicate payment, and whether that becomes a refund or a
   credit against next term is a decision for a human.
@@ -1377,6 +1522,14 @@ Recorded honestly so nobody rediscovers them the hard way.
 These were on this list and are now fixed. Kept briefly so nobody
 re-introduces them.
 
+- **Debts vanishing on promotion, and graduates left on registers.** See
+  `utils/enrolment.js`; covered by `integration/enrolment.test.js`.
+- **Teachers entering scores for any class.** See `canEnterScores`; covered by
+  `integration/scoreScope.test.js`.
+- **Audit gaps** on webhook settlement, parent accounts, child links and certificate
+  issue, and promotion entries with empty counts. Covered by
+  `integration/accountability.test.js`.
+- **Hard-coded deployment addresses** in CORS and the keep-alive.
 - **`totalExpected` over-counting.** Now derived from fee structures and
   enrolment via `buildFeeLedger`, not summed from payment attempts. Covered by
   `integration/financialReport.test.js`.

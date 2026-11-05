@@ -74,7 +74,7 @@ const checkEnv = (env = process.env) => {
     'CLOUDINARY_API_SECRET',
   ].forEach((key) => {
     if (!isSet(env, key)) {
-      warnings.push(`${key} is not set: uploads and PDFs will fail.`);
+      warnings.push(`${key} is not set: file uploads will fail.`);
     }
   });
 

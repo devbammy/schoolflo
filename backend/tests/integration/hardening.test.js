@@ -291,7 +291,11 @@ describe('published results are locked to teachers', () => {
       level: 'JSS',
       academicYear: YEAR,
     });
-    const subject = await Subject.create({ name: 'Maths', code: 'MTH' });
+    const subject = await Subject.create({
+      name: 'Maths',
+      code: 'MTH',
+      classes: [cls._id],
+    });
     const teacher = await makeUser('Teacher', {
       teacherProfile: { subjectsTaught: [subject._id] },
     });

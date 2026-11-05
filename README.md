@@ -51,6 +51,10 @@ Run from `backend/`:
 | `pnpm format`        | Prettier                         |
 | `pnpm seed`          | Seed the first admin account     |
 | `pnpm reconcile`     | Audit payment records (read-only)|
+| `pnpm migrate:enrolments` | Report missing class history (read-only) |
 
-CI runs lint, format check, tests and the client build on every push and pull
-request to `main`.
+On Windows the tests need the Microsoft Visual C++ Redistributable; see
+[Getting started](DOCUMENTATION.md#windows).
+
+CI runs lint, a dependency audit, the format check, tests and the client build
+on every push and pull request to `main`.

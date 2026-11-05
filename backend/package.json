@@ -19,7 +19,9 @@
     "reconcile": "node src/utils/reconcilePayments.js",
     "reconcile:apply": "node src/utils/reconcilePayments.js --apply",
     "migrate:certificates": "node src/utils/migrateCertificatePdfs.js",
-    "migrate:certificates:apply": "node src/utils/migrateCertificatePdfs.js --apply"
+    "migrate:certificates:apply": "node src/utils/migrateCertificatePdfs.js --apply",
+    "migrate:enrolments": "node src/utils/migrateEnrolments.js",
+    "migrate:enrolments:apply": "node src/utils/migrateEnrolments.js --apply"
   },
   "dependencies": {
     "@agendajs/mongo-backend": "^4.0.3",

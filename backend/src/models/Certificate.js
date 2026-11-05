@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Sequence = require('./Sequence');
 
 const certificateSchema = new mongoose.Schema(
   {
@@ -111,12 +112,17 @@ certificateSchema.pre('save', async function (next) {
       })
       .sort({ createdAt: -1 });
 
-    let nextNumber = 1;
+    // Issued from an atomic sequence. Adding one to the last number read gave
+    // two simultaneous issues the same number, and the second then failed on
+    // the unique index. The last number only seeds the sequence, so numbering
+    // carries on from what has already been printed.
+    const issued = lastCertificate?.certificateNumber
+      ? parseInt(lastCertificate.certificateNumber.split('/')[2], 10) || 0
+      : 0;
 
-    if (lastCertificate?.certificateNumber) {
-      const parts = lastCertificate.certificateNumber.split('/');
-      nextNumber = parseInt(parts[2]) + 1;
-    }
+    const sequenceKey = `certificate-${typePrefix}`;
+    await Sequence.atLeast(sequenceKey, issued);
+    const nextNumber = await Sequence.next(sequenceKey);
 
     this.certificateNumber = `${typePrefix}/${year}/${String(
       nextNumber,

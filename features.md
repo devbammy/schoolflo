@@ -28,7 +28,8 @@ works, see [DOCUMENTATION.md](DOCUMENTATION.md).
   timetable, with invigilation.
 - **Timetables** — `/timetables`, per class and per teacher.
 - **Promotion / class advancement** — `/promotions`, end-of-year progression
-  with repeats and graduations, audited.
+  with repeats and graduations, applied once, audited, keeping each student's
+  class history.
 - **Certificates & documents** — `/certificates`: report card, school leaving
   certificate, admission letter, character certificate, transfer certificate.
   PDF generation for the first three.
@@ -58,8 +59,8 @@ works, see [DOCUMENTATION.md](DOCUMENTATION.md).
   same balance.
 - **Manual / offline payments** — recorded by an admin, accumulating onto one
   record, exempt from the gateway minimum.
-- **Sequential receipts** — collision-free (`RCP-25-000042`), e-mailed per
-  instalment with the balance left after it.
+- **Sequential receipts** — collision-free (`RCP-25-000042`), one per instalment,
+  e-mailed with the balance left after it.
 - **Expected revenue** — derived from fee structures and enrolment, not from
   payment attempts, so the collection rate means something.
 - **Reconciliation** — `pnpm reconcile` audits the payment collection
@@ -76,8 +77,8 @@ works, see [DOCUMENTATION.md](DOCUMENTATION.md).
   revokes the session.
 - **Role-based access control** — four roles, with teacher scoping split into
   "may act on this class" and "may see its students".
-- **Rate limiting** — shared across instances through MongoDB, stricter on
-  `/auth`.
+- **Rate limiting** — shared across instances through MongoDB, counted per
+  account, stricter on sign-in.
 - **Password reset** — single-use, 10-minute tokens, and a forgot-password
   response that never reveals whether an account exists.
 
@@ -88,7 +89,7 @@ works, see [DOCUMENTATION.md](DOCUMENTATION.md).
 | Feature | What exists | What is missing |
 | ------- | ----------- | --------------- |
 | **School-wide analytics** | Admin overview: attendance pulse, fee collection, stalled marking, attention items | Pass rates per subject, average scores by class, attendance trends over time, teacher performance |
-| **Debt ledger** | Per-student, per-fee balances and `studentsOwing` for a term | A running cumulative balance across several terms, and a per-family view |
+| **Debt ledger** | Per-student, per-fee balances, `studentsOwing` for a term, and arrears from earlier terms and sessions on the parent and student pages | A school-wide arrears report, and a per-family view |
 | **SMS** | Twilio wired for announcements, skipped when unconfigured | Nigerian-first providers (Termii, Africa's Talking); no fee or result alerts by SMS |
 | **Session management** | Sessions are recorded and revocable; logout-everywhere works | No endpoint or UI listing a user's active devices, so a user cannot drop one device |
 | **Event management** | Calendar carries PTA meetings, sports day and general events | No RSVP tracking, no reminders |
@@ -154,9 +155,9 @@ In order, for a Nigerian secondary school running this in earnest:
 
 1. **Admission portal** — the busiest workflow of the school year, and the
    only one still done entirely on paper.
-2. **Invoice generation and the cumulative debt ledger** — the two things a
-   bursar asks for first. Most of the arithmetic already exists in
-   `feeLedgerService`; this is presentation and multi-term folding.
+2. **Invoice generation and a school-wide arrears report** — the two things a
+   bursar asks for first. The arithmetic already exists in `feeLedgerService`
+   and the balance endpoint; this is mostly presentation.
 3. **PWA with offline attendance** — a register that cannot be marked when the
    network drops is a register kept on paper and typed up later, if at all.
 4. **Sub-role permissions** — a Bursar with full admin rights is a control

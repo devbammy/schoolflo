@@ -9,6 +9,8 @@ const {
 const AppError = require('../utils/AppError');
 const audit = require('../services/auditService');
 const { buildFeeLedger } = require('../services/feeLedgerService');
+const { isBilledFor, sessionStart } = require('../utils/enrolment');
+const { TERMS } = require('../config/constants');
 const {
   initializePaystack,
   initializeFlutterwave,
@@ -98,24 +100,73 @@ const getStudentFeeBalances = async (req, res) => {
   const denied = checkStudentAccess(req.user, studentId, 'view');
   if (denied) return sendError(res, 403, denied);
 
-  const student = await User.findById(studentId).select('studentProfile.class');
+  const student = await User.findById(studentId).select(
+    'studentProfile.class studentProfile.enrolments studentProfile.profileStatus',
+  );
   if (!student) return sendError(res, 404, 'Student not found');
 
   // Asking about one named fee answers it directly. The office records cash
   // against whichever fee is in front of them, which is not always one of the
   // student's current class/term ones.
-  const filter = { isActive: true };
+  let fees;
+  let earlierFees = [];
+
   if (req.query.feeStructureId) {
-    filter._id = req.query.feeStructureId;
+    fees = await Fees.find({
+      isActive: true,
+      _id: req.query.feeStructureId,
+    }).sort({ dueDate: 1 });
   } else {
-    if (term) filter.term = term;
-    if (academicYear) filter.academicYear = academicYear;
-    if (student.studentProfile?.class)
-      filter.class = student.studentProfile.class;
+    // Which fees apply depends on where the student was in each session, not
+    // only on where they are now. Reading the current class alone made a
+    // promoted child's unpaid fees vanish from this page. Anything they have
+    // paid towards is included as well, so a receipt always has a fee behind it.
+    const profile = student.studentProfile || {};
+    const classIds = [
+      profile.class,
+      ...(profile.enrolments || []).map((e) => e.class),
+    ].filter(Boolean);
+    const paidFeeIds = await Payment.distinct('feeStructure', {
+      student: studentId,
+      amountPaid: { $gt: 0 },
+    });
+
+    const candidates = await Fees.find({
+      isActive: true,
+      $or: [{ class: { $in: classIds } }, { _id: { $in: paidFeeIds } }],
+    }).sort({ dueDate: 1 });
+
+    const paidIds = new Set(paidFeeIds.map(String));
+    const applicable = candidates.filter(
+      (fee) => isBilledFor(student, fee) || paidIds.has(String(fee._id)),
+    );
+
+    const termOrder = Object.values(TERMS);
+    const isEarlier = (fee) => {
+      if (!academicYear) return false;
+      const difference =
+        sessionStart(fee.academicYear) - sessionStart(academicYear);
+      if (difference !== 0) return difference < 0;
+      return (
+        Boolean(term) && termOrder.indexOf(fee.term) < termOrder.indexOf(term)
+      );
+    };
+
+    fees = applicable.filter(
+      (fee) =>
+        (!term || fee.term === term) &&
+        (!academicYear || fee.academicYear === academicYear),
+    );
+    earlierFees = applicable.filter(isEarlier);
   }
 
-  const fees = await Fees.find(filter).sort({ dueDate: 1 });
   const balances = await getFeeBalances(studentId, fees);
+
+  // The pages ask about one term, so without this a debt from a previous term
+  // would only be found by someone who thought to go back and look.
+  const arrears = (await getFeeBalances(studentId, earlierFees)).filter(
+    (balance) => balance.outstanding > 0,
+  );
 
   const totals = balances.reduce(
     (acc, b) => ({
@@ -134,7 +185,12 @@ const getStudentFeeBalances = async (req, res) => {
     },
   );
 
-  return sendSuccess(res, 200, 'Fee balances fetched', { balances, totals });
+  return sendSuccess(res, 200, 'Fee balances fetched', {
+    balances,
+    totals,
+    arrears,
+    arrearsTotal: arrears.reduce((sum, b) => sum + b.outstanding, 0),
+  });
 };
 
 // @desc    Initialize payment via Paystack
@@ -222,9 +278,10 @@ const verifyPaystackPayment = async (req, res) => {
   const denied = checkStudentAccess(req.user, existing.student);
   if (denied) return sendError(res, 403, denied);
 
-  const { settled, reason, payment, overpaid } = await settlePayment({
-    reference,
-  });
+  const { settled, reason, payment, overpaid, alreadySettled } =
+    await settlePayment({
+      reference,
+    });
 
   if (!settled) {
     if (reason === 'currency_mismatch') {
@@ -233,22 +290,27 @@ const verifyPaystackPayment = async (req, res) => {
     return sendError(res, 400, 'Payment has not been completed');
   }
 
-  await audit.record(req, {
-    action: 'payment.settle',
-    entity: 'Payment',
-    entityId: payment._id,
-    entityLabel: payment.receiptNumber,
-    subject: payment.student?._id || existing.student,
-    meta: {
-      reference,
-      amountPaid: payment.amountPaid,
-      status: payment.status,
-      balance: payment.balance,
-      gateway: payment.gateway,
-      viaRedirect: true,
-      overpaid: overpaid || undefined,
-    },
-  });
+  // Only when this call is the one that settled it. If the webhook got there
+  // first it has already been recorded, and another entry would read as money
+  // arriving twice.
+  if (!alreadySettled) {
+    await audit.record(req, {
+      action: 'payment.settle',
+      entity: 'Payment',
+      entityId: payment._id,
+      entityLabel: payment.receiptNumber,
+      subject: payment.student?._id || existing.student,
+      meta: {
+        reference,
+        amountPaid: payment.amountPaid,
+        status: payment.status,
+        balance: payment.balance,
+        gateway: payment.gateway,
+        viaRedirect: true,
+        overpaid: overpaid || undefined,
+      },
+    });
+  }
 
   return sendSuccess(res, 200, 'Payment verified and confirmed', { payment });
 };
@@ -348,8 +410,37 @@ const recordManualPayment = async (req, res) => {
   // of the fee is still unpaid. Charging it the whole fee would double-count
   // the part already settled online — and leave it stuck on Partial even
   // after the family had paid everything.
+  // Each sum handed over gets its own number. Reusing the record's first one
+  // gave every instalment of a fee the same receipt, so two pieces of paper for
+  // different amounts could not be told apart in a dispute.
+  const receiptNumber = await generateReceiptNumber();
+  const now = new Date();
+  const instalment = {
+    amount,
+    receiptNumber,
+    date: now,
+    processedBy: req.user._id,
+    notes,
+  };
+
   let payment;
   if (existing) {
+    // A record from before instalments were kept: what it already holds becomes
+    // the first entry, so the list always adds up to amountPaid.
+    if (!existing.instalments?.length && existing.amountPaid > 0) {
+      existing.instalments = [
+        {
+          amount: existing.amountPaid,
+          receiptNumber: existing.receiptNumber,
+          date: existing.paymentDate,
+          processedBy: existing.processedBy,
+          notes: existing.notes,
+        },
+      ];
+    }
+
+    existing.instalments.push(instalment);
+    existing.paymentDate = now;
     existing.amountPaid += amount;
     existing.amountDue = existing.amountPaid + remainingAfter;
     // Appended, not replaced: this record accumulates several receipts, and
@@ -359,8 +450,7 @@ const recordManualPayment = async (req, res) => {
       existing.notes = [existing.notes, notes].filter(Boolean).join(' | ');
     }
     existing.processedBy = req.user._id;
-    existing.receiptNumber =
-      existing.receiptNumber || (await generateReceiptNumber());
+    existing.receiptNumber = existing.receiptNumber || receiptNumber;
     payment = await existing.save();
   } else {
     payment = await Payment.create({
@@ -371,7 +461,9 @@ const recordManualPayment = async (req, res) => {
       amountPaid: amount,
       amountDue: amount + remainingAfter,
       gateway: method,
-      receiptNumber: await generateReceiptNumber(),
+      receiptNumber,
+      instalments: [instalment],
+      paymentDate: now,
       processedBy: req.user._id,
       notes,
     });
@@ -382,13 +474,17 @@ const recordManualPayment = async (req, res) => {
     { path: 'feeStructure', select: 'title term' },
   ]);
 
-  await sendReceiptEmail(payment, { amount, outstanding: remainingAfter });
+  await sendReceiptEmail(payment, {
+    amount,
+    outstanding: remainingAfter,
+    receiptNumber,
+  });
 
   await audit.record(req, {
     action: 'payment.manual',
     entity: 'Payment',
     entityId: payment._id,
-    entityLabel: payment.receiptNumber,
+    entityLabel: receiptNumber,
     subject: studentId,
     meta: {
       amount,

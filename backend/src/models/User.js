@@ -82,6 +82,15 @@ const UserSchema = new mongoose.Schema(
         default: 'Active',
       },
       graduationDate: Date,
+      // Where this student WAS. `class` above only says where they are now.
+      // See utils/enrolment.js.
+      enrolments: [
+        {
+          _id: false,
+          class: { type: mongoose.Schema.Types.ObjectId, ref: 'Class' },
+          academicYear: String,
+        },
+      ],
     },
 
     // Teacher-specific fields

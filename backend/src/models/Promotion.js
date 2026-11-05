@@ -78,6 +78,14 @@ const promotionSchema = new mongoose.Schema(
       default: 'Draft',
     },
     completedAt: Date,
+    // Separate from status: 'Completed' only means the decisions have been made.
+    // Without a record of having been applied, a batch could be applied again a
+    // year later and send a whole cohort back to the class they had left.
+    appliedAt: Date,
+    appliedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

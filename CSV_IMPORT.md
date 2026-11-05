@@ -258,6 +258,10 @@ rest of the file still imports.
 | File type | `.csv` only |
 | Roles | Students and Teachers (parents come in on student rows) |
 
+Large files are sent 20 rows at a time, and the button shows how far along it is.
+If the connection drops, the import stops and the results list which rows are
+unconfirmed. Check whether those accounts exist before importing them again.
+
 Admins are not importable. There are few of them and they carry the most
 privilege, so they are created one at a time on purpose.
 

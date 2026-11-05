@@ -74,10 +74,12 @@ app.use(
 // An explicit list, matched exactly. CLIENT_URL may hold several comma
 // separated origins. The previous substring match on a single string would
 // have admitted `https://schoolflo.vercel.app.attacker.com`.
-const DEFAULT_ORIGINS = [
-  'http://localhost:5173',
-  'https://schoolflo.vercel.app',
-];
+//
+// Nothing beyond the dev server is built in. One school's address used to sit in
+// this list, so every other school's production API trusted that origin as well
+// as its own. env.js refuses to start in production without CLIENT_URL.
+const DEFAULT_ORIGINS =
+  process.env.NODE_ENV === 'production' ? [] : ['http://localhost:5173'];
 
 const normalizeOrigin = (origin) => origin.trim().replace(/\/$/, '');
 
@@ -295,10 +297,20 @@ app.get('/keep-alive', (_, res) => res.status(204).end());
 const KEEP_ALIVE =
   process.env.KEEP_ALIVE === 'true' || process.env.NODE_ENV === 'production';
 
+// This school's own address: PING_URL, or the one Render publishes. It used to
+// fall back to one fixed deployment's URL, so every other school in production
+// sent that one traffic and never kept itself awake.
 const PING_URL =
-  process.env.PING_URL || 'https://schoolflo-xyo9.onrender.com/keep-alive';
+  process.env.PING_URL ||
+  (process.env.RENDER_EXTERNAL_URL
+    ? `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '')}/keep-alive`
+    : null);
 
-if (KEEP_ALIVE) {
+if (process.env.KEEP_ALIVE === 'true' && !PING_URL) {
+  console.warn('⚠️  KEEP_ALIVE is on but PING_URL is not set: not pinging.');
+}
+
+if (KEEP_ALIVE && PING_URL) {
   setInterval(
     async () => {
       try {

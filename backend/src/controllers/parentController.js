@@ -10,6 +10,7 @@ const { clientUrl } = require('../config/clientUrl');
 const AppError = require('../utils/AppError');
 const { emailTemplates } = require('../services/notificationService');
 const { enqueueEmail } = require('../services/jobQueue');
+const audit = require('../services/auditService');
 
 const escapeRegex = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -69,6 +70,19 @@ const createParent = async (req, res) => {
   const existing = await User.findOne({ email });
   if (existing) throw AppError.conflict('Email already registered');
 
+  // Linking is what grants access to a child's records, so every id must really
+  // be a student. Nothing checked, and a wrong id wrote a parent link onto
+  // whichever account it happened to match.
+  if (childrenIds.length) {
+    const found = await User.countDocuments({
+      _id: { $in: childrenIds },
+      role: 'Student',
+    });
+    if (found !== new Set(childrenIds.map(String)).size) {
+      throw AppError.badRequest('One or more children could not be found.');
+    }
+  }
+
   const parent = await User.create({
     firstName,
     lastName,
@@ -108,6 +122,18 @@ const createParent = async (req, res) => {
       `Parent welcome email failed for ${parent.email}: ${err.message}`,
     ),
   );
+
+  await audit.record(req, {
+    action: 'user.create',
+    entity: 'User',
+    entityId: parent._id,
+    entityLabel: `${parent.firstName} ${parent.lastName}`,
+    meta: {
+      email: parent.email,
+      role: 'Parent',
+      children: childrenIds.map(String),
+    },
+  });
 
   await parent.populate({
     path: 'parentProfile.children',
@@ -181,12 +207,32 @@ const linkChild = async (req, res) => {
     );
 
     if (String(child.studentProfile?.parentId) === String(parent._id)) {
-      child.studentProfile.parentId = undefined;
+      // Fall back to another linked parent rather than blank the field: the
+      // child still has one, and would otherwise be listed as having none.
+      const other = await User.findOne({
+        _id: { $ne: parent._id },
+        role: 'Parent',
+        'parentProfile.children': child._id,
+      }).select('_id');
+
+      child.studentProfile.parentId = other?._id;
       await child.save({ validateBeforeSave: false });
     }
   }
 
   await parent.save({ validateBeforeSave: false });
+
+  // A link is a permission: it decides who can read this child's results,
+  // attendance and fees, so it has to be possible to say who granted it.
+  await audit.record(req, {
+    action: action === 'link' ? 'parent.link_child' : 'parent.unlink_child',
+    entity: 'User',
+    entityId: parent._id,
+    entityLabel: `${parent.firstName} ${parent.lastName}`,
+    subject: child._id,
+    meta: { parentEmail: parent.email },
+  });
+
   await parent.populate({
     path: 'parentProfile.children',
     select: 'firstName lastName studentProfile avatar',
@@ -214,6 +260,14 @@ const deleteParent = async (req, res) => {
 
   await Session.deleteMany({ user: parent._id });
   await parent.deleteOne();
+
+  await audit.record(req, {
+    action: 'user.delete',
+    entity: 'User',
+    entityId: parent._id,
+    entityLabel: `${parent.firstName} ${parent.lastName}`,
+    meta: { email: parent.email, role: 'Parent' },
+  });
 
   return sendSuccess(res, 200, 'Parent account deleted');
 };

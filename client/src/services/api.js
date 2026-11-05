@@ -190,7 +190,10 @@ export const userService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  importCommit: (rows, role) => api.post('/users/import', { rows, role }),
+  // Longer than the default: each account costs a bcrypt hash, and a parent on
+  // the row costs a second one.
+  importCommit: (rows, role) =>
+    api.post('/users/import', { rows, role }, { timeout: 120000 }),
 };
 
 export const classService = {

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { paymentService } from '../../services/api';
 import FeeBalanceCard from '../../components/payments/FeeBalanceCard';
+import { receiptLabel } from '../../utils/receipts';
 import useAuthStore from '../../store/authStore';
 import { useFeature } from '../../store/featureStore';
 import toast from 'react-hot-toast';
@@ -18,6 +19,8 @@ export default function StudentPayments() {
   const [term, setTerm] = useState('First Term');
   const [payments, setPayments] = useState([]);
   const [balances, setBalances] = useState([]);
+  const [arrears, setArrears] = useState([]);
+  const [arrearsTotal, setArrearsTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(null);
   const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
@@ -36,6 +39,8 @@ export default function StudentPayments() {
       .then(([pRes, bRes]) => {
         setPayments(pRes.data.data?.payments || []);
         setBalances(bRes.data.data?.balances || []);
+        setArrears(bRes.data.data?.arrears || []);
+        setArrearsTotal(bRes.data.data?.arrearsTotal || 0);
       })
       .catch(() => toast.error('Failed to load payments'))
       .finally(() => setLoading(false));
@@ -113,6 +118,35 @@ export default function StudentPayments() {
           ))}
         </select>
       </div>
+
+      {arrears.length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div className="card__header">
+            <h3 className="card__title">Earlier balances</h3>
+            <span style={{ color: 'var(--clr-danger)', fontWeight: 600 }}>
+              ₦{arrearsTotal.toLocaleString()} still owed
+            </span>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
+              gap: 16,
+            }}
+          >
+            {arrears.map((balance) => (
+              <FeeBalanceCard
+                key={balance.feeStructure._id}
+                balance={balance}
+                paying={paying === balance.feeStructure._id}
+                canPayOnline={canPayOnline}
+                onPay={(amount) => handlePaystack(balance.feeStructure, amount)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {balances.length > 0 && (
         <div style={{ marginBottom: 28 }}>
@@ -209,7 +243,7 @@ export default function StudentPayments() {
                         fontFamily: 'var(--font-display)',
                       }}
                     >
-                      {p.receiptNumber || '—'}
+                      {receiptLabel(p)}
                     </td>
                     <td
                       style={{

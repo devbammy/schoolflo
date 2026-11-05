@@ -7,6 +7,7 @@ const AppError = require('../utils/AppError');
 const audit = require('../services/auditService');
 const { getCurrentPeriod } = require('../utils/academicPeriod');
 const { checkStudentAccess } = require('../utils/studentAccess');
+const { ENROLLED_FILTER } = require('../utils/enrolment');
 const {
   getTeacherClasses,
   assertClassAccess,
@@ -70,6 +71,7 @@ const markAttendance = async (req, res) => {
   const enrolled = await User.find({
     role: 'Student',
     'studentProfile.class': classId,
+    ...ENROLLED_FILTER,
   }).select('_id');
 
   const enrolledIds = new Set(enrolled.map((s) => String(s._id)));
@@ -150,6 +152,9 @@ const getClassRegister = async (req, res) => {
     User.find({
       role: 'Student',
       'studentProfile.class': new mongoose.Types.ObjectId(classId),
+      // A graduate keeps their last class, so without this they stayed on its
+      // register for good, to be marked absent every day.
+      ...ENROLLED_FILTER,
     })
       .select('firstName lastName studentProfile avatar')
       .sort({ lastName: 1, firstName: 1 }),
@@ -228,6 +233,7 @@ const getClassReport = async (req, res) => {
   const students = await User.find({
     role: 'Student',
     'studentProfile.class': classId,
+    ...ENROLLED_FILTER,
   })
     .select('firstName lastName studentProfile.admissionNumber')
     .sort({ lastName: 1, firstName: 1 })

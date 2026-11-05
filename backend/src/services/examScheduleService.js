@@ -4,6 +4,7 @@ const { emailTemplates } = require('./notificationService');
 const { enqueueBulkEmail } = require('./jobQueue');
 const { clientUrl } = require('../config/clientUrl');
 const AppError = require('../utils/AppError');
+const { ENROLLED_FILTER } = require('../utils/enrolment');
 
 const formatSessionDate = (date) =>
   new Date(date).toLocaleDateString('en-NG', { dateStyle: 'medium' });
@@ -125,7 +126,7 @@ class ExamScheduleService {
       const students = await User.find({
         role: 'Student',
         'studentProfile.class': schedule.class._id,
-        isActive: true,
+        ...ENROLLED_FILTER,
       }).select('firstName email');
 
       const classSessions = sessions.map(toEmailSession);

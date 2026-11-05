@@ -259,7 +259,13 @@ const Promotions = () => {
                 </>
               )}
 
-              {promotion.status === 'Completed' && (
+              {promotion.appliedAt && (
+                <span className="badge badge--success">
+                  <CheckCircle size={14} /> Applied
+                </span>
+              )}
+
+              {promotion.status === 'Completed' && !promotion.appliedAt && (
                 <button
                   className="action-btn success"
                   onClick={() =>

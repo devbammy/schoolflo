@@ -46,14 +46,24 @@ From `backend/`:
 | Seed the first admin | `pnpm seed` |
 | Audit payments (read-only) | `pnpm reconcile` |
 | Repair payments | `pnpm reconcile:apply` |
+| Backfill class history (read-only) | `pnpm migrate:enrolments` |
+| Write the class history | `pnpm migrate:enrolments:apply` |
 
-From `client/`: `pnpm dev` (`:5173`), `pnpm build`.
+From `client/`: `pnpm dev` (`:5173`), `pnpm build`, `pnpm lint`.
 
 CI (`.github/workflows/ci.yml`) runs backend lint, format check and tests,
 plus the client build, on every push and PR to `main`.
 
 If `pnpm` is not on PATH in your shell, `npx jest` / `npx eslint` /
 `npx prettier` / `npx vite build` work against the installed tree.
+
+**On Windows the tests need the Microsoft Visual C++ Redistributable**
+(`winget install --id Microsoft.VCRedist.2015+.x64 --exact`). Without it the
+failure is misleading: Jest's native resolver cannot load, its WebAssembly
+fallback cannot see Windows paths, and the message is `Module
+<rootDir>/tests/setup/globalSetup.js in the globalSetup option was not found`
+about a file that is plainly there. `mongod` needs the same runtime and exits
+with code `3221225781`.
 
 ---
 
@@ -139,6 +149,31 @@ Response shape is fixed — `sendSuccess`, `sendError`, `sendPaginated` in
   `services/feeLedgerService.js` — fee structures × enrolment, never summed
   from payment attempts. Both the financial report and the admin overview read
   it, so they cannot disagree.
+- **Each cash instalment is its own entry.** An office record accumulates, so
+  `amountPaid` is a running total; `Payment.instalments` is what says who handed
+  over how much, when, and on which receipt. Every instalment gets its own
+  receipt number, and the list always adds up to `amountPaid`.
+
+### Enrolment
+
+`utils/enrolment.js` is the one definition. `studentProfile.class` says where a
+student is **now**; `studentProfile.enrolments` says where they **were**.
+
+| Question | Use |
+| --- | --- |
+| Who belongs on a roster? (register, batch, mailing) | `...ENROLLED_FILTER` |
+| Does this fee apply to this student? | `isBilledFor(student, fee)` |
+| Was this student in that class that session? | `inClassDuring(student, classId, year)` |
+
+**Never read `studentProfile.class` to answer a question about the past**, and
+never treat it as proof someone is still enrolled: a graduate keeps their last
+class. Reading it for fees made a promoted child's debts vanish and billed them
+for the new class's closed session. Reading it for a register kept graduates on
+it for good.
+
+A promotion batch writes the session being left when it is applied. Moving a
+student by editing their class does not, on purpose: that edit is as often a
+correction as a transfer. See [Known gaps](DOCUMENTATION.md#17-known-gaps).
 
 ### Grading
 
@@ -202,6 +237,23 @@ Using the narrow one for a roster breaks grade entry for every teacher who is
 not also a form teacher. Using the wide one for a register hands the register
 to someone who teaches one period a week.
 
+Scores have their own rule, `canEnterScores`: whoever owns the class may enter
+any subject in it; anyone else must teach the subject **and** it must be offered
+in that class (`Subject.classes`). A teacher can be assigned from either side,
+`teacherProfile.subjectsTaught` or `Subject.teachers`, and nothing syncs them, so
+read both. **A subject with no classes assigned accepts scores from nobody but
+the class's owner and an admin.** A score must also belong under its class: the
+student is in it, was in it that session, or the row is already filed there.
+
+### Promotions
+
+- **A batch applies once.** `appliedAt` is claimed atomically; a second attempt
+  is a 409, and an applied batch can no longer be edited. Batches applied before
+  this field existed carry no flag.
+- Applying writes the session being left to each student's `enrolments` before
+  moving them.
+- Positions use the same competition ranking as report cards.
+
 ### Bulk account import
 
 - **Two passes, never one.** `previewImport` says what it would do and writes
@@ -215,6 +267,10 @@ to someone who teaches one period a week.
   number. Same family of trap as `bulkWrite` and the Result hooks.
 - Passwords are generated server-side, emailed, and never stored or returned.
   The CSV never carries one.
+- **The client commits in batches of 20.** Each account costs a bcrypt hash, so
+  one request for a large file outlasted the timeout: the admin was told it had
+  failed while the server carried on creating accounts. A batch that gets no
+  answer is reported as unconfirmed, because it may have gone through.
 - **A student row may name a parent.** An existing *student* email is an error;
   an existing *parent* email means reuse-and-link — that is what puts siblings
   under one account. An address belonging to any other role is refused: one
@@ -245,6 +301,9 @@ to someone who teaches one period a week.
 - `subject` links an entry to the student it concerns even when the entity is
   something else — that is what makes "everything that happened to this child"
   one query.
+- **Record the event once, where it actually happens.** A gateway settlement is
+  recorded by whichever of the webhook or the redirect settled it, never by the
+  one that arrived second.
 
 Record with:
 
@@ -341,12 +400,14 @@ one shared underline read as broken.
   documentation — match it. A comment restating what the line does is noise; a
   comment saying "the attendance page used to send hard-coded values, so every
   register was filed under First Term 2024/2025" is the point.
-- Files use **CRLF** line endings. Preserve them when scripting edits.
+- Line endings are mixed: source is mostly LF, and some files
+  (`DOCUMENTATION.md` among them) are CRLF. Preserve what a file already has
+  when scripting edits.
 - **Never put a literal U+FEFF in source.** ESLint's `no-irregular-whitespace`
   rejects it; build it with `String.fromCharCode(0xfeff)` or `\uFEFF`.
 - Prettier config is at the repo root and applies to both workspaces.
-  Backend lint is ESLint 8 with `.eslintrc.json`; **the client has no lint
-  config at all** — its check is `vite build`.
+  Both workspaces lint with ESLint 8 and `.eslintrc.json`. CI caps warnings
+  (60 backend, 130 client), so a new one can fail the build.
 - Prettier's CI check covers `src/**/*.js`, `tests/**/*.js` and `server.js`
   only. Markdown is not checked and is not Prettier-clean; don't reformat it.
 - Existing lint warnings (unused imports in a few controllers and services)
@@ -356,9 +417,11 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 28 suites, 475 tests, Jest, `maxWorkers: 1`. The integration
+`pnpm test` — 31 suites, 523 tests, Jest, `maxWorkers: 1`. The integration
 suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
-and take around ten minutes on a slow machine, mostly bcrypt at cost 12.
+and take from about three minutes to ten on a slow machine, mostly bcrypt at
+cost 12. Tests that exercise failures log to the console by design, so judge a
+run by its final summary, not by red text along the way.
 
 The client now has ESLint too (`pnpm lint` from `client/`), and CI runs it.
 The build alone never caught an undefined component — an undefined
@@ -400,7 +463,7 @@ Two patterns to follow:
    `tests/integration/jobQueue.test.js` covers the inline fallback and that
    the module is safe to require.
 
-Client code has **no test runner**. The check is that it builds.
+Client code has **no test runner**. The check is that it lints and builds.
 
 ---
 
@@ -413,7 +476,9 @@ Client code has **no test runner**. The check is that it builds.
 | What the school is owed | `feeLedgerService.buildFeeLedger()` |
 | Settlement | `paymentService.settlePayment()` |
 | Class stats, ranking, report cards | `services/gradingService.js` |
-| Teacher scope | `utils/teacherScope.js` |
+| Teacher scope, who may enter scores | `utils/teacherScope.js` |
+| Who is enrolled, class in a past session | `utils/enrolment.js` |
+| Every parent of a student | `utils/parentLookup.js` |
 | School wall clock (staff attendance) | `utils/schoolTime.js` |
 | Search scoping per role | `searchService.GROUP_ROLES` |
 | CSV reading and writing | `utils/csv.js` |
@@ -440,6 +505,11 @@ Client code has **no test runner**. The check is that it builds.
   request and refuses a revoked certificate to everyone but an admin. Do not put
   a file link in an email or an API response. `pnpm migrate:certificates` moves
   any legacy Cloudinary-hosted ones (dry run first).
+- **Email every parent, not `studentProfile.parentId`.** That field holds one
+  parent and a child can have two. `parentsOfStudent()` reads both sides.
+- **Nothing school-specific is built in.** In production CORS allows only
+  `CLIENT_URL`, and the keep-alive pings only `PING_URL` or Render's
+  `RENDER_EXTERNAL_URL`. A hard-coded address here becomes every school's.
 - **Build links with `clientUrl()`, never `process.env.CLIENT_URL`.**
   `CLIENT_URL` may list several origins for CORS; interpolating it raw breaks
   every reset, welcome and payment-return link.
@@ -484,7 +554,12 @@ Client code has **no test runner**. The check is that it builds.
 
 ---
 
-## Outstanding operational task
+## Outstanding operational tasks
+
+**`pnpm migrate:enrolments:apply` has not been run against production.** Until it
+has, a student promoted before enrolments existed has no record of the class they
+left, so that year's fees do not reach their balance or the ledger. Run the
+read-only `pnpm migrate:enrolments` first. It only adds entries.
 
 **`pnpm reconcile:apply` has not been run against production.** Payments
 settled before the settlement fix are marked `Paid` with `balance: 0`

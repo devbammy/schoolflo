@@ -78,9 +78,6 @@ class PDFService {
           .sort({ 'subject.name': 1 });
 
         if (results.length === 0) {
-          // Try to find any results for this student to debug
-          const allStudentResults = await Result.find({ student: student._id });
-
           // Check if there are unpublished results for this term
           const unpublishedResults = await Result.find({
             student: student._id,

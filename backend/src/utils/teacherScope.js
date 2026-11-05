@@ -73,6 +73,64 @@ const getTeacherRosterClassIds = async (user) => {
 };
 
 /**
+ * The subjects a teacher teaches, whichever side recorded it. The admin can
+ * assign from the teacher (`subjectsTaught`) or from the subject (`teachers`),
+ * and nothing keeps the two in step, so reading only one rejected a teacher who
+ * had been assigned from the other.
+ */
+const taughtSubjectFilter = (user) => {
+  const taught = (user.teacherProfile?.subjectsTaught || []).map(String);
+  return {
+    $or: [
+      ...(taught.length ? [{ _id: { $in: taught } }] : []),
+      { teachers: user._id },
+    ],
+  };
+};
+
+/**
+ * May this user enter or amend scores for a subject in a class?
+ *
+ * Whoever owns the class may enter any subject in it. Anyone else must teach the
+ * subject AND it must be offered in this class: checking the subject alone let a
+ * Maths teacher write Maths scores for every class in the school, including ones
+ * whose roster they are not allowed to load.
+ */
+const canEnterScores = async (user, { classId, subjectId }) => {
+  if (user.role === 'Admin') return true;
+  if (user.role !== 'Teacher') return false;
+
+  const owned = await getTeacherClassIds(user);
+  if (owned.includes(String(classId))) return true;
+
+  const subject = await Subject.exists({
+    _id: subjectId,
+    classes: classId,
+    ...taughtSubjectFilter(user),
+  });
+
+  return Boolean(subject);
+};
+
+/**
+ * Subjects whose results this user may read in a class. `null` means all of
+ * them (an Admin, or a teacher who owns the class).
+ */
+const getVisibleSubjectIds = async (user, classId) => {
+  if (user.role === 'Admin') return null;
+
+  const owned = await getTeacherClassIds(user);
+  if (owned.includes(String(classId))) return null;
+
+  const ids = await Subject.find({
+    classes: classId,
+    ...taughtSubjectFilter(user),
+  }).distinct('_id');
+
+  return ids.map(String);
+};
+
+/**
  * Throw unless this user may act on the class. Admins may act on any.
  */
 const assertClassAccess = async (user, classId) => {
@@ -108,4 +166,6 @@ module.exports = {
   getTeacherClasses,
   assertClassAccess,
   assertRosterAccess,
+  canEnterScores,
+  getVisibleSubjectIds,
 };

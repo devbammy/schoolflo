@@ -1,3 +1,4 @@
+import { receiptLabel } from '../../utils/receipts';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   DollarSign,
@@ -512,7 +513,7 @@ export default function PaymentsPage() {
                         color: 'var(--clr-text-3)',
                       }}
                     >
-                      {p.receiptNumber || '—'}
+                      {receiptLabel(p)}
                     </td>
                     <td
                       style={{

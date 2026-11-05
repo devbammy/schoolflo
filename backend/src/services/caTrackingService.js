@@ -2,6 +2,7 @@ const CATracker = require('../models/CATracker');
 const { Result } = require('../models/Exam'); // Using existing Result model
 const User = require('../models/User');
 const Subject = require('../models/Subject');
+const { ENROLLED_FILTER } = require('../utils/enrolment');
 
 class CATrackingService {
   // Sync CA tracker with results (run after results are published)
@@ -100,7 +101,7 @@ class CATrackingService {
     const students = await User.find({
       role: 'Student',
       'studentProfile.class': classId,
-      isActive: true,
+      ...ENROLLED_FILTER,
     }).select('firstName lastName studentProfile.admissionNumber');
 
     // Get tracking data for all students
@@ -225,7 +226,7 @@ class CATrackingService {
     const students = await User.find({
       role: 'Student',
       'studentProfile.class': classId,
-      isActive: true,
+      ...ENROLLED_FILTER,
     }).select('_id');
 
     const syncPromises = students.map((student) =>
