@@ -1,4 +1,5 @@
 const { body, param, query } = require('express-validator');
+const { SORT_CHOICES } = require('../utils/listSort');
 const { TERMS, ROLES } = require('../config/constants');
 
 const TERM_VALUES = Object.values(TERMS);
@@ -165,7 +166,16 @@ const paginationQuery = () => [
     .toInt(),
 ];
 
+/** `?sort=` on a list of named things. See utils/listSort.js. */
+const sortQuery = () => [
+  query('sort')
+    .optional()
+    .isIn(SORT_CHOICES)
+    .withMessage(`Sort must be one of: ${SORT_CHOICES.join(', ')}.`),
+];
+
 module.exports = {
+  sortQuery,
   TERM_VALUES,
   ROLE_VALUES,
   ACADEMIC_YEAR_PATTERN,

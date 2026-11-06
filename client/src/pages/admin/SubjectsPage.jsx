@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Search, BookOpen } from 'lucide-react';
 import { subjectService, classService, userService } from '../../services/api';
+import SortSelect, { DEFAULT_SORT } from '../../components/common/SortSelect';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from 'react-hot-toast';
@@ -20,6 +21,7 @@ export default function SubjectsPage() {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState(DEFAULT_SORT);
   const [modal, setModal] = useState(null);
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -32,14 +34,14 @@ export default function SubjectsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await subjectService.getAll();
+      const res = await subjectService.getAll({ sort });
       setSubjects(res.data.data.subjects || []);
     } catch {
       toast.error('Failed to load subjects');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sort]);
 
   useEffect(() => {
     load();
@@ -139,8 +141,8 @@ export default function SubjectsPage() {
         </button>
       </div>
 
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ position: 'relative', maxWidth: 360 }}>
+      <div className="list-toolbar">
+        <div className="list-toolbar__search" style={{ maxWidth: 360 }}>
           <Search
             size={15}
             style={{
@@ -159,6 +161,7 @@ export default function SubjectsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <SortSelect value={sort} onChange={setSort} />
       </div>
 
       <div className="card">

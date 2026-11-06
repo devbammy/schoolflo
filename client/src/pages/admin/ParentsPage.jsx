@@ -15,6 +15,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { parentService, userService } from '../../services/api';
+import SortSelect, { DEFAULT_SORT } from '../../components/common/SortSelect';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Pagination from '../../components/common/Pagination';
@@ -73,6 +74,7 @@ export default function ParentsPage() {
   const [parents, setParents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState(DEFAULT_SORT);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, pages: 1 });
   const [expanded, setExpanded] = useState(null);
@@ -100,6 +102,7 @@ export default function ParentsPage() {
     try {
       const params = { page, limit: 12 };
       if (search) params.search = search;
+      params.sort = sort;
       const res = await parentService.getAll(params);
       setParents(res.data.data);
       setMeta(res.data.meta || { total: 0, pages: 1 });
@@ -108,7 +111,7 @@ export default function ParentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, sort]);
 
   useEffect(() => {
     load();
@@ -294,8 +297,8 @@ export default function ParentsPage() {
       </div>
 
       {/* Search bar */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ position: 'relative', maxWidth: 420 }}>
+      <div className="list-toolbar">
+        <div className="list-toolbar__search" style={{ maxWidth: 420 }}>
           <Search
             size={15}
             style={{
@@ -317,6 +320,13 @@ export default function ParentsPage() {
             }}
           />
         </div>
+        <SortSelect
+          value={sort}
+          onChange={(value) => {
+            setSort(value);
+            setPage(1);
+          }}
+        />
       </div>
 
       {/* Info banner */}

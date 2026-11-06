@@ -3,6 +3,7 @@ const router = express.Router();
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const validate = require('../middleware/validate');
+const { sortQuery } = require('../validators/common');
 const {
   getSubjects,
   createSubject,
@@ -15,7 +16,7 @@ const {
   idParam,
 } = require('../validators/academicValidators');
 
-router.get('/', protect, getSubjects);
+router.get('/', protect, validate(sortQuery()), getSubjects);
 
 router.post(
   '/',

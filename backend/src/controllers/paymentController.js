@@ -7,6 +7,7 @@ const {
   getPaginationParams,
 } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
+const { applySort } = require('../utils/listSort');
 const audit = require('../services/auditService');
 const { buildFeeLedger } = require('../services/feeLedgerService');
 const { isBilledFor, sessionStart } = require('../utils/enrolment');
@@ -53,9 +54,9 @@ const getFeeStructures = async (req, res) => {
   if (academicYear) filter.academicYear = academicYear;
   if (classId) filter.class = classId;
 
-  const fees = await Fees.find(filter)
-    .populate('class', 'name level')
-    .sort({ createdAt: -1 });
+  const fees = await applySort(Fees.find(filter), req.query.sort, [
+    'title',
+  ]).populate('class', 'name level');
   return sendSuccess(res, 200, 'Fee structures fetched', {
     fees,
     count: fees.length,

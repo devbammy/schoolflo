@@ -8,6 +8,7 @@ const {
 } = require('../utils/apiResponse');
 const { clientUrl } = require('../config/clientUrl');
 const AppError = require('../utils/AppError');
+const { applySort } = require('../utils/listSort');
 const { emailTemplates } = require('../services/notificationService');
 const { enqueueEmail } = require('../services/jobQueue');
 const audit = require('../services/auditService');
@@ -41,10 +42,9 @@ const getParents = async (req, res) => {
   }
 
   const [parents, total] = await Promise.all([
-    User.find(filter)
+    applySort(User.find(filter), req.query.sort, ['firstName', 'lastName'])
       .populate(CHILD_POPULATE)
       .select('-password')
-      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
     User.countDocuments(filter),

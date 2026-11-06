@@ -182,6 +182,12 @@ correction as a transfer. See [Known gaps](DOCUMENTATION.md#17-known-gaps).
   derive from them. **Do not write a second ladder anywhere**, especially not
   in the client — the report-card endpoint sends `gradeScale` and
   `summary.principalComment` precisely so the client never has to.
+- **Score entry saves only students with a score.** The grades pages used to
+  send every student in the class and file a 0 for each blank, so a student
+  who does not take an optional subject got an F in it on their report card.
+  `hasScoreEntry` in `client/src/utils/grading.js` decides who is sent.
+- The grade preview while typing uses `gradeScale` from `GET /config`, never
+  a ladder written in the page. Both score-entry pages used to carry one.
 - `bulkWrite` bypasses `pre('save')`, which is why `utils/scoreValidation.js`
   exists and why the bulk path computes fields explicitly.
 - Positions use competition ranking; averages are rounded to 2dp *before*
@@ -410,6 +416,23 @@ combinations scrolled before this was fixed. Five rules keep it at zero.
   each added both again, so those pages sat inset in a paler panel, and CA
   Tracking's cards were clipped on a phone.
 
+### List order
+
+Lists of named things come back **A to Z by default** and take
+`?sort=az|za|newest|oldest`, all through `utils/listSort.js` and validated by
+`sortQuery()`. That covers users, parents, classes, subjects, fee structures and
+library books, and because the server does it, every dropdown that loads those
+lists is alphabetical too. Feeds that are about time (announcements, payments,
+tasks, the audit log) stay newest first.
+
+- **Sort on the server, never the client, for a paged list.** Sorting the page
+  in hand orders 20 rows out of 600.
+- **The collation is what makes it alphabetical.** Without it Mongo sorts by
+  character code: "Basic 10" before "Basic 2", and "arrow of God" after every
+  title that starts with a capital. A `$text` search refuses the collation, so
+  the library drops it only while searching.
+- On a page, `<SortSelect>` sits in the filter row (`.list-toolbar`).
+
 ### Dashboards
 
 The four dashboards share `components/dashboard/DashboardParts.jsx`. Two rules:
@@ -455,7 +478,7 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 32 suites, 529 tests, Jest, `maxWorkers: 1`. The integration
+`pnpm test` — 34 suites, 547 tests, Jest, `maxWorkers: 1`. The integration
 suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
 and take from about three minutes to ten on a slow machine, mostly bcrypt at
 cost 12. Tests that exercise failures log to the console by design, so judge a
@@ -577,6 +600,10 @@ Client code has **no test runner**. The check is that it lints and builds.
 - **`Fees.totalAmount` is derived in `pre('validate')`, not `pre('save')`.**
   Mongoose validates before save hooks, so a required field computed in
   `pre('save')` can never be satisfied.
+- **Deleting a class only deactivates it**, and its name stays taken because
+  `Class.name` is unique. Creating a class with that name again **restores**
+  the old record rather than refusing, which keeps every student, result and
+  fee filed under it attached.
 - **`findByIdAndUpdate` does not apply schema defaults.** Students created
   through an update can be missing `studentProfile.profileStatus` entirely, so
   queries that filter on it must accept `null` too.

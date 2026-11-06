@@ -15,6 +15,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { userService, classService } from '../../services/api';
+import SortSelect, { DEFAULT_SORT } from '../../components/common/SortSelect';
 import toast from 'react-hot-toast';
 import useQuickAction from '../../utils/useQuickAction';
 import BulkImportModal from '../../components/common/BulkImportModal';
@@ -66,6 +67,7 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
+  const [sort, setSort] = useState(DEFAULT_SORT);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, pages: 1 });
   const [modal, setModal] = useState(null); // null | 'create' | 'edit'
@@ -112,6 +114,7 @@ export default function StudentsPage() {
       };
       if (search) params.search = search;
       if (classFilter) params.class = classFilter;
+      params.sort = sort;
       const res = await userService.getAll(params);
       setStudents(res.data.data);
       setMeta(res.data.meta || { total: 0, pages: 1 });
@@ -120,7 +123,7 @@ export default function StudentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, classFilter]);
+  }, [page, search, classFilter, sort]);
 
   useEffect(() => {
     load();
@@ -288,6 +291,13 @@ export default function StudentsPage() {
             }}
           />
         </div>
+        <SortSelect
+          value={sort}
+          onChange={(value) => {
+            setSort(value);
+            setPage(1);
+          }}
+        />
         <select
           className="form-control"
           style={{ width: 'auto', minWidth: 160 }}

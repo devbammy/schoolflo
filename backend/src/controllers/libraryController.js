@@ -6,6 +6,7 @@ const {
   getPaginationParams,
 } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
+const { applySort } = require('../utils/listSort');
 
 const FINE_PER_DAY = 100; // ₦100 per day overdue
 const DEFAULT_LOAN_DAYS = 14;
@@ -56,9 +57,14 @@ const getBooks = async (req, res) => {
     : filter;
 
   const [books, total] = await Promise.all([
-    Book.find(fullFilter)
+    // Collated like every other list, except during a $text search, which
+    // refuses any collation but the simple one. Without it the whole list
+    // sorted by character code, so "arrow of God" landed after every title
+    // that starts with a capital.
+    applySort(Book.find(fullFilter), req.query.sort, ['title'], {
+      collate: !search,
+    })
       .populate(BOOK_POPULATE)
-      .sort({ title: 1 })
       .skip(skip)
       .limit(limit),
     Book.countDocuments(fullFilter),

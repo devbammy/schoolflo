@@ -9,6 +9,7 @@ import {
   BookMarked,
 } from 'lucide-react';
 import { libraryService } from '../../services/api';
+import SortSelect, { DEFAULT_SORT } from '../../components/common/SortSelect';
 import toast from 'react-hot-toast';
 import { format, isPast } from 'date-fns';
 
@@ -30,11 +31,12 @@ export default function MyLibraryPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [available, setAvailable] = useState('');
+  const [sort, setSort] = useState(DEFAULT_SORT);
 
   const loadBooks = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { limit: 30 };
+      const params = { limit: 30, sort };
       if (search) params.search = search;
       if (category) params.category = category;
       if (available) params.available = available;
@@ -45,7 +47,7 @@ export default function MyLibraryPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, category, available]);
+  }, [search, category, available, sort]);
 
   const loadMyRecords = useCallback(async () => {
     setLoading(true);
@@ -215,6 +217,7 @@ export default function MyLibraryPage() {
               <option value="">All Books</option>
               <option value="true">Available Only</option>
             </select>
+            <SortSelect label="Sort books" value={sort} onChange={setSort} />
           </div>
 
           {loading ? (

@@ -17,6 +17,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { libraryService, userService } from '../../services/api';
+import SortSelect, { DEFAULT_SORT } from '../../components/common/SortSelect';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from 'react-hot-toast';
@@ -77,6 +78,7 @@ export default function LibraryPage() {
   const [bookSearch, setBookSearch] = useState('');
   const [bookCategory, setBookCategory] = useState('');
   const [bookAvailable, setBookAvailable] = useState('');
+  const [bookSort, setBookSort] = useState(DEFAULT_SORT);
   const [recStatus, setRecStatus] = useState('');
 
   // Modals
@@ -103,6 +105,7 @@ export default function LibraryPage() {
       if (bookSearch) params.search = bookSearch;
       if (bookCategory) params.category = bookCategory;
       if (bookAvailable) params.available = bookAvailable;
+      params.sort = bookSort;
       const r = await libraryService.getBooks(params);
       setBooks(r.data.data || []);
       setBookMeta(r.data.meta || { total: 0, pages: 1 });
@@ -111,7 +114,7 @@ export default function LibraryPage() {
     } finally {
       setLoading(false);
     }
-  }, [bookPage, bookSearch, bookCategory, bookAvailable]);
+  }, [bookPage, bookSearch, bookCategory, bookAvailable, bookSort]);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -482,6 +485,14 @@ export default function LibraryPage() {
               <option value="">All Availability</option>
               <option value="true">Available Only</option>
             </select>
+            <SortSelect
+              label="Sort books"
+              value={bookSort}
+              onChange={(value) => {
+                setBookSort(value);
+                setBookPage(1);
+              }}
+            />
           </div>
 
           <div className="card">

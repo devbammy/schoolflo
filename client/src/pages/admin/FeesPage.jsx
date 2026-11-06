@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Plus, Edit2, Trash2, DollarSign, Calendar } from 'lucide-react';
 import { feeService, classService } from '../../services/api';
+import SortSelect, { DEFAULT_SORT } from '../../components/common/SortSelect';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from 'react-hot-toast';
@@ -35,6 +36,7 @@ export default function FeesPage() {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ term: '', academicYear: '' });
+  const [sort, setSort] = useState(DEFAULT_SORT);
   const [modal, setModal] = useState(null);
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -44,7 +46,7 @@ export default function FeesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { sort };
       if (filters.term) params.term = filters.term;
       if (filters.academicYear) params.academicYear = filters.academicYear;
       const res = await feeService.getAll(params);
@@ -54,7 +56,7 @@ export default function FeesPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, sort]);
 
   useEffect(() => {
     load();
@@ -155,6 +157,7 @@ export default function FeesPage() {
       <div
         style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}
       >
+        <SortSelect value={sort} onChange={setSort} />
         <select
           className="form-control"
           style={{ width: 'auto', minWidth: 160 }}

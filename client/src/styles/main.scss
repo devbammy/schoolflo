@@ -916,6 +916,48 @@ p {
   }
 }
 
+// A list page's search box, with its sort and filters beside it, wrapping onto
+// a second line on a phone rather than pushing the page sideways.
+.list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+
+  &__search {
+    position: relative;
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+}
+
+// The order of a list. Sits in the same row as a page's search and filters,
+// and wraps with them.
+.sort-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  max-width: 100%;
+  color: var(--clr-text-3);
+
+  &__label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .form-control {
+    width: auto;
+    min-width: 150px;
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
 // The academic calendar: the month beside its sidebar, stacked on narrower
 // screens. This was an inline `1fr 340px` grid, which no media query can
 // reach, so on a phone the fixed sidebar took the whole width and the month

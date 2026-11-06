@@ -28,7 +28,12 @@ const errorHandler = (err, req, res, next) => {
   } else if (err.name === 'CastError') {
     // Mongoose bad ObjectId
     statusCode = 400;
-    message = `'${err.value}' is not a valid ${err.path || 'id'}.`;
+    // A whole object can fail to cast (a form section, say), and quoting it
+    // printed "'[object Object]' is not a valid sections".
+    message =
+      err.value !== null && typeof err.value === 'object'
+        ? `Invalid value for ${err.path || 'a field'}.`
+        : `'${err.value}' is not a valid ${err.path || 'id'}.`;
     expected = true;
   } else if (err.code === 11000) {
     // Mongoose duplicate key

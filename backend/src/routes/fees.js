@@ -13,9 +13,9 @@ const {
   createFeeRules,
   updateFeeRules,
 } = require('../validators/paymentValidators');
-const { objectIdParam } = require('../validators/common');
+const { objectIdParam, sortQuery } = require('../validators/common');
 
-router.get('/', protect, getFeeStructures);
+router.get('/', protect, validate(sortQuery()), getFeeStructures);
 
 router.post(
   '/',

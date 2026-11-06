@@ -24,12 +24,21 @@ const {
   borrowBookRules,
   idParam,
 } = require('../validators/operationsValidators');
-const { objectIdParam, paginationQuery } = require('../validators/common');
+const {
+  objectIdParam,
+  paginationQuery,
+  sortQuery,
+} = require('../validators/common');
 
 const recordIdParam = [objectIdParam('recordId', 'Record id')];
 
 // ─── Books ───────────────────────────────────────────────────────────────────
-router.get('/books', protect, validate(paginationQuery()), getBooks);
+router.get(
+  '/books',
+  protect,
+  validate([...paginationQuery(), ...sortQuery()]),
+  getBooks,
+);
 
 // Must precede '/books/:id' so 'categories' is never treated as an id.
 router.get('/books/categories', protect, getCategories);

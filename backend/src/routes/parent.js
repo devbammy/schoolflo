@@ -18,7 +18,7 @@ const {
   linkChildRules,
   idParam,
 } = require('../validators/academicValidators');
-const { paginationQuery } = require('../validators/common');
+const { paginationQuery, sortQuery } = require('../validators/common');
 
 // Static paths first, so 'students' and 'children' are never read as an :id.
 router.get(
@@ -39,7 +39,7 @@ router.get(
   '/',
   protect,
   authorize('Admin'),
-  validate(paginationQuery()),
+  validate([...paginationQuery(), ...sortQuery()]),
   getParents,
 );
 

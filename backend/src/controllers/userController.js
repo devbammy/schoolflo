@@ -23,6 +23,7 @@ const {
   getPaginationParams,
 } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
+const { applySort } = require('../utils/listSort');
 const audit = require('../services/auditService');
 const {
   uploadToCloudinary,
@@ -136,14 +137,13 @@ const getUsers = async (req, res) => {
   }
 
   const [users, total] = await Promise.all([
-    User.find(filter)
+    applySort(User.find(filter), req.query.sort, ['firstName', 'lastName'])
       .populate('studentProfile.class', 'name level')
       .populate(
         'studentProfile.parentId',
         'firstName lastName phone parentProfile.relationship',
       )
       .select('-password')
-      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
     User.countDocuments(filter),

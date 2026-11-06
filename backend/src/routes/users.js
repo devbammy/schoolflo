@@ -22,7 +22,11 @@ const {
   updateUserRules,
   idParam,
 } = require('../validators/academicValidators');
-const { objectIdParam, paginationQuery } = require('../validators/common');
+const {
+  objectIdParam,
+  paginationQuery,
+  sortQuery,
+} = require('../validators/common');
 const {
   previewUserImport,
   commitUserImport,
@@ -61,7 +65,7 @@ router.get(
   '/',
   protect,
   authorize('Admin'),
-  validate(paginationQuery()),
+  validate([...paginationQuery(), ...sortQuery()]),
   getUsers,
 );
 

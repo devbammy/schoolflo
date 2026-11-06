@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getFeatures } = require('../config/features');
+const { GRADE_SCALE } = require('../config/constants');
 const { sendSuccess } = require('../utils/apiResponse');
 
 /**
@@ -21,6 +22,9 @@ router.get('/', (req, res) =>
     // The same SCHOOL_NAME printed on its report cards. Public, like the rest of
     // this: the login page shows it before anyone has signed in.
     school: { name: (process.env.SCHOOL_NAME || '').trim() || null },
+    // The one grading ladder, for the score-entry pages to preview grades as a
+    // teacher types. They used to carry their own copies.
+    gradeScale: GRADE_SCALE,
   }),
 );
 

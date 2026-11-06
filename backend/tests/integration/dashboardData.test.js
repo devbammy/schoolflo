@@ -163,6 +163,14 @@ describe('the public configuration', () => {
     expect(res.body.data.features).toBeDefined();
   });
 
+  it('sends the one grading scale, for the score-entry pages', async () => {
+    const { GRADE_SCALE } = require('../../src/config/constants');
+
+    const res = await request(app).get('/config');
+
+    expect(res.body.data.gradeScale).toEqual(GRADE_SCALE);
+  });
+
   it('is null rather than blank when unset', async () => {
     process.env.SCHOOL_NAME = '  ';
 

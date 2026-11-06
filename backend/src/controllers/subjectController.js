@@ -1,12 +1,17 @@
 const Subject = require('../models/Subject');
 const { sendSuccess } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
+const { applySort } = require('../utils/listSort');
 
 // @desc    List active subjects
 // @route   GET /api/v1/subjects
 // @access  Any authenticated user
 const getSubjects = async (req, res) => {
-  const subjects = await Subject.find({ isActive: true })
+  const subjects = await applySort(
+    Subject.find({ isActive: true }),
+    req.query.sort,
+    ['name'],
+  )
     .populate('teachers', 'firstName lastName')
     .populate('classes', 'name');
 

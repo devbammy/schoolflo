@@ -7,6 +7,8 @@ import {
   userService,
 } from '../../services/api';
 import toast from 'react-hot-toast';
+import useFeatureStore from '../../store/featureStore';
+import { gradeFor, hasScoreEntry } from '../../utils/grading';
 import {
   getCurrentAcademicYear,
   generateAcademicYearOptions,
@@ -84,13 +86,10 @@ export default function GradesPage() {
 
   const calcTotal = (studentId) => scoreTotal(scores[studentId]);
 
+  const gradeScale = useFeatureStore((s) => s.gradeScale);
   const getGrade = (total) => {
-    if (total >= 70) return { g: 'A', c: 'A' };
-    if (total >= 60) return { g: 'B', c: 'B' };
-    if (total >= 50) return { g: 'C', c: 'C' };
-    if (total >= 45) return { g: 'D', c: 'D' };
-    if (total >= 40) return { g: 'E', c: 'E' };
-    return { g: 'F', c: 'F' };
+    const g = gradeFor(total, gradeScale);
+    return { g, c: g };
   };
 
   const handleBulkSave = async () => {
@@ -98,10 +97,18 @@ export default function GradesPage() {
       return toast.error('Select class and subject first');
     setSaving(true);
     try {
-      const results = students.map((s) => ({
-        student: s._id,
-        scores: scores[s._id] || { ...EMPTY_SCORES },
-      }));
+      // Only students with a score. Blank rows used to be saved as 0, which
+      // gave everyone who does not take this subject an F in it.
+      const results = students
+        .filter((s) => hasScoreEntry(scores[s._id]))
+        .map((s) => ({
+          student: s._id,
+          scores: { ...EMPTY_SCORES, ...scores[s._id] },
+        }));
+      if (!results.length) {
+        setSaving(false);
+        return toast.error('Enter at least one score to save');
+      }
       await resultService.bulkUpsert({
         class: filters.class,
         subject: filters.subject,
@@ -109,7 +116,9 @@ export default function GradesPage() {
         academicYear: filters.academicYear,
         results,
       });
-      toast.success(`${students.length} results saved`);
+      toast.success(
+        `${results.length} result${results.length === 1 ? '' : 's'} saved`,
+      );
     } catch (err) {
       toast.error(err.response?.data?.message || 'Save failed');
     } finally {

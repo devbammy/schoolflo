@@ -213,7 +213,7 @@ export const userService = {
 };
 
 export const classService = {
-  getAll: () => api.get('/classes'),
+  getAll: (params) => api.get('/classes', { params }),
   getById: (id) => api.get(`/classes/${id}`),
   create: (data) => api.post('/classes', data),
   update: (id, data) => api.put(`/classes/${id}`, data),
@@ -221,7 +221,7 @@ export const classService = {
 };
 
 export const subjectService = {
-  getAll: () => api.get('/subjects'),
+  getAll: (params) => api.get('/subjects', { params }),
   create: (data) => api.post('/subjects', data),
   update: (id, data) => api.put(`/subjects/${id}`, data),
 };

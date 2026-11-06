@@ -12,6 +12,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { userService, classService, subjectService } from '../../services/api';
+import SortSelect, { DEFAULT_SORT } from '../../components/common/SortSelect';
 import BulkImportModal from '../../components/common/BulkImportModal';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -44,6 +45,7 @@ export default function TeachersPage() {
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState(DEFAULT_SORT);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, pages: 1 });
   const [modal, setModal] = useState(null);
@@ -60,6 +62,7 @@ export default function TeachersPage() {
     try {
       const params = { role: 'Teacher', page, limit: 15 };
       if (search) params.search = search;
+      params.sort = sort;
       const res = await userService.getAll(params);
       setTeachers(res.data.data);
       setMeta(res.data.meta || { total: 0, pages: 1 });
@@ -68,7 +71,7 @@ export default function TeachersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, sort]);
 
   useEffect(() => {
     load();
@@ -202,8 +205,8 @@ export default function TeachersPage() {
         onImported={load}
       />
 
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ position: 'relative', maxWidth: 400 }}>
+      <div className="list-toolbar">
+        <div className="list-toolbar__search" style={{ maxWidth: 400 }}>
           <Search
             size={15}
             style={{
@@ -225,6 +228,13 @@ export default function TeachersPage() {
             }}
           />
         </div>
+        <SortSelect
+          value={sort}
+          onChange={(value) => {
+            setSort(value);
+            setPage(1);
+          }}
+        />
       </div>
 
       <div className="card">

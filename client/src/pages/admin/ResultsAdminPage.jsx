@@ -21,18 +21,15 @@ import {
   scoreTotal,
 } from '../../utils/scoreComponents';
 
+import useFeatureStore from '../../store/featureStore';
+import { gradeFor, hasScoreEntry } from '../../utils/grading';
+
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 
-function gradeOf(score) {
-  if (score >= 70) return 'A';
-  if (score >= 60) return 'B';
-  if (score >= 50) return 'C';
-  if (score >= 45) return 'D';
-  if (score >= 40) return 'E';
-  return 'F';
-}
-
 export default function ResultsAdminPage() {
+  const gradeScale = useFeatureStore((s) => s.gradeScale);
+  const gradeOf = (score) => gradeFor(score, gradeScale);
+
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [students, setStudents] = useState([]);
@@ -118,10 +115,17 @@ export default function ResultsAdminPage() {
       return toast.error('Select a class AND subject to save');
     setSaving(true);
     try {
-      const payload = students.map((s) => ({
-        student: s._id,
-        scores: scores[s._id]?.[filters.subject] || { ...EMPTY_SCORES },
-      }));
+      // Only students with a score in this subject; see utils/grading.js.
+      const payload = students
+        .filter((s) => hasScoreEntry(scores[s._id]?.[filters.subject]))
+        .map((s) => ({
+          student: s._id,
+          scores: { ...EMPTY_SCORES, ...scores[s._id]?.[filters.subject] },
+        }));
+      if (!payload.length) {
+        setSaving(false);
+        return toast.error('Enter at least one score to save');
+      }
       await resultService.bulkUpsert({
         class: filters.class,
         subject: filters.subject,
@@ -129,7 +133,7 @@ export default function ResultsAdminPage() {
         academicYear: filters.academicYear,
         results: payload,
       });
-      toast.success(`${students.length} results saved`);
+      toast.success(`${payload.length} results saved`);
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Save failed');

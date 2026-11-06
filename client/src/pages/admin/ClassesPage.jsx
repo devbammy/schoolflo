@@ -10,6 +10,7 @@ import {
   GraduationCap,
 } from 'lucide-react';
 import { classService, subjectService, userService } from '../../services/api';
+import SortSelect, { DEFAULT_SORT } from '../../components/common/SortSelect';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from 'react-hot-toast';
@@ -37,6 +38,7 @@ export default function ClassesPage() {
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState(DEFAULT_SORT);
   const [modal, setModal] = useState(null);
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -49,14 +51,14 @@ export default function ClassesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await classService.getAll();
+      const res = await classService.getAll({ sort });
       setClasses(res.data.data.classes || []);
     } catch {
       toast.error('Failed to load classes');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sort]);
 
   useEffect(() => {
     load();
@@ -133,8 +135,10 @@ export default function ClassesPage() {
     try {
       const payload = { ...form, subjects: selectedSubjects };
       if (!selected) {
-        await classService.create(payload);
-        toast.success('Class created successfully');
+        // The server restores a deactivated class of the same name rather
+        // than refusing it, and says which it did.
+        const { data } = await classService.create(payload);
+        toast.success(data.message || 'Class created successfully');
       } else {
         await classService.update(selected._id, payload);
         toast.success('Class updated');
@@ -178,8 +182,8 @@ export default function ClassesPage() {
         </button>
       </div>
 
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ position: 'relative', maxWidth: 360 }}>
+      <div className="list-toolbar">
+        <div className="list-toolbar__search" style={{ maxWidth: 360 }}>
           <Search
             size={15}
             style={{
@@ -198,6 +202,7 @@ export default function ClassesPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <SortSelect value={sort} onChange={setSort} />
       </div>
 
       {loading ? (
