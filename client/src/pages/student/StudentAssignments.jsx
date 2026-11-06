@@ -94,7 +94,7 @@ export default function StudentAssignments() {
 
   // ---------------- UI ----------------
   return (
-    <>
+    <div className="assignments-page">
       <div className="page-header">
         <div>
           <h1 className="page-header__title">Course Assignments</h1>
@@ -256,6 +256,6 @@ export default function StudentAssignments() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

@@ -77,13 +77,7 @@ export default function AnnouncementsPage() {
           </div>
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 14,
-          }}
-        >
+        <div className="announcement-grid">
           {list.map((a) => (
             <div
               key={a._id}

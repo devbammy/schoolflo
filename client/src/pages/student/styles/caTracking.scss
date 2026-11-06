@@ -19,7 +19,7 @@
     align-items: flex-end;
 
     h1 {
-      font-size: 2.5rem;
+      font-size: 1.5rem;
       font-weight: 800;
       letter-spacing: -0.02em;
     }
@@ -57,7 +57,7 @@
 
     .stat-card {
       padding: var(--space-6);
-      border-radius: var(--radius-xl);
+      border-radius: var(--radius-lg);
       background: var(--clr-surface);
       border: 1px solid var(--clr-border);
       display: flex;
@@ -185,7 +185,7 @@
     width: 500px;
     background: var(--clr-surface);
     border: 1px solid var(--clr-border);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-lg);
     box-shadow: var(--shadow-2xl);
     z-index: 100;
     padding: var(--space-6);
@@ -228,7 +228,7 @@
 .insights-sidebar {
   .insight-box {
     background: #f8fafc;
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-lg);
     padding: var(--space-6);
     h4 {
       display: flex;

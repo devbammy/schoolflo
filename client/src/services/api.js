@@ -166,6 +166,22 @@ export const authService = {
 
 export const userService = {
   getAll: (params) => api.get('/users', { params }),
+  /**
+   * Every matching user, for a picker. The API pages lists at 100, so asking
+   * for more is refused outright (the library asked for 200 and its borrower
+   * list came back empty), and asking for exactly 100 quietly drops the 101st
+   * student from a school's payment form.
+   */
+  getEvery: async (params) => {
+    const everyone = [];
+    for (let page = 1; ; page += 1) {
+      const { data } = await api.get('/users', {
+        params: { ...params, page, limit: 100 },
+      });
+      everyone.push(...(data.data || []));
+      if (!data.meta?.hasNext) return everyone;
+    }
+  },
   getById: (id) => api.get(`/users/${id}`),
   getProfile: (id) => api.get(`/users/${id}/profile`),
   create: (data) => api.post('/auth/register', data),

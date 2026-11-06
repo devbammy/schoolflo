@@ -236,7 +236,7 @@ export default function AssignmentsPage() {
   );
 
   return (
-    <>
+    <div className="assignments-page">
       <div className="page-header">
         <div>
           <h1 className="page-header__title">Assignments Management</h1>
@@ -816,6 +816,6 @@ export default function AssignmentsPage() {
         confirmLabel="Remove"
         danger
       />
-    </>
+    </div>
   );
 }

@@ -1,7 +1,6 @@
-@use '../../../styles/main.scss' as *;
 
+// The page column already pads; a second 2rem here left a phone 250px wide.
 .view-results-container {
-  padding: 2rem;
   max-width: 1200px;
   margin: 0 auto;
 
@@ -14,8 +13,8 @@
     gap: 1.5rem;
 
     h1 {
-      font-size: 2rem;
-      font-weight: 800;
+      font-size: 1.5rem;
+      font-weight: 700;
       color: #1e293b;
       margin: 0;
     }
@@ -25,12 +24,15 @@
     }
   }
 
+  // Wraps, or on a phone its three selects ran 235px off the right edge.
   .filter-bar {
     display: flex;
+    flex-wrap: wrap;
+    max-width: 100%;
     gap: 12px;
     background: white;
     padding: 8px;
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     border: 1px solid #e2e8f0;
 
@@ -56,6 +58,7 @@
 
   .results-stats-strip {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
     margin-bottom: 1.5rem;
 

@@ -215,20 +215,28 @@ p {
 }
 
 // ─── Cards ────────────────────────────────────────────────────────────────────
+// One corner for every card-sized container (--radius-lg). Small things inside
+// a card, such as chips, badges and inputs, stay tighter so they read as parts.
 .card {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
   overflow: hidden;
 
   &__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
     padding: var(--space-5) var(--space-6);
     border-bottom: 1px solid var(--clr-border);
-    background: linear-gradient(135deg, #fafbff 0%, #f0f4fb 100%);
+    background: var(--clr-surface);
+
+    @media (max-width: 640px) {
+      padding: var(--space-4);
+    }
   }
 
   &__title {
@@ -240,11 +248,15 @@ p {
 
   &__body {
     padding: var(--space-6);
+
+    @media (max-width: 640px) {
+      padding: var(--space-4);
+    }
   }
   &__footer {
     padding: var(--space-4) var(--space-6);
     border-top: 1px solid var(--clr-border);
-    background: var(--clr-bg);
+    background: var(--clr-surface);
   }
 }
 
@@ -253,37 +265,33 @@ p {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-xs);
   display: flex;
   align-items: flex-start;
   gap: var(--space-4);
-  transition:
-    transform var(--transition-base),
-    box-shadow var(--transition-base);
   position: relative;
   overflow: hidden;
 
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
-    background: var(--accent-color, var(--clr-primary));
-    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-  }
+  // No hover lift: most stat cards go nowhere, and a card that rises under the
+  // pointer promises a click that never happens.
+  &[role='button'],
+  &--link {
+    cursor: pointer;
+    transition:
+      border-color var(--transition-fast),
+      box-shadow var(--transition-fast);
 
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    &:hover {
+      border-color: var(--clr-primary-lt);
+      box-shadow: var(--shadow-sm);
+    }
   }
 
   &__icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-md);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     background: color-mix(
       in srgb,
       var(--accent-color, var(--clr-primary)) 12%,
@@ -304,8 +312,6 @@ p {
     font-weight: 500;
     color: var(--clr-text-3);
     margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
   }
 
   &__value {
@@ -465,6 +471,7 @@ p {
   overflow-x: auto;
   border-radius: var(--radius-lg);
   border: 1px solid var(--clr-border);
+  background: var(--clr-surface);
 
   // The wrapper scrolls; it must not itself be stretched by the table inside
   // it, or the scroll never engages and the page moves instead.
@@ -484,18 +491,18 @@ p {
   font-size: 0.9375rem;
 
   thead tr {
-    background: linear-gradient(135deg, #f0f4fb 0%, #e8eff9 100%);
+    background: var(--clr-bg);
   }
 
   th {
-    padding: 14px 16px;
+    padding: 12px 16px;
     text-align: left;
-    font-family: var(--font-display);
-    font-size: 0.8125rem;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
     font-weight: 600;
-    color: var(--clr-text-2);
+    color: var(--clr-text-3);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     white-space: nowrap;
   }
 
@@ -907,6 +914,37 @@ p {
       background: var(--clr-bg);
     }
   }
+}
+
+// The academic calendar: the month beside its sidebar, stacked on narrower
+// screens. This was an inline `1fr 340px` grid, which no media query can
+// reach, so on a phone the fixed sidebar took the whole width and the month
+// itself was squeezed to nothing.
+.calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-5);
+  align-items: start;
+
+  // The read-only calendar's sidebar is a little narrower.
+  &--narrow {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+
+  @media (max-width: 1024px) {
+    &,
+    &--narrow {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}
+
+// Announcements: three across where they fit, one per row on a phone. An inline
+// `repeat(3, 1fr)` kept three on a 375px screen, each a word wide.
+.announcement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: var(--space-4);
 }
 
 // ─── Dashboard Grid ───────────────────────────────────────────────────────────
@@ -1435,7 +1473,7 @@ select.form-control {
     margin-bottom: var(--space-8);
     background: var(--clr-surface);
     padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     border: 1px solid var(--clr-border);
     box-shadow: var(--shadow-xs);
 
@@ -1747,7 +1785,7 @@ select.form-control {
 
 .promo-card {
   background: $surface;
-  border-radius: $radius;
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
   box-shadow: $shadow;
   border: 1px solid #e2e8f0;
@@ -1882,14 +1920,14 @@ select.form-control {
 // Stats inside Details Modal
 .stats-header {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
   gap: 1rem;
   margin-bottom: 2rem;
 
   .stat-box {
     background: #f8fafc;
     padding: 1.25rem;
-    border-radius: $radius;
+    border-radius: var(--radius-lg);
     display: flex;
     align-items: center;
     gap: 1rem;
@@ -2004,7 +2042,7 @@ select.form-control {
 
     &__title {
       font-family: var(--font-display);
-      font-size: 2rem;
+      font-size: 1.5rem;
       color: var(--clr-text-1);
       margin-bottom: var(--space-1);
     }
@@ -2185,7 +2223,7 @@ select.form-control {
 
     &__title {
       font-family: var(--font-display);
-      font-size: 2.25rem;
+      font-size: 1.5rem;
       color: var(--clr-text-1);
       letter-spacing: -0.02em;
     }
@@ -2355,7 +2393,7 @@ select.form-control {
 
     &__title {
       font-family: var(--font-display);
-      font-size: 2rem;
+      font-size: 1.5rem;
       color: var(--clr-text-1);
     }
 
@@ -2493,7 +2531,7 @@ select.form-control {
 
     .title {
       font-family: var(--font-display);
-      font-size: 2.25rem;
+      font-size: 1.5rem;
       color: var(--clr-text-1);
     }
     .subtitle {
@@ -2635,7 +2673,7 @@ select.form-control {
   .summary-layout {
     .stats-header {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
       gap: var(--space-4);
       margin-bottom: var(--space-8);
 
@@ -3337,7 +3375,7 @@ select.form-control {
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-5);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   border: 1px solid
     color-mix(in srgb, var(--clr-success) 30%, var(--clr-border));
   background: color-mix(in srgb, var(--clr-success) 7%, var(--clr-surface));
@@ -3387,7 +3425,7 @@ select.form-control {
 .overview-stat {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xs);
   padding: var(--space-3) var(--space-4);
   display: flex;
@@ -3446,7 +3484,7 @@ select.form-control {
 .pulse-tile {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: var(--space-4) var(--space-5);
   box-shadow: var(--shadow-xs);
   transition:

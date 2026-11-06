@@ -498,14 +498,7 @@ export default function AcademicCalendarPage() {
           </div>
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 340px',
-            gap: 20,
-            alignItems: 'start',
-          }}
-        >
+        <div className="calendar-layout">
           {/* ── LEFT: Month calendar ────────────────────────────────── */}
           <div className="card">
             {/* Month nav */}

@@ -110,10 +110,10 @@ export default function PaymentsPage() {
         term: filters.term,
         academicYear: filters.academicYear,
       }),
-      userService.getAll({ role: 'Student', limit: 100 }),
+      userService.getEvery({ role: 'Student' }),
     ]).then(([f, s]) => {
       setFees(f.data.data?.fees || []);
-      setStudents(s.data.data || []);
+      setStudents(s);
     });
   }, [filters]);
 

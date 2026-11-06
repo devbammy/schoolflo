@@ -294,14 +294,7 @@ export default function CalendarViewPage() {
         )}
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 300px',
-          gap: 20,
-          alignItems: 'start',
-        }}
-      >
+      <div className="calendar-layout calendar-layout--narrow">
         {/* ── Month calendar grid ──────────────────────────────────── */}
         <div className="card">
           <div className="card__header">

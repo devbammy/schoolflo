@@ -157,11 +157,11 @@ export default function LibraryPage() {
       .getCategories()
       .then((r) => setCategories(r.data.data?.categories || []));
     Promise.all([
-      userService.getAll({ role: 'Student', limit: 200 }),
-      userService.getAll({ role: 'Teacher', limit: 100 }),
+      userService.getEvery({ role: 'Student' }),
+      userService.getEvery({ role: 'Teacher' }),
     ]).then(([s, t]) => {
-      setStudents(s.data.data || []);
-      setTeachers(t.data.data || []);
+      setStudents(s);
+      setTeachers(t);
     });
     loadStats();
   }, []);
