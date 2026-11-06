@@ -394,6 +394,22 @@ combinations scrolled before this was fixed. Five rules keep it at zero.
 8. **Figures never wrap.** A stat tile's number is `white-space: nowrap` and
    shrinks on phones instead: `₦22,0` over `00` reads as two numbers.
 
+### Cards and page wrappers
+
+- **One corner for anything card-sized: `var(--radius-lg)`.** Cards, panels,
+  filter bars and table containers all use it. Chips, badges and inputs inside
+  a card stay smaller (`--radius-sm` / `--radius-md`) so they read as parts of
+  it. Before this there were five corner sizes across the pages, from 6px on
+  the shared `.card` to 24px, depending on who wrote the page.
+- **Card and table headers are flat white**, no gradients. `.stat-card` has no
+  hover lift unless it is a link (`role="button"` or `.stat-card--link`): a
+  card that rises under the pointer promises a click that never happens.
+- **A page's outer wrapper adds no padding and no background.**
+  `.page-content` already pads every page and `body` already has the page
+  colour. `.promotions-container`, `.certificates-page` and `.ca-container`
+  each added both again, so those pages sat inset in a paler panel, and CA
+  Tracking's cards were clipped on a phone.
+
 ### Dashboards
 
 The four dashboards share `components/dashboard/DashboardParts.jsx`. Two rules:

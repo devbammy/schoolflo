@@ -1247,6 +1247,10 @@ Two figures come from the server for the dashboards specifically:
   still owes, from `getFeeBalances()`. The Fees tile used to show the latest
   payment's status, so a part-payment read as "Paid".
 
+Every other page uses the same visual language: `.card` and the table wrapper
+take the 16px `--radius-lg` corner and a flat white header, so a page reads as
+the dashboards do without per-page styles.
+
 Doughnuts are used only for a whole split into a few parts (attendance, payment
 methods), always with their values listed beside them. One amount against a
 total (fees collected) is a progress meter.
