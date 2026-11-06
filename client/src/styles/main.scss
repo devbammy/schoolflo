@@ -1754,9 +1754,8 @@ select.form-control {
 // ---- Promotions
 
 .promotions-container {
-  padding: 2rem;
-  background: $bg;
-  min-height: 100vh;
+  padding: 0;
+  background: transparent;
 
   .page-header {
     display: flex;
@@ -2028,9 +2027,7 @@ select.form-control {
 // _certificates.scss
 
 .certificates-page {
-  padding: var(--space-6);
-  background-color: var(--clr-bg);
-  min-height: 100vh;
+  padding: 0;
   font-family: var(--font-body);
 
   // Header Section
@@ -2213,7 +2210,7 @@ select.form-control {
 // _student-certificates.scss
 
 .student-certificates-page {
-  padding: var(--space-6);
+  padding: 0;
   max-width: var(--content-max);
   margin: 0 auto;
   font-family: var(--font-body);
@@ -2382,7 +2379,7 @@ select.form-control {
 // _parent-certificates.scss
 
 .parent-certificates-page {
-  padding: var(--space-6);
+  padding: 0;
   max-width: var(--content-max);
   margin: 0 auto;
 
@@ -2519,7 +2516,7 @@ select.form-control {
 // _promotions.scss
 
 .promotions-container {
-  padding: var(--space-6);
+  padding: 0;
   max-width: 1400px;
   margin: 0 auto;
 
