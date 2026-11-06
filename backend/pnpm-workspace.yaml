@@ -15,4 +15,9 @@ allowBuilds:
 # version, so force them rather than wait for express 5.
 overrides:
   qs: '>=6.16.0 <7'
-  body-parser: '>=1.20.6 <2'
+  body-parser: '>=1.20.9 <2'
+  # Express 4's own pins, behind published fixes in the same major: a
+  # trust-subnet IP spoof (proxy-addr) and, through axios, credential headers
+  # surviving a cross-origin redirect (follow-redirects).
+  proxy-addr: '>=2.0.8 <3'
+  follow-redirects: '>=1.16.2 <2'
