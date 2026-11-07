@@ -595,6 +595,14 @@ Client code has **no test runner**. The check is that it lints and builds.
   them, and from inside the app that looked like nothing at all: no send, no
   entry in the provider's dashboard, and no error for two minutes, because
   that is Nodemailer's default timeout. SMTP now gives up after 10 seconds.
+- **The email queue opens its own MongoDB connection** (`address:`), never
+  Mongoose's. Mongoose bundles driver 6 and `@agendajs/mongo-backend` resolved
+  driver 7, so sharing one failed every poll with "Unsupported BSON version".
+  Agenda 6 also takes `define(name, handler, options)` and needs `now()` to
+  schedule a job; the old code had the arguments swapped and used
+  `create().save()`, which sets no run time. All three meant **no email was
+  ever sent, and nothing was logged**: Agenda reports through an `error` event,
+  which is now logged. Prove the queue against a running server, not in Jest.
 - **The email queue deletes jobs when done** (`removeOnComplete`) because a
   welcome email's body is a plaintext password. It retries with backoff; do not
   add anything to a job that must not sit in the database.

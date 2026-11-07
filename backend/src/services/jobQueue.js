@@ -41,9 +41,9 @@ const startJobQueue = async () => {
   if (started) return agenda;
 
   try {
-    // Reuses the connection the app already holds rather than dialing its
-    // own, so the queue cannot outlive or race the main connection.
-    if (!mongoose.connection?.db) {
+    // Started after the app's own connection, so a database that is down
+    // stops here with a clear message instead of inside Agenda.
+    if (!mongoose.connection?.db || !process.env.MONGO_URI) {
       throw new Error('MongoDB connection is not ready');
     }
 
@@ -53,8 +53,14 @@ const startJobQueue = async () => {
     ]);
 
     agenda = new Agenda({
+      // Its own connection, from the connection string. It used to borrow
+      // Mongoose's, but the two come with different MongoDB drivers (Mongoose
+      // bundles driver 6, this backend resolved driver 7), and every poll
+      // failed with "Unsupported BSON version". Agenda reported that only
+      // through an 'error' event nobody listened to, so every email sat in the
+      // jobs collection for good, without a single line in the log.
       backend: new MongoBackend({
-        mongo: mongoose.connection.db,
+        address: process.env.MONGO_URI,
         collection: 'jobs',
       }),
       processEvery: '20 seconds',
@@ -62,10 +68,26 @@ const startJobQueue = async () => {
       defaultConcurrency: 3,
     });
 
+    // Handler second, options third: Agenda 6's order. This was written the
+    // other way round, so Agenda took the options object for the handler and
+    // never ran the real one. Every email was queued and none was ever sent,
+    // and nothing failed, so nothing was logged and nothing reached the mail
+    // provider.
     agenda.define(
       SEND_EMAIL,
+      async (job) => {
+        const { to, subject, html, text } = job.attrs.data || {};
+        if (!to) return;
+
+        const { success, error } = await sendEmail({ to, subject, html, text });
+
+        // Throwing marks the job failed, which is what triggers Agenda's
+        // retry backoff. Returning quietly would silently drop the email.
+        if (!success) {
+          throw new Error(error || 'Email send failed');
+        }
+      },
       {
-        priority: 'normal',
         concurrency: 3,
 
         // Throwing below only marks a job failed. Agenda retries nothing
@@ -85,19 +107,13 @@ const startJobQueue = async () => {
         // in the `jobs` collection. Delete a job as soon as it has been sent.
         removeOnComplete: true,
       },
-      async (job) => {
-        const { to, subject, html, text } = job.attrs.data || {};
-        if (!to) return;
-
-        const { success, error } = await sendEmail({ to, subject, html, text });
-
-        // Throwing marks the job failed, which is what triggers Agenda's
-        // retry backoff. Returning quietly would silently drop the email.
-        if (!success) {
-          throw new Error(error || 'Email send failed');
-        }
-      },
     );
+
+    // Anything Agenda itself cannot do, such as reaching its collection. This
+    // is the listener whose absence hid the BSON failure above.
+    agenda.on('error', (err) => {
+      console.error(`⚠️  Job queue error: ${err.message}`);
+    });
 
     agenda.on('fail:' + SEND_EMAIL, (err, job) => {
       console.error(
@@ -154,9 +170,10 @@ const enqueueEmail = async ({ to, subject, html, text }) => {
   }
 
   try {
-    const job = agenda.create(SEND_EMAIL, { to, subject, html, text });
-    job.attrs.failCount = 0;
-    await job.save();
+    // now(), not create() + save(). Agenda 6's create() sets no run time, so a
+    // saved job had no nextRunAt and the processor, which looks for jobs that
+    // are due, never picked it up.
+    await agenda.now(SEND_EMAIL, { to, subject, html, text });
 
     return { success: true, queued: true };
   } catch (error) {
