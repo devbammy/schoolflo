@@ -1,62 +1,77 @@
 # Subjects: Glory and Praise Prime Academy Foundation, Kuje, Abuja
 
-Arranged from *GPPAF SUBJECT OFFERED.pdf* for entry into SchoolFlo.
+Arranged from *GPPAF SUBJECT OFFERED.pdf* and the school's confirmation that
+the senior streams are **Science (B)**, **Humanities (A)** and **Business (C)**,
+with **A and C taught together in one class**.
 
 ## How it works, in two lines
 
-- **A subject is created once**, and you tick every class that offers it.
-  One Mathematics, ticked for Basic 1 to SS 3. Not one Mathematics per class.
-- **Each senior stream is its own class.** SchoolFlo gives a subject to a whole
-  class, not to a section, so *SS 1 Science* and *SS 1 Humanities* must be
-  separate classes for Physics to go to one and Government to the other.
+- **A subject is created once**, and you tick every class that offers it. One
+  Mathematics, ticked for Basic 1 to SS 3. Not one Mathematics per class.
+- **Tick a class if any student in it takes the subject.** Teachers then enter
+  scores only for the students who take it, and only those students get a
+  result. Everyone else has nothing recorded, so the subject never appears on
+  their report card.
 
 ---
 
-## Step 1: Fix the senior classes (you are here)
+## Step 1: The senior classes
 
-If you created SS 1, SS 2 and SS 3 as single classes with sections A, B, C and T,
-change them to one class per stream.
+Six senior classes, two per level. Level **SS** for all of them.
 
-1. **Create these 12 classes** (Classes → New Class). Level **SS**, one section
-   **A** each:
+| Class name | Sections | Who is in it |
+| --- | --- | --- |
+| SS 1 Science | B | Science students |
+| SS 1 Humanities & Business | A, C | Humanities (A) and Business (C) together |
+| SS 2 Science | B | Science students |
+| SS 2 Humanities & Business | A, C | Humanities (A) and Business (C) together |
+| SS 3 Science | B | Science students |
+| SS 3 Humanities & Business | A, C | Humanities (A) and Business (C) together |
 
-   | | Humanities | Science | Business | Technology |
-   | --- | --- | --- | --- | --- |
-   | SS 1 | SS 1 Humanities | SS 1 Science | SS 1 Business | SS 1 Technology |
-   | SS 2 | SS 2 Humanities | SS 2 Science | SS 2 Business | SS 2 Technology |
-   | SS 3 | SS 3 Humanities | SS 3 Science | SS 3 Business | SS 3 Technology |
+When adding a student to *Humanities & Business*, set their **section** to A or C,
+so the class list shows which stream each student is in.
 
-   If a stream has more than one arm (two Science classes, say), give that class
-   sections A and B. Sections are now arms *within* a stream, not streams.
+**If you already created other senior classes** (a plain SS 1, a Technology
+class, or separate Humanities and Business classes), delete them before any
+students are put in them. Deleting only hides a class.
 
-2. **Delete the old SS 1, SS 2 and SS 3** (Classes → the bin icon). This only
-   hides them. Do it before any students are put in them.
+**Things that follow from this set-up:**
 
-3. **Go back to the subjects you have already created** and tick the new stream
-   classes. In each subject, open **Edit**, tick the classes below, and save.
-   Ticks on the old SS 1 to SS 3 do nothing once those classes are deleted.
+- **One register and one form teacher** for A and C, because they share a room.
+- **One fee structure** per class per term, shared by A and C.
+- **Positions** are worked out per class, so A and C students are ranked
+  together. If the school wants them ranked separately, they need to be two
+  classes instead.
+- **Promotion** runs one batch per class: SS 1 Science → SS 2 Science, and
+  SS 1 Humanities & Business → SS 2 Humanities & Business.
 
-   | Code | Subject | Tick these senior classes |
-   | --- | --- | --- |
-   | MTH | Mathematics | All 12 |
-   | ENG | English Language | All 12 |
-   | CVE | Civic Education | All 12 |
-   | CRS | Christian Religious Studies | SS 1–3 Humanities, SS 1–3 Business |
-   | IRS | Islamic Religious Studies | SS 1–3 Humanities, SS 1–3 Business |
-   | FRE | French | SS 1–3 Humanities, SS 1–3 Business |
-   | HAU | Hausa | SS 1–3 Humanities, SS 1–3 Business |
-   | IGB | Igbo | SS 1–3 Humanities, SS 1–3 Business |
-   | YOR | Yoruba | SS 1–3 Humanities, SS 1–3 Business |
-   | AGR | Agricultural Science | SS 1–3 Science, SS 1–3 Technology |
-
-   "SS 1–3 Science" means tick SS 1 Science, SS 2 Science and SS 3 Science.
-
-4. **Then carry on with the senior subjects** in Step 3, which list exactly which
-   stream classes each one gets.
+Below, **"SS 1–3 Science"** means tick SS 1 Science, SS 2 Science and SS 3
+Science. **"SS 1–3 H&B"** means the three Humanities & Business classes.
+**"All 6 SS"** means all six.
 
 ---
 
-## Step 2: All classes, for reference
+## Step 2: Re-tick the subjects you have already made
+
+These subjects were created with the old senior classes ticked. Open each one,
+tick the classes below, and save.
+
+| Code | Subject | Tick these senior classes |
+| --- | --- | --- |
+| MTH | Mathematics | All 6 SS |
+| ENG | English Language | All 6 SS |
+| CVE | Civic Education | All 6 SS |
+| CRS | Christian Religious Studies | SS 1–3 H&B |
+| IRS | Islamic Religious Studies | SS 1–3 H&B |
+| FRE | French | SS 1–3 H&B |
+| HAU | Hausa | SS 1–3 H&B |
+| IGB | Igbo | SS 1–3 H&B |
+| YOR | Yoruba | SS 1–3 H&B |
+| AGR | Agricultural Science | SS 1–3 Science |
+
+---
+
+## Step 3: All classes, for reference
 
 | Class name | Level | Sections |
 | --- | --- | --- |
@@ -66,35 +81,20 @@ change them to one class per stream.
 | Nursery 2 | Primary | A |
 | Basic 1 to Basic 5 | Primary | A |
 | JSS 1 to JSS 3 | JSS | A |
-| SS 1 Humanities, SS 1 Science, SS 1 Business, SS 1 Technology | SS | A |
-| SS 2 Humanities, SS 2 Science, SS 2 Business, SS 2 Technology | SS | A |
-| SS 3 Humanities, SS 3 Science, SS 3 Business, SS 3 Technology | SS | A |
+| SS 1 Science, SS 2 Science, SS 3 Science | SS | B |
+| SS 1 Humanities & Business, SS 2 …, SS 3 … | SS | A, C |
 
 SchoolFlo's class levels are Primary, JSS, SS and College, so KG and the
-nursery classes use **Primary**. Add more sections (B, C …) to any class with
-more than one arm.
-
-**Things that follow from one class per stream:**
-
-- **Positions** on report cards are worked out per class, so a student is ranked
-  within their stream.
-- **Fees**: a fee structure is set per class and term, so each stream class
-  needs its own, even if the amount is the same for all four.
-- **Promotion** runs one batch per class: SS 1 Science → SS 2 Science.
+nursery classes use **Primary**. Add more sections to any class with more than
+one arm.
 
 ---
 
-## Step 3: Subjects
+## Step 4: Subjects
 
-**Classes** is what to tick. **Type**: *Core* means every student in those
-classes takes it; *Elective* means some do not (a stream option, or one of an
+**Type**: *Core* means every student in those classes takes it; *Elective* means
+some do not (a stream subject in the joined class, an option, or one of an
 either/or such as CRS or IRS).
-
-**Electives are safe to tick for a whole class.** Teachers enter scores only
-for the students who take the subject, and only those students get a result.
-Everyone else has nothing recorded, so the subject never appears on their report
-card. (Before the latest update, saving filled a 0 for every blank student. Make
-sure that update is live before teachers enter senior scores.)
 
 ### Early years (KG – Nursery 2)
 
@@ -118,14 +118,14 @@ sure that update is live before teachers enter senior scores.)
 | PHO | Phonics | KG, Pre-Nursery, Nursery 1, Nursery 2, Basic 1–5 | Core |
 | HWR | Handwriting | KG, Pre-Nursery, Nursery 1, Nursery 2, Basic 1–5 | Core |
 | CMP | Computer Studies | Pre-Nursery, Nursery 1, Nursery 2, Basic 1–5, JSS 1–3 | Core |
-| CRS | Christian Religious Studies | KG, Pre-Nursery, Nursery 1, Nursery 2, Basic 1–5, JSS 1–3, SS 1–3 Humanities, SS 1–3 Business | Elective |
+| CRS | Christian Religious Studies | KG, Pre-Nursery, Nursery 1, Nursery 2, Basic 1–5, JSS 1–3, SS 1–3 H&B | Elective |
 
 ### Primary (Basic 1 – 5), several continuing upward
 
 | Code | Subject | Classes | Type |
 | --- | --- | --- | --- |
-| MTH | Mathematics | Basic 1–5, JSS 1–3, all 12 SS classes | Core |
-| ENG | English Language | Basic 1–5, JSS 1–3, all 12 SS classes | Core |
+| MTH | Mathematics | Basic 1–5, JSS 1–3, All 6 SS | Core |
+| ENG | English Language | Basic 1–5, JSS 1–3, All 6 SS | Core |
 | BST | Basic Science and Technology | Basic 1–5 | Core |
 | PVS | Pre-Vocational Studies | Basic 1–5 | Core |
 | NVE | National Values Education | Basic 1–5 | Core |
@@ -133,7 +133,7 @@ sure that update is live before teachers enter senior scores.)
 | CCA | Cultural and Creative Arts | Basic 1–5, JSS 1–3 | Core |
 | QTR | Quantitative Reasoning | Basic 1–5 | Core |
 | VBR | Verbal Reasoning | Basic 1–5 | Core |
-| FRE | French | Basic 1–5, JSS 1–3, SS 1–3 Humanities, SS 1–3 Business | Elective |
+| FRE | French | Basic 1–5, JSS 1–3, SS 1–3 H&B | Elective |
 
 ### Junior Secondary (JSS 1 – 3), several continuing into SS
 
@@ -143,74 +143,76 @@ sure that update is live before teachers enter senior scores.)
 | BTE | Basic Technology | JSS 1–3 | Core |
 | HEC | Home Economics | JSS 1–3 | Core |
 | SOS | Social Studies | JSS 1–3 | Core |
-| CVE | Civic Education | JSS 1–3, all 12 SS classes | Core |
+| CVE | Civic Education | JSS 1–3, All 6 SS | Core |
 | SEC | Security Education | JSS 1–3 | Core |
 | BUS | Business Studies | JSS 1–3 | Core |
 | MUS | Music | JSS 1–3 | Core |
-| AGR | Agricultural Science | JSS 1–3, SS 1–3 Science, SS 1–3 Technology | Elective |
-| IRS | Islamic Religious Studies | JSS 1–3, SS 1–3 Humanities, SS 1–3 Business | Elective |
-| HAU | Hausa | JSS 1–3, SS 1–3 Humanities, SS 1–3 Business | Elective |
-| IGB | Igbo | JSS 1–3, SS 1–3 Humanities, SS 1–3 Business | Elective |
-| YOR | Yoruba | JSS 1–3, SS 1–3 Humanities, SS 1–3 Business | Elective |
+| AGR | Agricultural Science | JSS 1–3, SS 1–3 Science | Elective |
+| IRS | Islamic Religious Studies | JSS 1–3, SS 1–3 H&B | Elective |
+| HAU | Hausa | JSS 1–3, SS 1–3 H&B | Elective |
+| IGB | Igbo | JSS 1–3, SS 1–3 H&B | Elective |
+| YOR | Yoruba | JSS 1–3, SS 1–3 H&B | Elective |
 
-### Senior Secondary: the subjects you are about to create
+### Senior Secondary
 
-| Code | Subject | Tick these classes | Compulsory for | Optional for |
-| --- | --- | --- | --- | --- |
-| BIO | Biology | SS 1–3 Science, SS 1–3 Technology, SS 1–3 Business | Science, Technology | Business |
-| CHE | Chemistry | SS 1–3 Science, SS 1–3 Technology | Science, Technology | |
-| PHY | Physics | SS 1–3 Science, SS 1–3 Technology | Science, Technology | |
-| TDR | Technical Drawing | SS 1–3 Science, SS 1–3 Technology | Technology | Science |
-| FMT | Further Mathematics | SS 1–3 Science, SS 1–3 Technology | | Science, Technology |
-| ECO | Economics | All 12 SS classes | Humanities, Business | Science, Technology |
-| GEO | Geography | All 12 SS classes | | All four |
-| GOV | Government | SS 1–3 Humanities | Humanities | |
-| LIT | Literature in English | SS 1–3 Humanities | Humanities | |
-| VIS | Visual Arts | SS 1–3 Humanities | | Humanities |
-| COM | Commerce | SS 1–3 Business | Business | |
-| ACC | Financial Accounting | SS 1–3 Business | Business | |
-| OFP | Office Practice | SS 1–3 Business | Business | |
+| Code | Subject | Tick these classes | Taken by |
+| --- | --- | --- | --- |
+| BIO | Biology | All 6 SS | Science (compulsory), Business C (optional) |
+| CHE | Chemistry | SS 1–3 Science | Science |
+| PHY | Physics | SS 1–3 Science | Science |
+| TDR | Technical Drawing | SS 1–3 Science | Science (optional) |
+| FMT | Further Mathematics | SS 1–3 Science | Science (optional) |
+| ECO | Economics | All 6 SS | Humanities A and Business C (compulsory), Science (optional) |
+| GEO | Geography | All 6 SS | Optional for everyone |
+| GOV | Government | SS 1–3 H&B | Humanities A |
+| LIT | Literature in English | SS 1–3 H&B | Humanities A |
+| VIS | Visual Arts | SS 1–3 H&B | Humanities A (optional) |
+| COM | Commerce | SS 1–3 H&B | Business C |
+| ACC | Financial Accounting | SS 1–3 H&B | Business C |
+| OFP | Office Practice | SS 1–3 H&B | Business C |
+
+All senior subjects are **Elective** on the subject form, except Mathematics,
+English Language and Civic Education.
 
 ### Trade subjects (every senior student takes one)
 
 | Code | Subject | Tick these classes |
 | --- | --- | --- |
-| MKT | Marketing | All 12 SS classes |
-| DTP | Data Processing | All 12 SS classes |
-| PDC | Painting and Decoration | All 12 SS classes |
+| MKT | Marketing | All 6 SS |
+| DTP | Data Processing | All 6 SS |
+| PDC | Painting and Decoration | All 6 SS |
 
-**53 subjects in total.** Mark each one *Core* or *Elective* on the subject form
-as the Type column says.
+**53 subjects in total.**
 
 ---
 
-## Step 4: Senior streams at a glance
+## Step 5: Who takes what in the senior classes
 
-Who takes what, from the school's list. The class you tick already limits a
-subject to its streams; this is the reference for options within a stream.
+From the school's list. In *Humanities & Business*, the section (A or C) tells a
+teacher which students to enter scores for.
 
-| Subject | Humanities | Science | Business | Technology |
-| --- | --- | --- | --- | --- |
-| Mathematics | Compulsory | Compulsory | Compulsory | Compulsory |
-| English Language | Compulsory | Compulsory | Compulsory | Compulsory |
-| Civic Education | Compulsory | Compulsory | Compulsory | Compulsory |
-| Trade subject (one of MKT, DTP, PDC) | Compulsory | Compulsory | Compulsory | Compulsory |
-| Biology | — | Compulsory | Optional | Compulsory |
-| Chemistry | — | Compulsory | — | Compulsory |
-| Physics | — | Compulsory | — | Compulsory |
-| Technical Drawing | — | Optional | — | Compulsory |
-| Economics | Compulsory | Optional | Compulsory | Optional |
-| Government | Compulsory | — | — | — |
-| CRS / IRS | Compulsory (one) | — | Optional (one) | — |
-| Literature in English | Compulsory | — | — | — |
-| Commerce | — | — | Compulsory | — |
-| Financial Accounting | — | — | Compulsory | — |
-| Office Practice | — | — | Compulsory | — |
-| Further Mathematics | — | Optional | — | Optional |
-| Agricultural Science | — | Optional | — | Optional |
-| Geography | Optional | Optional | Optional | Optional |
-| Visual Arts | Optional | — | — | — |
-| Nigerian language or French | Optional (one) | — | Optional (one) | — |
+| Subject | Science (B) | Humanities (A) | Business (C) |
+| --- | --- | --- | --- |
+| Mathematics | Compulsory | Compulsory | Compulsory |
+| English Language | Compulsory | Compulsory | Compulsory |
+| Civic Education | Compulsory | Compulsory | Compulsory |
+| Trade subject (one of MKT, DTP, PDC) | Compulsory | Compulsory | Compulsory |
+| Biology | Compulsory | — | Optional |
+| Chemistry | Compulsory | — | — |
+| Physics | Compulsory | — | — |
+| Economics | Optional | Compulsory | Compulsory |
+| Government | — | Compulsory | — |
+| Literature in English | — | Compulsory | — |
+| CRS / IRS | — | Compulsory (one) | Optional (one) |
+| Commerce | — | — | Compulsory |
+| Financial Accounting | — | — | Compulsory |
+| Office Practice | — | — | Compulsory |
+| Further Mathematics | Optional | — | — |
+| Agricultural Science | Optional | — | — |
+| Technical Drawing | Optional | — | — |
+| Geography | Optional | Optional | Optional |
+| Visual Arts | — | Optional | — |
+| Nigerian language or French | — | Optional (one) | Optional (one) |
 
 ---
 
@@ -219,22 +221,24 @@ subject to its streams; this is the reference for options within a stream.
 Choices made where the list was ambiguous. Each is easy to change before scores
 exist, and much harder after.
 
-1. **English.** Basic 1–5 lists *English Studies / Literature*, JSS *English
+1. **Ranking in the joined class.** A and C are one class, so they are ranked
+   together. If the school ranks them separately, make them two classes.
+2. **English.** Basic 1–5 lists *English Studies / Literature*, JSS *English
    Language*, SS *English*. Treated as one subject, **English Language**, so a
    student's English record is continuous.
-2. **CRS and Moral Instruction in Basic 1–5.** Listed there as one subject.
+3. **CRS and Moral Instruction in Basic 1–5.** Listed there as one subject.
    Basic 1–5 is ticked under **CRS** only. If Moral Instruction is scored
    separately in Basic, tick Basic 1–5 under MOR as well.
-3. **"Either/or" subjects are separate subjects.** IRK/CRK, CRS/IRS,
+4. **"Either/or" subjects are separate subjects.** IRK/CRK, CRS/IRS,
    Hausa/Igbo/Yoruba and Nigerian Language/French each became one subject per
    option: a student takes one and is scored in that one.
-4. **Social Studies / Civic Education / Security Education** (JSS) is three
+5. **Social Studies / Civic Education / Security Education** (JSS) is three
    subjects. SS *Civics* is the same **Civic Education**.
-5. **Agriculture** and **Agricultural Science** are one subject, **AGR**.
-6. **Accounts** is entered as **Financial Accounting**, its WAEC name.
-7. **Stream class names** follow the list's own headings. Rename them if the
-   school calls them something else (SS 1A, SS 1B…); keep one class per stream.
-8. **Codes** are three letters and unique, which SchoolFlo requires. Where two
-   subjects shared a natural code, one was changed: Composition is **CPS** (COM
-   is Commerce), Health Habit is **HEH** (HEC is Home Economics), Social Habit is
-   **SOH** (SOS is Social Studies).
+6. **Agriculture** and **Agricultural Science** are one subject, **AGR**.
+7. **Accounts** is entered as **Financial Accounting**, its WAEC name.
+8. **The Technology stream** in the original list is not used, per the school.
+   Its subjects (Technical Drawing, Further Mathematics, Agricultural Science)
+   remain options for Science.
+9. **Codes** are three letters and unique, which SchoolFlo requires. Composition
+   is **CPS** (COM is Commerce), Health Habit is **HEH** (HEC is Home
+   Economics), Social Habit is **SOH** (SOS is Social Studies).
