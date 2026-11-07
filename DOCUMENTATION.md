@@ -130,7 +130,7 @@ schoolflo/
 │   │       ├── schoolTime.js      # school wall clock (staff attendance)
 │   │       ├── reconcilePayments.js
 │   │       └── ms.js
-│   └── tests/                     # 34 suites, 547 tests
+│   └── tests/                     # 35 suites, 554 tests
 │       ├── unit/                  # grading, validation, error handling
 │       ├── integration/           # real in-memory MongoDB
 │       └── setup/                 # one shared MongoDB, a database per suite
@@ -1331,6 +1331,13 @@ a plaintext password. Failed sends retry with backoff, then are removed.
 
 **SMS** via Twilio is wired for announcements and skipped when unconfigured.
 
+**Two ways to send.** With `RESEND_API_KEY` set, mail goes through Resend's
+HTTP API over HTTPS and the `SMTP_*` settings are ignored. Use it on any host
+that blocks outbound SMTP ports (25, 465, 587), as Render's free plan does: there
+an SMTP send never reaches the provider and fails only after a timeout. Without
+the key, mail goes over SMTP, which now times out after 10 seconds rather than
+Nodemailer's default two minutes. The startup log says which is in use.
+
 TLS certificate validation is **on**. Set `SMTP_ALLOW_SELF_SIGNED=true` only
 for a local mail server with a self-signed certificate.
 
@@ -1383,6 +1390,7 @@ PAYSTACK_SECRET_KEY=sk_live_...    # also verifies webhook signatures
 FLUTTERWAVE_SECRET_KEY=
 FLUTTERWAVE_WEBHOOK_HASH=          # the secret hash set in Flutterwave's dashboard
 
+RESEND_API_KEY=                    # send over HTTPS; SMTP_* is then ignored
 SMTP_HOST=
 SMTP_PORT=587                      # 465 switches to implicit TLS
 SMTP_USER=
@@ -1414,7 +1422,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 34 suites, 547 tests
+pnpm test              # 35 suites, 554 tests
 pnpm test:coverage
 ```
 
@@ -1440,6 +1448,7 @@ pnpm test:coverage
 | `unit/adminOverview.test.js` | The overview's pulse, attention items and fee maths       |
 | `unit/csv.test.js`           | Quoted fields, embedded newlines, CRLF, Excel's BOM       |
 | `unit/env.test.js`           | What stops the server booting, and what only warns        |
+| `unit/emailDelivery.test.js` | Resend API when its key is set, SMTP otherwise, and Resend's reason when it refuses |
 | `unit/emailTemplates.test.js` | User text is escaped in every template                   |
 | `unit/clientUrlAndLoginKey.test.js` | One link address; one login budget per account     |
 | `integration/enrolment.test.js` | Fees across promotion, arrears, rosters, applying a batch once |

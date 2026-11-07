@@ -58,9 +58,14 @@ const checkEnv = (env = process.env) => {
   }
 
   // ── Warnings: a feature degrades, the portal runs ─────────────────────
-  if (!isSet(env, 'SMTP_HOST')) {
+  if (isSet(env, 'RESEND_API_KEY')) {
+    // Sent over HTTPS (see notificationService); the SMTP settings are unused.
+    ['FROM_EMAIL', 'FROM_NAME'].forEach((key) => {
+      if (!isSet(env, key)) warnings.push(`${key} is not set (email).`);
+    });
+  } else if (!isSet(env, 'SMTP_HOST')) {
     warnings.push(
-      'SMTP_HOST is not set: no email (welcome, reset, receipts) will be sent.',
+      'Neither RESEND_API_KEY nor SMTP_HOST is set: no email (welcome, reset, receipts) will be sent.',
     );
   } else {
     ['SMTP_USER', 'SMTP_PASS', 'FROM_EMAIL'].forEach((key) => {

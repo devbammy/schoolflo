@@ -2,6 +2,50 @@ const nodemailer = require('nodemailer');
 
 let transporter;
 
+// How long to wait on the mail provider before giving up. Nodemailer's own
+// default is two minutes, so on a host that silently drops SMTP traffic every
+// send held a worker for two minutes and the startup check logged nothing for
+// as long, which reads as "email was never tried".
+const MAIL_TIMEOUT_MS = 10 * 1000;
+
+/**
+ * Resend's HTTP API, used whenever RESEND_API_KEY is set.
+ *
+ * Over HTTPS rather than SMTP because some hosts block outbound SMTP ports
+ * (25, 465, 587) outright, Render's free plan among them, and from inside the
+ * app that looks exactly like a slow mail server: nothing arrives, nothing
+ * reaches the provider's dashboard, and no error comes back for minutes.
+ */
+const usingResendApi = () => Boolean(process.env.RESEND_API_KEY);
+
+const sendViaResend = async ({ to, subject, html, text }) => {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    signal: AbortSignal.timeout(MAIL_TIMEOUT_MS),
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
+      to: [to],
+      subject,
+      html,
+      text,
+    }),
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    // Resend explains itself ("The domain is not verified", "API key is
+    // invalid"), and that is the line whoever reads the log needs.
+    throw new Error(
+      `Resend ${response.status}: ${body.message || response.statusText}`,
+    );
+  }
+  return { messageId: body.id };
+};
+
 const getTransporter = () => {
   if (!transporter) {
     const port = parseInt(process.env.SMTP_PORT || '587', 10);
@@ -12,6 +56,9 @@ const getTransporter = () => {
       // 465 is implicit TLS; 587 and 25 start plaintext and upgrade via
       // STARTTLS, which nodemailer does automatically.
       secure: port === 465,
+      connectionTimeout: MAIL_TIMEOUT_MS,
+      greetingTimeout: MAIL_TIMEOUT_MS,
+      socketTimeout: MAIL_TIMEOUT_MS,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -35,6 +82,14 @@ const getTransporter = () => {
  * Called from server.js; failures are logged, never fatal.
  */
 const verifyTransport = async () => {
+  if (usingResendApi()) {
+    // No call is made here: a sending-only key cannot read anything back, so
+    // a check would report a working key as broken. The first send says
+    // whether it works, in the log, with Resend's own reason if not.
+    console.log(`📧 Email via the Resend API, from ${process.env.FROM_EMAIL}`);
+    return true;
+  }
+
   if (!process.env.SMTP_HOST) {
     console.warn('⚠️  SMTP_HOST is not set — outbound email is disabled');
     return false;
@@ -54,8 +109,18 @@ const verifyTransport = async () => {
  * Send a single email
  */
 const sendEmail = async ({ to, subject, html, text }) => {
+  if (usingResendApi()) {
+    try {
+      const { messageId } = await sendViaResend({ to, subject, html, text });
+      return { success: true, messageId };
+    } catch (error) {
+      console.error(`Email send error: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
   if (!process.env.SMTP_HOST) {
-    return { success: false, error: 'SMTP is not configured' };
+    return { success: false, error: 'Email is not configured' };
   }
 
   try {

@@ -21,7 +21,7 @@ Two workspaces in one repo, deployed separately:
 | `client/` | React 18 · Vite · Zustand · SCSS | Vercel |
 
 External services: Paystack + Flutterwave (payments), Cloudinary (files),
-Nodemailer/SMTP (email), Twilio (SMS, optional).
+email through Resend's HTTP API or any SMTP server, Twilio (SMS, optional).
 
 The directory is `client/`, **not** `frontend/`.
 
@@ -478,7 +478,7 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 34 suites, 547 tests, Jest, `maxWorkers: 1`. The integration
+`pnpm test` — 35 suites, 554 tests, Jest, `maxWorkers: 1`. The integration
 suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
 and take from about three minutes to ten on a slow machine, mostly bcrypt at
 cost 12. Tests that exercise failures log to the console by design, so judge a
@@ -590,6 +590,11 @@ Client code has **no test runner**. The check is that it lints and builds.
 - **Published results are locked to teachers**; an admin correction recomputes
   class statistics. A user with records cannot be deleted (deactivate), and the
   last active admin cannot be deactivated or deleted.
+- **Email goes over HTTPS when `RESEND_API_KEY` is set**, and over SMTP only
+  otherwise. Some hosts block outbound SMTP ports, Render's free plan among
+  them, and from inside the app that looked like nothing at all: no send, no
+  entry in the provider's dashboard, and no error for two minutes, because
+  that is Nodemailer's default timeout. SMTP now gives up after 10 seconds.
 - **The email queue deletes jobs when done** (`removeOnComplete`) because a
   welcome email's body is a plaintext password. It retries with backoff; do not
   add anything to a job that must not sit in the database.
