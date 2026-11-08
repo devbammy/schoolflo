@@ -24,6 +24,7 @@ const {
 } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
 const { applySort } = require('../utils/listSort');
+const { buildUserUpdate } = require('../utils/userUpdate');
 const audit = require('../services/auditService');
 const {
   uploadToCloudinary,
@@ -393,10 +394,11 @@ const updateUser = async (req, res) => {
     .lean();
   if (!before) throw AppError.notFound('User not found');
 
-  const user = await User.findByIdAndUpdate(req.params.id, updateData, {
-    new: true,
-    runValidators: true,
-  }).select('-password');
+  const user = await User.findByIdAndUpdate(
+    req.params.id,
+    buildUserUpdate(updateData),
+    { new: true, runValidators: true },
+  ).select('-password');
 
   if (!user) throw AppError.notFound('User not found');
 

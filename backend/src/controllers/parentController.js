@@ -12,6 +12,7 @@ const { applySort } = require('../utils/listSort');
 const { emailTemplates } = require('../services/notificationService');
 const { enqueueEmail } = require('../services/jobQueue');
 const audit = require('../services/auditService');
+const { buildUserUpdate } = require('../utils/userUpdate');
 
 const escapeRegex = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -153,9 +154,13 @@ const updateParent = async (req, res) => {
 
   // Matched on role as well as id: this route is for parents, and without the
   // role it would edit any account — a teacher, an admin — handed to it.
+  // Field by field, through the same helper as students and teachers. The
+  // form sends only occupation and relationship, and passing it whole replaced
+  // the entire parentProfile, children list included: editing a parent's phone
+  // number unlinked every child they had.
   const parent = await User.findOneAndUpdate(
     { _id: req.params.id, role: 'Parent' },
-    updateData,
+    buildUserUpdate(updateData),
     {
       new: true,
       runValidators: true,

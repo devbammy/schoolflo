@@ -130,7 +130,7 @@ schoolflo/
 │   │       ├── schoolTime.js      # school wall clock (staff attendance)
 │   │       ├── reconcilePayments.js
 │   │       └── ms.js
-│   └── tests/                     # 35 suites, 554 tests
+│   └── tests/                     # 36 suites, 563 tests
 │       ├── unit/                  # grading, validation, error handling
 │       ├── integration/           # real in-memory MongoDB
 │       └── setup/                 # one shared MongoDB, a database per suite
@@ -1422,7 +1422,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 35 suites, 554 tests
+pnpm test              # 36 suites, 563 tests
 pnpm test:coverage
 ```
 
@@ -1454,6 +1454,7 @@ pnpm test:coverage
 | `integration/enrolment.test.js` | Fees across promotion, arrears, rosters, applying a batch once |
 | `integration/scoreScope.test.js` | Who may enter and read scores, and for which class    |
 | `integration/accountability.test.js` | Settlement audit, cash instalments, parent links, certificate numbers |
+| `integration/userUpdate.test.js` | Editing a person changes only the form's fields: parent links, class history and children survive |
 | `integration/listSort.test.js` | A to Z by default, number order, case, stable paging, the library's text search |
 | `integration/classes.test.js` | Recreating a deleted class restores it; editing a section with no teacher |
 | `integration/dashboardData.test.js` | A parent's fee status from the balance, payment methods, the school's name |

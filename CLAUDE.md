@@ -478,7 +478,7 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 35 suites, 554 tests, Jest, `maxWorkers: 1`. The integration
+`pnpm test` — 36 suites, 563 tests, Jest, `maxWorkers: 1`. The integration
 suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
 and take from about three minutes to ten on a slow machine, mostly bcrypt at
 cost 12. Tests that exercise failures log to the console by design, so judge a
@@ -617,6 +617,12 @@ Client code has **no test runner**. The check is that it lints and builds.
   `Class.name` is unique. Creating a class with that name again **restores**
   the old record rather than refusing, which keeps every student, result and
   fee filed under it attached.
+- **Never pass a profile form straight to `findByIdAndUpdate`.** A nested
+  object replaces the whole subdocument: saving the student form wiped the
+  linked parent and class history, and saving a parent wiped their children.
+  An empty field also arrives as `''`, which is not an id, enum or date.
+  `buildUserUpdate` in `utils/userUpdate.js` sets only the fields a form may
+  change, each by its own path, and clears the empty ones.
 - **`findByIdAndUpdate` does not apply schema defaults.** Students created
   through an update can be missing `studentProfile.profileStatus` entirely, so
   queries that filter on it must accept `null` too.
