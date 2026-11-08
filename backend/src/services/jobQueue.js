@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { sendEmail } = require('./notificationService');
+const { hasMailbox } = require('../utils/mailbox');
 
 const SEND_EMAIL = 'send email';
 
@@ -158,6 +159,17 @@ const startJobQueue = async () => {
  */
 const enqueueEmail = async ({ to, subject, html, text }) => {
   if (!to) return { success: false, queued: false, error: 'No recipient' };
+
+  // Checked before queueing, so a job that can never succeed is not stored
+  // and then retried with backoff until it gives up (see utils/mailbox).
+  if (!hasMailbox(to)) {
+    return {
+      success: false,
+      queued: false,
+      skipped: true,
+      error: 'No mailbox',
+    };
+  }
 
   // Every return carries a `success` flag with the same meaning as
   // sendEmail's, so a caller can check one field regardless of whether the

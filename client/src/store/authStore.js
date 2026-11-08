@@ -12,10 +12,14 @@ const useAuthStore = create(
       isLoading: false,
       error: null,
 
-      login: async (email, password) => {
+      // `identifier` is an email, or a student's admission number.
+      login: async (identifier, password) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post('/auth/login', { email, password });
+          const { data } = await api.post('/auth/login', {
+            identifier,
+            password,
+          });
           const { user, accessToken, refreshToken } = data.data;
 
           set({

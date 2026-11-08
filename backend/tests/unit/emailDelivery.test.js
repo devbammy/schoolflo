@@ -110,6 +110,21 @@ describe('with RESEND_API_KEY set', () => {
   });
 });
 
+describe('a student with no mailbox', () => {
+  it('is skipped, not sent and not reported as a failure to retry', async () => {
+    process.env.RESEND_API_KEY = 're_test_key';
+    global.fetch = jest.fn();
+
+    const result = await load().sendEmail({
+      ...message,
+      to: 'student-65f0c0ffee@no-email.invalid',
+    });
+
+    expect(result).toMatchObject({ success: false, skipped: true });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe('with neither set', () => {
   it('reports email as not configured without trying to send', async () => {
     global.fetch = jest.fn();

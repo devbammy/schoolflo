@@ -28,6 +28,11 @@ export default function ForgotPasswordPage() {
           <div><p>Check your email for a reset link.</p><Link to="/login" className="btn btn--primary" style={{ marginTop: 16, display: 'inline-flex' }}>Back to Login</Link></div>
         ) : (
           <form onSubmit={handleSubmit}>
+            {/* A reset link needs a mailbox. A student who signs in with an
+                admission number has none, so the office issues a new slip. */}
+            <p style={{ color: 'var(--clr-text-3)', fontSize: '0.875rem', marginTop: 0 }}>
+              Sign in with an admission number? There is no email to send a link to: ask the school office for a new login slip.
+            </p>
             <div className="form-group"><label>Email Address</label><input type="email" className="form-control" required value={email} onChange={e => setEmail(e.target.value)} /></div>
             <button type="submit" className="btn btn--primary btn--full" disabled={loading}>{loading ? 'Sending...' : 'Send Reset Link'}</button>
             <div style={{ marginTop: 16, textAlign: 'center' }}><Link to="/login" style={{ color: 'var(--clr-primary)', fontSize: '0.875rem' }}>Back to Login</Link></div>

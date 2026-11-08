@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { CloudCog, Eye, EyeOff, Lock, Mail, School } from 'lucide-react';
+import { Eye, EyeOff, Lock, School, UserRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useAuthStore from '../../store/authStore';
 
@@ -12,7 +12,8 @@ const ROLE_REDIRECTS = {
 };
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  // An email, or a student's admission number.
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const { login, isLoading, error } = useAuthStore();
@@ -21,7 +22,7 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const result = await login(email, password);
+    const result = await login(identifier.trim(), password);
 
     if (result.success) {
       toast.success('Welcome back!');
@@ -208,9 +209,9 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="email">Email Address</label>
+              <label htmlFor="identifier">Email or admission number</label>
               <div style={{ position: 'relative' }}>
-                <Mail
+                <UserRound
                   size={16}
                   style={{
                     position: 'absolute',
@@ -220,16 +221,21 @@ export default function LoginPage() {
                     color: 'var(--clr-text-3)',
                   }}
                 />
+                {/* type="text", not "email": the browser would refuse an
+                    admission number as an invalid address. */}
                 <input
-                  id="email"
-                  type="email"
+                  id="identifier"
+                  type="text"
                   className="form-control"
                   style={{ paddingLeft: 40 }}
-                  placeholder="you@school.edu.ng"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@school.edu.ng or AO260012"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   required
-                  autoComplete="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
               </div>
             </div>
@@ -336,7 +342,8 @@ export default function LoginPage() {
               color: 'var(--clr-text-3)',
             }}
           >
-            Contact your school administrator for account access.
+            Students sign in with the admission number on their login slip. Lost
+            it? Ask the school office for a new one.
           </p>
         </div>
       </div>

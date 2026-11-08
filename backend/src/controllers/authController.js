@@ -9,6 +9,20 @@ const { sendSuccess, sendError } = require('../utils/apiResponse');
 const { emailTemplates } = require('../services/notificationService');
 const { enqueueEmail } = require('../services/jobQueue');
 const audit = require('../services/auditService');
+const { hasMailbox } = require('../utils/mailbox');
+const {
+  isEmailIdentifier,
+  normalizeAdmissionNumber,
+  normalizeEmailIdentifier,
+  rawLoginIdentifier,
+} = require('../utils/loginIdentifier');
+
+// What the audit log calls an account. A student with no email is known by
+// their admission number, not by an address nobody can read.
+const accountLabel = (user) =>
+  hasMailbox(user.email)
+    ? user.email
+    : user.studentProfile?.admissionNumber || String(user._id);
 
 /**
  * Record a refresh token as a live session so it can later be revoked.
@@ -42,8 +56,11 @@ const register = async (req, res) => {
     parentProfile,
   } = req.body;
 
-  const existingUser = await User.findOne({ email });
-  if (existingUser) return sendError(res, 400, 'Email already registered');
+  // A student created with no email gets a placeholder address in the model.
+  if (email) {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return sendError(res, 400, 'Email already registered');
+  }
 
   // Helper to convert empty strings to null for ObjectId fields
   const cleanObjectId = (val) => (val === '' || !val ? null : val);
@@ -51,7 +68,7 @@ const register = async (req, res) => {
   const user = await User.create({
     firstName,
     lastName,
-    email,
+    email: email || undefined,
     password,
     role,
     phone,
@@ -86,20 +103,24 @@ const register = async (req, res) => {
 
   // Welcome email carrying the credentials the admin just set. Sent before
   // `password` is cleared below, and never allowed to fail the registration —
-  // the account exists either way.
-  enqueueEmail({
-    to: user.email,
-    subject: 'Your account is ready',
-    html: emailTemplates.welcome({
-      firstName: user.firstName,
-      email: user.email,
-      password,
-      role: user.role,
-      loginUrl: `${clientUrl()}/login`,
-    }),
-  }).catch((err) =>
-    console.error(`Welcome email failed for ${user.email}: ${err.message}`),
-  );
+  // the account exists either way. A student with no mailbox has none sent;
+  // the admin chose the password and hands it over on a login slip.
+  const emailed = hasMailbox(user.email);
+  if (emailed) {
+    enqueueEmail({
+      to: user.email,
+      subject: 'Your account is ready',
+      html: emailTemplates.welcome({
+        firstName: user.firstName,
+        email: user.email,
+        password,
+        role: user.role,
+        loginUrl: `${clientUrl()}/login`,
+      }),
+    }).catch((err) =>
+      console.error(`Welcome email failed for ${user.email}: ${err.message}`),
+    );
+  }
 
   user.password = undefined;
 
@@ -110,7 +131,7 @@ const register = async (req, res) => {
     entityLabel: `${user.firstName} ${user.lastName}`,
     subject: user.role === 'Student' ? user._id : undefined,
     meta: {
-      email: user.email,
+      email: emailed ? user.email : undefined,
       role: user.role,
       admissionNumber: user.studentProfile?.admissionNumber,
       staffId: user.teacherProfile?.staffId,
@@ -125,14 +146,31 @@ const register = async (req, res) => {
 // @access  Public
 
 const login = async (req, res) => {
-  const { email, password } = req.body;
+  // loginRules normalises this already. Done again here (it is idempotent) so
+  // the lookup never depends on a validator having run: a client sending the
+  // older `email` field, or a route mounted without the rules, still works.
+  const { password } = req.body;
+  const typed = String(rawLoginIdentifier(req.body) || '').trim();
+  const identifier = isEmailIdentifier(typed)
+    ? normalizeEmailIdentifier(typed)
+    : normalizeAdmissionNumber(typed);
 
-  if (!email || !password) {
-    return sendError(res, 400, 'Email and password are required');
+  if (!identifier || !password) {
+    return sendError(
+      res,
+      400,
+      'Email or admission number, and password, are required',
+    );
   }
 
+  // An admission number only ever names a student. Staff and parents sign in
+  // with their email, which is also where a forgotten password goes.
+  const query = isEmailIdentifier(identifier)
+    ? { email: identifier }
+    : { role: 'Student', 'studentProfile.admissionNumber': identifier };
+
   // 🔐 Get user with password
-  const user = await User.findOne({ email }).select('+password');
+  const user = await User.findOne(query).select('+password');
   if (!user) return sendError(res, 401, 'Invalid credentials');
 
   const isMatch = await user.comparePassword(password);
@@ -141,7 +179,7 @@ const login = async (req, res) => {
       action: 'auth.login',
       entity: 'User',
       entityId: user._id,
-      entityLabel: user.email,
+      entityLabel: accountLabel(user),
       outcome: 'failure',
       reason: 'Incorrect password',
     });
@@ -187,7 +225,7 @@ const login = async (req, res) => {
     action: 'auth.login',
     entity: 'User',
     entityId: user._id,
-    entityLabel: user.email,
+    entityLabel: accountLabel(user),
   });
 
   return sendSuccess(res, 200, 'Login successful', {
@@ -244,7 +282,7 @@ const updatePassword = async (req, res) => {
     action: 'auth.password_change',
     entity: 'User',
     entityId: user._id,
-    entityLabel: user.email,
+    entityLabel: accountLabel(user),
   });
 
   return sendSuccess(res, 200, 'Password updated successfully', {
@@ -333,7 +371,7 @@ const resetPassword = async (req, res) => {
     action: 'auth.password_reset',
     entity: 'User',
     entityId: user._id,
-    entityLabel: user.email,
+    entityLabel: accountLabel(user),
   });
 
   const accessToken = user.generateAccessToken();

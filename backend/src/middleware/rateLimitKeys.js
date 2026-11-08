@@ -1,4 +1,10 @@
 const jwt = require('jsonwebtoken');
+const {
+  isEmailIdentifier,
+  normalizeAdmissionNumber,
+  normalizeEmailIdentifier,
+  rawLoginIdentifier,
+} = require('../utils/loginIdentifier');
 
 /**
  * What a rate limit should count.
@@ -65,10 +71,15 @@ const byLoginTarget = (req) => {
   // typed. It must reduce it exactly as the validator will (see
   // NORMALIZE_EMAIL_OPTIONS), or one account can be attacked under many
   // spellings, each with its own budget.
-  const email = String(req.body?.email || '')
-    .trim()
-    .toLowerCase()
-    .replace(/@googlemail\.com$/, '@gmail.com');
+  const typed = String(rawLoginIdentifier(req.body) || '').trim();
+
+  // A student signing in with an admission number, reduced exactly as the
+  // login validator reduces it, for the same reason as the address below.
+  if (typed && !isEmailIdentifier(typed)) {
+    return `login:adm:${normalizeAdmissionNumber(typed)}`;
+  }
+
+  const email = normalizeEmailIdentifier(typed);
 
   return email ? `login:${email}` : `login-ip:${normalizeIp(req.ip)}`;
 };

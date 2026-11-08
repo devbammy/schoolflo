@@ -95,6 +95,18 @@ describe('the inline fallback', () => {
     expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
+  // A student who signs in with an admission number. Queued, the job could
+  // only fail and be retried with backoff until it gave up.
+  it('never queues or sends to an address with no mailbox', async () => {
+    const result = await enqueueEmail({
+      to: 'student-65f0c0ffee@no-email.invalid',
+      subject: 'Announcement',
+    });
+
+    expect(result).toMatchObject({ success: false, skipped: true });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
   it('skips bulk recipients with no address', async () => {
     const result = await enqueueBulkEmail(
       [{ email: 'ok@school.ng' }, { email: '' }, {}],

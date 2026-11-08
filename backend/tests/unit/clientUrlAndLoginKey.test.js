@@ -29,4 +29,21 @@ describe('byLoginTarget', () => {
   it('keeps +tagged addresses separate, as the login lookup does', () => {
     expect(key('parent+kid@gmail.com')).not.toBe(key('parent@gmail.com'));
   });
+
+  // Students sign in with an admission number, typed on a phone that
+  // capitalises and spaces it. Each spelling must share one budget.
+  it('counts every spelling of one admission number as one account', () => {
+    const typed = (identifier) =>
+      byLoginTarget({ body: { identifier }, ip: '1.2.3.4' });
+
+    expect(typed(' ao 260012')).toBe(typed('AO260012'));
+    expect(typed('AO260012')).not.toBe(typed('AO260013'));
+    expect(typed('AO260012')).not.toMatch(/ip/);
+  });
+
+  it('reads the identifier field as well as the older email field', () => {
+    expect(
+      byLoginTarget({ body: { identifier: 'Teacher@School.com' }, ip: '1' }),
+    ).toBe(key('teacher@school.com'));
+  });
 });

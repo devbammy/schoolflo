@@ -271,8 +271,12 @@ student is in it, was in it that session, or the row is already filed there.
   staff IDs come from a `pre('save')` hook, and `insertMany` skips save
   middleware — a bulk insert silently produces students with no admission
   number. Same family of trap as `bulkWrite` and the Result hooks.
-- Passwords are generated server-side, emailed, and never stored or returned.
-  The CSV never carries one.
+- Passwords are generated server-side and never stored, and the CSV never
+  carries one. They are emailed, except to a **student with no email**, whose
+  password comes back once in the commit response, for a printed login slip.
+- **A student's email is optional.** See "Students with no email" below. Since
+  nothing unique then guards against a second import, a student whose name is
+  already in that class is refused.
 - **The client commits in batches of 20.** Each account costs a bcrypt hash, so
   one request for a large file outlasted the timeout: the admin was told it had
   failed while the server carried on creating accounts. A batch that gets no
@@ -297,6 +301,27 @@ student is in it, was in it that session, or the row is already filed there.
   column and that suite fails until the doc is updated — which is the point,
   because a doc that lies sends a school off to fix a file that was never
   wrong.
+
+### Students with no email
+
+Most pupils have none, so a student may be created without one. They sign in
+with their **admission number** and a password the admin prints on a slip.
+
+- **The account still has an address**: `student-<id>@no-email.invalid`, set in
+  `pre('validate')`. `email` stays required and unique, so the production
+  index needs no migration. Ask `hasMailbox()` (`utils/mailbox.js`) before
+  treating an address as real; `sendEmail` and `enqueueEmail` already do.
+- **Search on email through `emailMatches()`**, or "student" matches every pupil
+  with no address.
+- **Login takes `identifier`**: an email if it contains `@`, otherwise an
+  admission number, which only ever finds a student. `utils/loginIdentifier.js`
+  normalises it, and the login limiter keys on the same value. Change one
+  without the other and each spelling gets its own budget.
+- **A slip password is in clear in one place only**: the response that made it,
+  sent `no-store`. Never log it, store it, or email it.
+- **Never one shared password for all students.** It was asked for. Admission
+  numbers are guessable, so it would open every child's records to every
+  child.
 
 ### Audit log
 
@@ -478,7 +503,7 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 36 suites, 563 tests, Jest, `maxWorkers: 1`. The integration
+`pnpm test` — 37 suites, 588 tests, Jest, `maxWorkers: 1`. The integration
 suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
 and take from about three minutes to ten on a slow machine, mostly bcrypt at
 cost 12. Tests that exercise failures log to the console by design, so judge a
@@ -552,6 +577,9 @@ Client code has **no test runner**. The check is that it lints and builds.
 | Client's copy of the feature set | `client/src/store/featureStore.js` |
 | Printable timetable grid | `client/src/components/common/PrintableTimetable.jsx` |
 | Bulk import UI | `client/src/components/common/BulkImportModal.jsx` |
+| Has this account a real mailbox? | `backend/src/utils/mailbox.js` |
+| Email or admission number at login | `backend/src/utils/loginIdentifier.js` |
+| Printable login slips | `client/src/components/common/LoginSlips.jsx` |
 | Axios interceptors + auth bridge | `client/src/services/api.js` |
 | Dashboard building blocks (tiles, noticeboard, calendar, charts) | `client/src/components/dashboard/DashboardParts.jsx` |
 | Account menu (change password, sign out) | `client/src/components/layout/UserMenu.jsx` |

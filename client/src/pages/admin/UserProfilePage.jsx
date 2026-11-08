@@ -20,6 +20,7 @@ import {
 import { format } from 'date-fns';
 import { userService } from '../../services/api';
 import toast from 'react-hot-toast';
+import { shownEmail } from '../../utils/mailbox';
 
 // ── Shared bits ──────────────────────────────────────────────────────────────
 const fmtDate = (d) => (d ? format(new Date(d), 'dd MMM yyyy') : '—');
@@ -280,7 +281,9 @@ export default function UserProfilePage() {
               <span
                 style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <Mail size={14} /> {user.email}
+                <Mail size={14} />{' '}
+                {shownEmail(user.email) ||
+                  'No email · signs in with admission number'}
               </span>
               {user.phone && (
                 <span

@@ -6,6 +6,7 @@ const { Assignment } = require('../models/Assignment');
 const { Book } = require('../models/Library');
 const Task = require('../models/Task');
 const { getTeacherClassIds } = require('../utils/teacherScope');
+const { emailMatches } = require('../utils/mailbox');
 
 /**
  * One search box for the whole portal.
@@ -58,7 +59,7 @@ const searchStudents = async (pattern, { user, limit }) => {
     $or: [
       { firstName: pattern },
       { lastName: pattern },
-      { email: pattern },
+      emailMatches(pattern),
       { 'studentProfile.admissionNumber': pattern },
     ],
   };

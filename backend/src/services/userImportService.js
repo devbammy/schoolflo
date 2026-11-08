@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const Class = require('../models/Class');
 const { parseCsv, toCsv } = require('../utils/csv');
+const { readablePassword } = require('../utils/loginPassword');
 
 /**
  * Turning a spreadsheet into accounts.
@@ -30,8 +31,12 @@ const MAX_IMPORT_ROWS = 150;
 // than rejected: schools export from systems that add columns nobody asked for.
 const COLUMNS = {
   Student: {
-    required: ['firstname', 'lastname', 'email'],
+    required: ['firstname', 'lastname'],
     optional: [
+      // Optional for a student, because most pupils have none. A student
+      // without one signs in with their admission number and a password the
+      // admin prints on a login slip (see utils/mailbox).
+      'email',
       'phone',
       'class',
       'section',
@@ -163,6 +168,48 @@ const validateRows = async (rows, role) => {
   const seen = new Map();
   emails.forEach((email) => seen.set(email, (seen.get(email) || 0) + 1));
 
+  // The same child imported twice. An email used to make that impossible, as
+  // the second attempt found the address taken. A student with no email has
+  // nothing unique to collide on, so running a file again (or retrying a batch
+  // that never answered, which may have gone through) would enrol every child
+  // in it a second time. A name already in the same class stops that.
+  const studentKey = (first, last, classId) =>
+    [first, last, classId || '']
+      .map((v) => String(v).trim().toLowerCase())
+      .join('|');
+
+  const enrolled = new Set();
+  const inFile = new Map();
+
+  if (role === 'Student') {
+    const firsts = [
+      ...new Set(
+        rows.map((r) => String(r.firstname || '').trim()).filter(Boolean),
+      ),
+    ];
+    const existing = firsts.length
+      ? await User.find({ role: 'Student', firstName: { $in: firsts } })
+          .collation({ locale: 'en', strength: 2 })
+          .select('firstName lastName studentProfile.class')
+          .lean()
+      : [];
+    existing.forEach((s) =>
+      enrolled.add(
+        studentKey(s.firstName, s.lastName, s.studentProfile?.class),
+      ),
+    );
+
+    rows.forEach((r) => {
+      const found = classByName.get(
+        String(r.class || '')
+          .trim()
+          .toLowerCase(),
+      );
+      const key = studentKey(r.firstname || '', r.lastname || '', found?._id);
+      inFile.set(key, (inFile.get(key) || 0) + 1);
+    });
+  }
+
   return rows.map((row) => {
     const errors = [];
     const email = String(row.email || '')
@@ -182,14 +229,16 @@ const validateRows = async (rows, role) => {
       errors.push('email appears more than once in this file');
 
     const profile = {};
+    let className;
 
     if (role === 'Student') {
-      const className = String(row.class || '').trim();
-      if (className) {
-        const found = classByName.get(className.toLowerCase());
-        if (!found) errors.push(`class "${className}" does not exist`);
+      const classTyped = String(row.class || '').trim();
+      if (classTyped) {
+        const found = classByName.get(classTyped.toLowerCase());
+        if (!found) errors.push(`class "${classTyped}" does not exist`);
         else {
           profile.class = found._id;
+          className = found.name;
 
           const section = String(row.section || '').trim();
           if (section) {
@@ -224,6 +273,20 @@ const validateRows = async (rows, role) => {
 
       const address = String(row.address || '').trim();
       if (address) profile.address = address;
+
+      if (firstName && lastName) {
+        const key = studentKey(firstName, lastName, profile.class);
+        const where = className ? `in ${className}` : 'with no class';
+        if (enrolled.has(key)) {
+          errors.push(
+            `${firstName} ${lastName} is already enrolled ${where}. If this is a different child, add them on the Students page`,
+          );
+        } else if (inFile.get(key) > 1) {
+          errors.push(
+            `${firstName} ${lastName} appears more than once ${where} in this file`,
+          );
+        }
+      }
     }
 
     // ── The parent named on this row, if any ─────────────────────────────
@@ -245,7 +308,7 @@ const validateRows = async (rows, role) => {
           errors.push('parentEmail is required when a parent is named');
         } else if (!EMAIL_SHAPE.test(parentEmail)) {
           errors.push('parentEmail is not a valid address');
-        } else if (parentEmail === email) {
+        } else if (email && parentEmail === email) {
           errors.push('parentEmail cannot be the same as the student email');
         } else if (seen.get(parentEmail)) {
           // The address is also a student in this file, so it cannot be both.
@@ -316,6 +379,7 @@ const validateRows = async (rows, role) => {
         phone: String(row.phone || '').trim() || undefined,
         role,
         profile,
+        className,
       },
       parent,
     };
@@ -452,20 +516,27 @@ const createUsers = async (rows, role) => {
     if (!entry.valid) {
       failed.push({
         line: entry.line,
-        email: entry.user.email,
+        // The name too: a student with no email is otherwise just a number.
+        name: `${entry.user.firstName} ${entry.user.lastName}`.trim(),
+        email: entry.user.email || null,
         errors: entry.errors,
       });
       continue;
     }
 
-    const password = generatePassword();
-    const { firstName, lastName, email, phone, profile } = entry.user;
+    const { firstName, lastName, email, phone, profile, className } =
+      entry.user;
+
+    // Emailed passwords are random characters, because they are pasted. One
+    // printed on a slip is typed by a child, so it is words (utils/loginPassword).
+    const onSlip = !email;
+    const password = onSlip ? readablePassword() : generatePassword();
 
     try {
       const user = await User.create({
         firstName,
         lastName,
-        email,
+        email: email || undefined,
         password,
         phone,
         role,
@@ -481,8 +552,12 @@ const createUsers = async (rows, role) => {
         _id: user._id,
         firstName,
         lastName,
-        email,
-        password, // handed to the caller for the welcome email, never stored
+        email: email || null,
+        // Handed to the caller and never stored: emailed when there is an
+        // address, otherwise returned once to the admin for the login slip.
+        password,
+        onSlip,
+        className,
         admissionNumber: user.studentProfile?.admissionNumber,
         staffId: user.teacherProfile?.staffId,
       };
@@ -524,9 +599,10 @@ const createUsers = async (rows, role) => {
       // the preview and now. One row failing must not abandon the rest.
       failed.push({
         line: entry.line,
-        email,
+        name: `${firstName} ${lastName}`.trim(),
+        email: email || null,
         errors: [
-          err?.code === 11000
+          err?.code === 11000 && email
             ? 'email was taken while this import was being reviewed'
             : err.message,
         ],
@@ -563,10 +639,12 @@ const buildTemplate = (role) => {
         '08030000009',
         'Mother',
       ],
+      // No email: Emeka signs in with his admission number, and his
+      // password comes back to the admin for a printed login slip.
       [
         'Emeka',
         'Obi',
-        'emeka.obi@example.com',
+        '',
         '',
         'JSS 1',
         'B',

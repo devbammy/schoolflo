@@ -1,0 +1,109 @@
+/**
+ * Login slips: a preview table on screen, and a sheet of cut-out slips for the
+ * printer. Two slips across an A4 page, each kept whole across page breaks.
+ */
+
+.login-slips {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+
+  &__preview {
+    width: 100%;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  // Read aloud and typed by a child, so it is set apart from the prose and
+  // never broken across lines.
+  &__code {
+    font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+  }
+
+  &__offscreen {
+    position: absolute;
+    left: -10000px;
+    top: 0;
+    width: 760px; // an A4 portrait sheet, so the clone has real widths
+    pointer-events: none;
+  }
+}
+
+.slip-sheet {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  font-family: var(--font-body, system-ui, sans-serif);
+  color: #111;
+  background: #fff;
+}
+
+.slip {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  border: 1px dashed #888; // the line to cut along
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: #444;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 6px;
+  }
+
+  &__school {
+    font-weight: 700;
+    color: #111;
+  }
+
+  &__name {
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  &__creds {
+    margin: 0;
+    display: grid;
+    gap: 6px;
+
+    dt {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #555;
+    }
+
+    dd {
+      margin: 0;
+      font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+      font-size: 1.15rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+  }
+
+  &__how {
+    margin: 0;
+    font-size: 0.7rem;
+    line-height: 1.45;
+    color: #333;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media print {
+  .login-slips__offscreen {
+    position: static;
+    left: auto;
+    width: auto;
+  }
+}

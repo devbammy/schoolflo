@@ -5,6 +5,14 @@ const {
   optionalObjectIdBody,
   NORMALIZE_EMAIL_OPTIONS,
 } = require('./common');
+const {
+  ADMISSION_NUMBER_SHAPE,
+  EMAIL_SHAPE,
+  isEmailIdentifier,
+  normalizeAdmissionNumber,
+  normalizeEmailIdentifier,
+  rawLoginIdentifier,
+} = require('../utils/loginIdentifier');
 
 const emailRule = (field = 'email') =>
   body(field)
@@ -31,8 +39,36 @@ const passwordRule = (field = 'password', label = 'Password') =>
     .isLength({ min: 8, max: 128 })
     .withMessage(`${label} must be between 8 and 128 characters.`);
 
+// One box takes either an email or a student's admission number (see
+// utils/loginIdentifier). Older clients send the same thing as `email`.
 const loginRules = [
-  emailRule(),
+  body('identifier')
+    .customSanitizer((value, { req }) => rawLoginIdentifier(req.body))
+    .exists({ checkFalsy: true })
+    .withMessage('Enter your email or admission number.')
+    .bail()
+    .isString()
+    .withMessage('Enter your email or admission number.')
+    .bail()
+    .trim()
+    .custom((value) => {
+      if (isEmailIdentifier(value)) {
+        if (!EMAIL_SHAPE.test(value)) {
+          throw new Error('Enter a valid email address.');
+        }
+        return true;
+      }
+      if (!ADMISSION_NUMBER_SHAPE.test(normalizeAdmissionNumber(value))) {
+        throw new Error('Enter a valid email or admission number.');
+      }
+      return true;
+    })
+    .bail()
+    .customSanitizer((value) =>
+      isEmailIdentifier(value)
+        ? normalizeEmailIdentifier(value)
+        : normalizeAdmissionNumber(value),
+    ),
   body('password')
     .exists({ checkFalsy: true })
     .withMessage('Password is required.'),
@@ -41,7 +77,17 @@ const loginRules = [
 const registerRules = [
   stringBody('firstName', 'First name', { min: 1, max: 50 }),
   stringBody('lastName', 'Last name', { min: 1, max: 50 }),
-  emailRule(),
+  // A student may have no email: they sign in with their admission number
+  // (see utils/mailbox). Staff and parents always need one, because that is
+  // where a forgotten password is reset.
+  body('email')
+    .if((value, { req }) => req.body.role !== 'Student' || Boolean(value))
+    .exists({ checkFalsy: true })
+    .withMessage('Email is required.')
+    .bail()
+    .isEmail()
+    .withMessage('Enter a valid email address.')
+    .normalizeEmail(NORMALIZE_EMAIL_OPTIONS),
   passwordRule(),
   body('role')
     .exists({ checkFalsy: true })

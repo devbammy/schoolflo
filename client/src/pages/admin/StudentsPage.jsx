@@ -13,12 +13,16 @@ import {
   UserCheck,
   UserX,
   Eye,
+  KeyRound,
 } from 'lucide-react';
 import { userService, classService } from '../../services/api';
 import SortSelect, { DEFAULT_SORT } from '../../components/common/SortSelect';
 import toast from 'react-hot-toast';
 import useQuickAction from '../../utils/useQuickAction';
 import BulkImportModal from '../../components/common/BulkImportModal';
+import Modal from '../../components/common/Modal';
+import LoginSlips from '../../components/common/LoginSlips';
+import { shownEmail } from '../../utils/mailbox';
 
 // How each fee-status value from the API renders in the table.
 const FEE_STATUS = {
@@ -77,6 +81,11 @@ export default function StudentsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [stats, setStats] = useState(null);
   const [importing, setImporting] = useState(false);
+  // A login slip to print: a new password issued here, or the one just typed
+  // for a student created with no email. Held only while the modal is open.
+  const [slip, setSlip] = useState(null);
+  const [slipFor, setSlipFor] = useState(null);
+  const [issuing, setIssuing] = useState(false);
 
   // The overview is school-wide, so it is fetched independently of the table's
   // search / class / page filters. `limit: 1` — we only want the counts.
@@ -146,7 +155,7 @@ export default function StudentsPage() {
     setForm({
       firstName: s.firstName,
       lastName: s.lastName,
-      email: s.email,
+      email: shownEmail(s.email),
       phone: s.phone || '',
       role: 'Student',
       studentProfile: {
@@ -170,8 +179,23 @@ export default function StudentsPage() {
     setSaving(true);
     try {
       if (modal === 'create') {
-        await userService.create(form);
-        toast.success('Student created and welcome email sent');
+        const { data } = await userService.create(form);
+        if (form.email) {
+          toast.success('Student created and welcome email sent');
+        } else {
+          // No email, so no welcome email: the admin hands the password they
+          // just typed over on a slip, with the admission number made now.
+          const created = data.data.user;
+          const cls = classes.find((c) => c._id === form.studentProfile.class);
+          setSlip({
+            firstName: created.firstName,
+            lastName: created.lastName,
+            className: cls?.name || null,
+            admissionNumber: created.studentProfile?.admissionNumber,
+            password: form.password,
+          });
+          toast.success('Student created');
+        }
       } else {
         await userService.update(selected._id, form);
         toast.success('Student updated');
@@ -183,6 +207,21 @@ export default function StudentsPage() {
       toast.error(err.response?.data?.message || 'Operation failed');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // A new password replaces the old one and signs the student out everywhere,
+  // so it is confirmed first.
+  const issueSlip = async () => {
+    setIssuing(true);
+    try {
+      const { data } = await userService.issueLoginSlip(slipFor._id);
+      setSlip(data.data.slip);
+      setSlipFor(null);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not issue a new slip');
+    } finally {
+      setIssuing(false);
     }
   };
 
@@ -412,7 +451,11 @@ export default function StudentsPage() {
                               color: 'var(--clr-text-3)',
                             }}
                           >
-                            {s.email}
+                            {shownEmail(s.email) ||
+                              `No email · signs in with ${
+                                s.studentProfile?.admissionNumber ||
+                                'admission no.'
+                              }`}
                           </div>
                         </div>
                       </div>
@@ -488,6 +531,13 @@ export default function StudentsPage() {
                           title="Edit"
                         >
                           <Edit2 size={14} />
+                        </button>
+                        <button
+                          className="btn btn--ghost btn--sm btn--icon"
+                          onClick={() => setSlipFor(s)}
+                          title="New password and login slip"
+                        >
+                          <KeyRound size={14} />
                         </button>
                         <button
                           className="btn btn--ghost btn--sm btn--icon"
@@ -580,7 +630,7 @@ export default function StudentsPage() {
                   {[
                     ['firstName', 'First Name', 'text'],
                     ['lastName', 'Last Name', 'text'],
-                    ['email', 'Email', 'email'],
+                    ['email', 'Email (optional)', 'email'],
                     ['phone', 'Phone', 'tel'],
                   ].map(([field, label, type]) => (
                     <div
@@ -592,9 +642,7 @@ export default function StudentsPage() {
                       <input
                         type={type}
                         className="form-control"
-                        required={['firstName', 'lastName', 'email'].includes(
-                          field,
-                        )}
+                        required={['firstName', 'lastName'].includes(field)}
                         value={form[field]}
                         onChange={(e) => setField(field, e.target.value)}
                       />
@@ -776,6 +824,71 @@ export default function StudentsPage() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={Boolean(slipFor)}
+        onClose={() => setSlipFor(null)}
+        title="Issue a new login slip?"
+        maxWidth={440}
+        footer={
+          <>
+            <button
+              className="btn btn--secondary"
+              onClick={() => setSlipFor(null)}
+              disabled={issuing}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn--primary"
+              onClick={issueSlip}
+              disabled={issuing}
+            >
+              <KeyRound size={14} /> {issuing ? 'Issuing…' : 'New password'}
+            </button>
+          </>
+        }
+      >
+        <p style={{ marginTop: 0 }}>
+          {slipFor?.firstName} {slipFor?.lastName} gets a new password, and the
+          old one stops working at once. They are signed out on every device.
+        </p>
+        <p
+          style={{
+            fontSize: '0.875rem',
+            color: 'var(--clr-text-3)',
+            marginBottom: 0,
+          }}
+        >
+          Use this when a slip is lost or a password is forgotten. The student
+          can change the new password themselves after signing in.
+        </p>
+      </Modal>
+
+      <Modal
+        open={Boolean(slip)}
+        onClose={() => {
+          if (
+            window.confirm(
+              'Close the slip? The password cannot be shown again once this closes.',
+            )
+          ) {
+            setSlip(null);
+          }
+        }}
+        title="Login slip"
+        maxWidth={620}
+      >
+        {slip && (
+          <>
+            <p style={{ marginTop: 0, fontSize: '0.875rem' }}>
+              Print this and hand it to the student. The password is shown only
+              now.
+            </p>
+            <LoginSlips slips={[slip]} buttonLabel="Print slip" />
+          </>
+        )}
+      </Modal>
     </>
   );
 }

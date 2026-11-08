@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Modal from './Modal';
+import LoginSlips from './LoginSlips';
 import api, { userService } from '../../services/api';
 
 /**
@@ -45,6 +46,9 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null);
   const [dragging, setDragging] = useState(false);
+  // Whether the slips have been printed. Closing first loses the passwords,
+  // because the server never had them in a form it can give back.
+  const [slipsPrinted, setSlipsPrinted] = useState(false);
   const inputRef = useRef(null);
 
   const label = role.toLowerCase();
@@ -56,12 +60,24 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
     setResult(null);
     setBusy(false);
     setDragging(false);
+    setSlipsPrinted(false);
   }, []);
 
+  const unprintedSlips =
+    step === STEP.DONE && result?.slips?.length > 0 && !slipsPrinted;
+
   const close = useCallback(() => {
+    if (
+      unprintedSlips &&
+      !window.confirm(
+        'The login slips have not been printed. Once this closes the passwords cannot be shown again, and each student would need a new slip. Close anyway?',
+      )
+    ) {
+      return;
+    }
     reset();
     onClose();
-  }, [reset, onClose]);
+  }, [reset, onClose, unprintedSlips]);
 
   const downloadTemplate = async () => {
     try {
@@ -112,6 +128,7 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
       created: [],
       failed: [],
       parentsCreated: [],
+      slips: [],
       summary: {
         requested: rows.length,
         created: 0,
@@ -132,6 +149,7 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
         merged.created.push(...data.data.created);
         merged.failed.push(...data.data.failed);
         merged.parentsCreated.push(...data.data.parentsCreated);
+        merged.slips.push(...(data.data.slips || []));
         merged.summary.parentsLinked += data.data.summary.parentsLinked;
       } catch (err) {
         // Stop rather than press on: this may be a connection that has gone.
@@ -144,6 +162,7 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
         rows.slice(start).forEach((row, index) => {
           merged.failed.push({
             line: row._line,
+            name: `${row.firstname || ''} ${row.lastname || ''}`.trim(),
             email: row.email,
             errors: [
               index < batch.length
@@ -235,7 +254,7 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
             marginTop: 4,
           }}
         >
-          Up to 1,000 rows
+          Up to 150 rows. Split a bigger file, one class per file works well.
         </div>
       </div>
 
@@ -326,7 +345,11 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
                     wordBreak: 'break-all',
                   }}
                 >
-                  {row.user.email || '—'}
+                  {row.user.email || (
+                    <span style={{ color: 'var(--clr-text-3)' }}>
+                      none, gets a login slip
+                    </span>
+                  )}
                 </td>
                 {showsParents && (
                   <td
@@ -386,6 +409,8 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
         }}
       >
         Each new account gets its own password, sent to them by email.
+        {role === 'Student' &&
+          ' A student with no email signs in with their admission number instead, and you print their password on a login slip after the import.'}
         {newParents > 0 &&
           ` ${newParents} parent account${newParents === 1 ? '' : 's'} will also be created — siblings sharing an address get one account.`}{' '}
         Rejected rows are skipped — nothing about them is created.
@@ -420,7 +445,11 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
               marginTop: 2,
             }}
           >
-            Each one has been emailed their password.
+            {result.slips.length === 0
+              ? 'Each one has been emailed their password.'
+              : result.slips.length === result.summary.created
+                ? 'None of them has an email, so each needs a login slip.'
+                : `Those with an email have been sent their password. ${result.slips.length} need a login slip.`}
             {result.summary.parentsCreated > 0 &&
               ` ${result.summary.parentsCreated} parent account${
                 result.summary.parentsCreated === 1 ? '' : 's'
@@ -428,6 +457,31 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
           </div>
         </div>
       </div>
+
+      {result.slips.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <div
+            style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: 4 }}
+          >
+            Login slips
+          </div>
+          <p
+            style={{
+              fontSize: '0.8125rem',
+              color: 'var(--clr-warning)',
+              marginTop: 0,
+            }}
+          >
+            Print these now. The passwords are shown only once: after this
+            window closes, a student who never got theirs needs a new slip from
+            the Students page.
+          </p>
+          <LoginSlips
+            slips={result.slips}
+            onPrinted={() => setSlipsPrinted(true)}
+          />
+        </div>
+      )}
 
       {result.failed.length > 0 && (
         <div style={{ marginTop: 18 }}>
@@ -447,7 +501,9 @@ export default function BulkImportModal({ open, onClose, role, onImported }) {
                     <td style={{ width: 56, color: 'var(--clr-text-3)' }}>
                       {f.line}
                     </td>
-                    <td style={{ fontSize: '0.8125rem' }}>{f.email || '—'}</td>
+                    <td style={{ fontSize: '0.8125rem' }}>
+                      {f.name || f.email || '—'}
+                    </td>
                     <td
                       style={{
                         fontSize: '0.75rem',

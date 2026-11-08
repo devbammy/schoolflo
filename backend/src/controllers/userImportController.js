@@ -73,7 +73,20 @@ const commitUserImport = async (req, res) => {
       console.error(`Welcome email failed for ${person.email}: ${err.message}`),
     );
 
-  created.forEach((user) => welcome(user, role));
+  created.filter((user) => !user.onSlip).forEach((user) => welcome(user, role));
+
+  // Students with no email of their own. Their passwords go back to the admin,
+  // in this response only, to print on login slips. Nothing else ever sees
+  // them: not the database, not the audit log, not an email.
+  const slips = created
+    .filter((user) => user.onSlip)
+    .map((user) => ({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      className: user.className || null,
+      admissionNumber: user.admissionNumber,
+      password: user.password,
+    }));
 
   // Only parents this import actually created. One that already existed keeps
   // the password it has — resending would be a password nobody asked to change.
@@ -90,14 +103,22 @@ const commitUserImport = async (req, res) => {
       failed: failed.length,
       parentsCreated: (parentsCreated || []).length,
       // The addresses, so the log answers "who did this import create".
-      // Passwords are never written anywhere but the email.
-      emails: created.map((u) => u.email),
+      // Passwords are never written anywhere but the email or the slip.
+      emails: created.filter((u) => u.email).map((u) => u.email),
+      admissionNumbers: created
+        .filter((u) => u.onSlip)
+        .map((u) => u.admissionNumber),
       parentEmails: (parentsCreated || []).map((p) => p.email),
     },
   });
 
+  // The body carries passwords whenever there are slips. Nothing between here
+  // and the admin's screen may keep a copy.
+  res.set('Cache-Control', 'no-store');
+
   return sendSuccess(res, 201, `Created ${created.length} of ${rows.length}`, {
     created: created.map(({ password, ...safe }) => safe),
+    slips,
     failed,
     parentsCreated: (parentsCreated || []).map(({ password, ...safe }) => safe),
     summary: {
@@ -106,6 +127,7 @@ const commitUserImport = async (req, res) => {
       failed: failed.length,
       parentsCreated: (parentsCreated || []).length,
       parentsLinked: created.filter((u) => u.parentLinked).length,
+      slips: slips.length,
     },
   });
 };

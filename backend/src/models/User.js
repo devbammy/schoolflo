@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { ROLES } = require('../config/constants');
+const { placeholderEmail } = require('../utils/mailbox');
 
 const UserSchema = new mongoose.Schema(
   {
@@ -132,6 +133,17 @@ UserSchema.virtual('fullName').get(function () {
 
 // Indexes
 UserSchema.index({ role: 1 });
+
+// A student with no email of their own gets an address that can never receive
+// mail, so `email` stays required and unique for everyone (see utils/mailbox).
+// pre('validate'), not pre('save'): validation runs first, and a required field
+// filled in by a save hook can never be satisfied.
+UserSchema.pre('validate', function (next) {
+  if (this.role === 'Student' && !this.email) {
+    this.email = placeholderEmail(this._id);
+  }
+  next();
+});
 
 // Admission Number and harshed password
 UserSchema.pre('save', async function (next) {

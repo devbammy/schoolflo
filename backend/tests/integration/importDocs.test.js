@@ -97,6 +97,13 @@ describe('CSV_IMPORT.md worked example', () => {
     expect(result.rows[1].user.phone).toBeUndefined();
   });
 
+  it('accepts the student with no email, as the document promises', async () => {
+    const result = await previewImport(Buffer.from(example, 'utf8'), 'Student');
+
+    expect(result.rows[1].user.email).toBe('');
+    expect(result.rows[1].valid).toBe(true);
+  });
+
   it('keeps the quoted comma in the address, as the document points out', async () => {
     const result = await previewImport(Buffer.from(example, 'utf8'), 'Student');
 
@@ -140,8 +147,12 @@ describe('CSV_IMPORT.md column tables', () => {
 });
 
 describe('CSV_IMPORT.md stated limits', () => {
+  // The cap the admin actually meets. The CSV parser has a looser one of its
+  // own (1,000), and the doc quoted that in its Limits table after the import
+  // cap fell to 150, while the page above it said 150.
   it('quotes the real row cap', () => {
-    const { MAX_ROWS } = require('../../src/utils/csv');
-    expect(doc).toContain(MAX_ROWS.toLocaleString('en-US'));
+    const { MAX_IMPORT_ROWS } = require('../../src/services/userImportService');
+    expect(doc).toContain(`| Rows per file | ${MAX_IMPORT_ROWS} |`);
+    expect(doc).toContain(`Import at most ${MAX_IMPORT_ROWS} at a time`);
   });
 });

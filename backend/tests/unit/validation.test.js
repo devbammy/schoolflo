@@ -130,11 +130,53 @@ describe('request validation middleware', () => {
     expect(res.body.errors).toHaveLength(2);
   });
 
+  // Anything with an "@" is read as an email. Without one it is an admission
+  // number, so "not-an-email" is no longer malformed: it has that shape.
   it('rejects a malformed email', async () => {
     const res = await request(appWith(loginRules))
       .post('/')
-      .send({ email: 'not-an-email', password: 'x' });
+      .send({ email: 'ada@nowhere', password: 'x' });
     expect(res.status).toBe(400);
+  });
+
+  it('rejects something that is neither an email nor an admission number', async () => {
+    const res = await request(appWith(loginRules))
+      .post('/')
+      .send({ identifier: 'ao!26', password: 'x' });
+    expect(res.status).toBe(400);
+  });
+
+  it('normalises an admission number as a phone types it', async () => {
+    let seen;
+    const app = express();
+    app.use(express.json());
+    app.post('/', validate(loginRules), (req, res) => {
+      seen = req.body.identifier;
+      res.json({ ok: true });
+    });
+
+    const res = await request(app)
+      .post('/')
+      .send({ identifier: ' Ao 260012 ', password: 'x' });
+
+    expect(res.status).toBe(200);
+    expect(seen).toBe('AO260012');
+  });
+
+  it('still accepts the email field older clients send', async () => {
+    let seen;
+    const app = express();
+    app.use(express.json());
+    app.post('/', validate(loginRules), (req, res) => {
+      seen = req.body.identifier;
+      res.json({ ok: true });
+    });
+
+    await request(app)
+      .post('/')
+      .send({ email: 'Teacher@GoogleMail.com', password: 'x' });
+
+    expect(seen).toBe('teacher@gmail.com');
   });
 
   it('rejects non-ObjectId ids on payment init', async () => {

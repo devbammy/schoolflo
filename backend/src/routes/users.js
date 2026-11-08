@@ -33,6 +33,7 @@ const {
   downloadTemplate,
   getImportColumns,
 } = require('../controllers/userImportController');
+const { issueLoginSlip } = require('../controllers/loginSlipController');
 
 // Bulk import. These sit above '/:id' for the same reason the student roster
 // does — 'import' must never be read as a user id.
@@ -91,6 +92,15 @@ router.put(
   authorize('Admin'),
   validate(updateUserRules),
   updateUser,
+);
+
+// A new password for a student, returned once for a printed login slip.
+router.post(
+  '/:id/login-slip',
+  protect,
+  authorize('Admin'),
+  validate(idParam),
+  issueLoginSlip,
 );
 
 router.patch(

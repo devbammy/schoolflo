@@ -130,7 +130,7 @@ schoolflo/
 │   │       ├── schoolTime.js      # school wall clock (staff attendance)
 │   │       ├── reconcilePayments.js
 │   │       └── ms.js
-│   └── tests/                     # 36 suites, 563 tests
+│   └── tests/                     # 37 suites, 588 tests
 │       ├── unit/                  # grading, validation, error handling
 │       ├── integration/           # real in-memory MongoDB
 │       └── setup/                 # one shared MongoDB, a database per suite
@@ -596,6 +596,39 @@ fact that is trusted. Running it twice is safe: the second run finds nothing.
 - **Sessions** — one row per signed-in device, storing a SHA-256 hash of the
   refresh token. A dump of the collection cannot be replayed.
 
+### Students with no email
+
+Most pupils have no address of their own, and one school's registration sheet
+gave two-thirds of them a parent's or a sibling's instead. One address is one
+account, so those rows could never all import.
+
+So a student may have **no email**. They sign in with their **admission
+number**, and the admin hands them a password on a **printed login slip**.
+
+| Piece | Where |
+| --- | --- |
+| The account's address | A placeholder, `student-<id>@no-email.invalid`, set in `User` `pre('validate')`. `.invalid` is reserved (RFC 2606) and never delivers. `email` stays required and unique, so the production index is unchanged. |
+| "Does this account have a mailbox?" | `utils/mailbox.js` `hasMailbox()`. `sendEmail` and `enqueueEmail` both skip a placeholder, so nothing is queued and retried for an address that cannot receive. |
+| The sign-in box | `POST /auth/login` takes `identifier`: an email if it has an `@`, otherwise an admission number. `email` is still read for older clients. An admission number only ever finds a `role: 'Student'`. |
+| Normalising what was typed | `utils/loginIdentifier.js`. Upper case, spaces removed: a phone types "Ao 260012". The login limiter keys on the same value, so each spelling does not get its own budget. |
+| The password on a slip | `utils/loginPassword.js`: two words from a 256-word list and two digits, about 22.6 bits. Enough against the per-account limiter; the student may change it whenever they like. Emailed passwords stay random characters. |
+| Printing | `components/common/LoginSlips.jsx`, two slips across an A4 portrait page, sorted by class then name. |
+| A lost slip | `POST /users/:id/login-slip` (Admin): a new password, every session ended, audited as `auth.login_slip`. *Forgot password* cannot help, as there is nowhere to send the link. |
+
+A slip password exists in clear in exactly one place: the response that created
+it, sent with `Cache-Control: no-store`. Not the database, not the audit log,
+not an email. Closing the import window before printing loses them, and the
+client asks first.
+
+**One shared password for every student was asked for, and refused.**
+Admission numbers are initials, the year and a counter, so they are trivial to
+guess, and with one password any pupil could open any other child's results,
+fees and certificates, or change that password and lock them out.
+
+Searching by email skips placeholders (`emailMatches()`); otherwise "student"
+matched every pupil with no address. The client shows nothing in place of a
+placeholder (`client/src/utils/mailbox.js`).
+
 ### Refresh token rotation
 
 `POST /auth/refresh` mints a new refresh token, retires the one presented, and
@@ -718,8 +751,8 @@ Base URL: `/api/v1`. All routes require a Bearer token unless marked Public.
 
 | Method | Endpoint                 | Access | Notes                                        |
 | ------ | ------------------------ | ------ | -------------------------------------------- |
-| POST   | `/login`                 | Public | Returns `{ user, accessToken, refreshToken }`|
-| POST   | `/register`              | Admin  | Sends a welcome email with the credentials. Returns `{ user }`, never tokens: the caller is not that person |
+| POST   | `/login`                 | Public | `{ identifier, password }`: an email, or a student's admission number. Returns `{ user, accessToken, refreshToken }`|
+| POST   | `/register`              | Admin  | Sends a welcome email with the credentials. A student may have no email, and then none is sent. Returns `{ user }`, never tokens: the caller is not that person |
 | GET    | `/me`                    | Any    | Fully populated profile                      |
 | PUT    | `/update-password`       | Any    | New password must differ from the current one|
 | POST   | `/forgot-password`       | Public | Always 200 — never reveals whether an account exists |
@@ -876,8 +909,8 @@ for the clock itself and a teacher's own history.
 Only `Student` and `Teacher` can be imported. Admins and Parents are created
 one at a time on purpose — there are few of them and they carry more privilege.
 
-**Required columns:** `firstname`, `lastname`, `email`.
-**Optional:** `phone` plus, for a student, `class`, `section`, `gender`,
+**Required columns:** `firstname`, `lastname`, and `email` for a teacher.
+**Optional:** `phone` plus, for a student, `email`, `class`, `section`, `gender`,
 `dateofbirth`, `address`; for a teacher, `qualification`,
 `specialization`, `designation`. Headers are matched loosely, so
 `First Name`, `firstname` and `FIRST_NAME` all agree. Unknown columns are
@@ -931,13 +964,21 @@ Only parents the import actually created are emailed a password. One that
 already existed keeps the password they have — resending would be a password
 change nobody asked for.
 
-Passwords are generated per account and emailed; the CSV never carries one and
-nothing stores or returns the clear text. Rows are created **one at a time**,
+Passwords are generated per account; the CSV never carries one. An account
+with an email is sent its password. A student without one gets a readable
+password returned once in the commit response as `slips`, for printing (see
+[Students with no email](#students-with-no-email)). Nothing stores the clear
+text.
+
+A student with no email has nothing unique to collide on, so a file run twice,
+or a batch retried after it timed out, would enrol every child in it again. A
+student whose first and last name are already in the same class is refused for
+that reason, as is the same name twice in one class within the file. Rows are created **one at a time**,
 because admission numbers and staff IDs come from a `pre('save')` hook that
 `insertMany` would skip. A row that fails at creation time — someone took the
 address between preview and commit — is reported without abandoning the rest.
 
-Capped at 1,000 rows and 2 MB per file.
+Capped at 150 rows (`MAX_IMPORT_ROWS`) and 2 MB per file.
 
 The client commits **20 rows at a time** and shows its progress. Each account
 costs a bcrypt hash, so one request for a large file outlasted the timeout, and the
@@ -1116,7 +1157,8 @@ await audit.record(req, {
 ### User
 
 ```
-firstName, lastName, email (unique), password (bcrypt, select:false), role,
+firstName, lastName, email (unique; a placeholder for a student with none),
+password (bcrypt, select:false), role,
 phone, avatar{url,publicId}, isActive, lastLogin, passwordChangedAt
 studentProfile: { admissionNumber (auto), class→Class, section, parentId→User,
                   dateOfBirth, gender, profileStatus,
@@ -1264,8 +1306,11 @@ total (fees collected) is a progress meter.
 
 ## 11a. Printing
 
-Report cards and timetables are printed from the browser with
-`react-to-print` — no server-side PDF for either, and no extra dependency.
+Report cards, timetables and login slips are printed from the browser with
+`react-to-print` — no server-side PDF for any of them, and no extra dependency.
+
+`LoginSlips` passes its own `pageStyle` (A4 portrait), because the timetable's
+stylesheet sets landscape for every print.
 
 `PrintableTimetable` renders **its own week grid** rather than printing the
 interactive view. The on-screen `TimetableView` is built for a phone, one day
@@ -1422,7 +1467,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 36 suites, 563 tests
+pnpm test              # 37 suites, 588 tests
 pnpm test:coverage
 ```
 

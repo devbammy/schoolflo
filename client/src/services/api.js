@@ -187,6 +187,8 @@ export const userService = {
   create: (data) => api.post('/auth/register', data),
   update: (id, data) => api.put(`/users/${id}`, data),
   toggleStatus: (id) => api.patch(`/users/${id}/toggle-status`),
+  // A new password for a student, returned once for a printed slip.
+  issueLoginSlip: (id) => api.post(`/users/${id}/login-slip`),
   delete: (id) => api.delete(`/users/${id}`),
   uploadAvatar: (id, file) => {
     const form = new FormData();

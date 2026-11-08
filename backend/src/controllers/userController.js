@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { emailMatches } = require('../utils/mailbox');
 const Session = require('../models/Session');
 const { Fees, Payment } = require('../models/Fees');
 const AcademicCalendar = require('../models/AcademicCalendar');
@@ -131,7 +132,7 @@ const getUsers = async (req, res) => {
     filter.$or = [
       { firstName: pattern },
       { lastName: pattern },
-      { email: pattern },
+      emailMatches(pattern),
       { 'studentProfile.admissionNumber': pattern },
       { 'teacherProfile.staffId': pattern },
     ];

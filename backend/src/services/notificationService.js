@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { hasMailbox } = require('../utils/mailbox');
 
 let transporter;
 
@@ -109,6 +110,12 @@ const verifyTransport = async () => {
  * Send a single email
  */
 const sendEmail = async ({ to, subject, html, text }) => {
+  // A student who signs in with an admission number has an address that can
+  // never receive mail. Not an error: there is simply nobody to send it to.
+  if (!hasMailbox(to)) {
+    return { success: false, skipped: true, error: 'No mailbox' };
+  }
+
   if (usingResendApi()) {
     try {
       const { messageId } = await sendViaResend({ to, subject, html, text });
