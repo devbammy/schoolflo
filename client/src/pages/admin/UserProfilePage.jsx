@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { userService } from '../../services/api';
+import { useFeature } from '../../store/featureStore';
 import toast from 'react-hot-toast';
 import { shownEmail } from '../../utils/mailbox';
 
@@ -177,6 +178,7 @@ const EmptyRow = ({ children }) => (
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function UserProfilePage() {
   const { id } = useParams();
+  const keepsClock = useFeature('staffAttendance');
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -729,86 +731,90 @@ export default function UserProfilePage() {
             )}
           </Section>
 
-          <Section title="Attendance — Last 30 Days" icon={ClipboardCheck}>
-            {related.staffAttendance?.summaryLast30Days?.total > 0 ? (
-              <StatTiles
-                tiles={[
-                  {
-                    label: 'Days recorded',
-                    value: related.staffAttendance.summaryLast30Days.total,
-                  },
-                  {
-                    label: 'Attended',
-                    value: related.staffAttendance.summaryLast30Days.attended,
-                    color: 'var(--clr-success)',
-                  },
-                  {
-                    label: 'Rate',
-                    value: `${related.staffAttendance.summaryLast30Days.attendanceRate}%`,
-                  },
-                  {
-                    label: 'Avg worked',
-                    value: `${Math.round(
-                      (related.staffAttendance.summaryLast30Days
-                        .averageWorkedMinutes || 0) / 6,
-                    ) / 10}h`,
-                  },
-                  {
-                    label: 'Late minutes',
-                    value:
-                      related.staffAttendance.summaryLast30Days
-                        .totalLateMinutes || 0,
-                  },
-                ]}
-              />
-            ) : (
-              <EmptyRow>No clock-in records in the last 30 days.</EmptyRow>
-            )}
-            {related.staffAttendance?.recent?.length > 0 && (
-              <div className="table-wrapper" style={{ marginTop: 16 }}>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Clock In</th>
-                      <th>Clock Out</th>
-                      <th>Worked</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {related.staffAttendance.recent.map((a) => (
-                      <tr key={a._id}>
-                        <td>{fmtDate(a.date)}</td>
-                        <td>
-                          <span className="badge badge--neutral">
-                            {a.status}
-                          </span>
-                        </td>
-                        <td>
-                          {a.clockIn?.at
-                            ? format(new Date(a.clockIn.at), 'HH:mm')
-                            : '—'}
-                        </td>
-                        <td>
-                          {a.clockOut?.at
-                            ? format(new Date(a.clockOut.at), 'HH:mm')
-                            : '—'}
-                        </td>
-                        <td>
-                          {a.workedMinutes
-                            ? `${Math.floor(a.workedMinutes / 60)}h ${
-                                a.workedMinutes % 60
-                              }m`
-                            : '—'}
-                        </td>
+          {/* The staff clock, which has its own switch. This panel used to
+              show where the clock was off, as an empty "no records". */}
+          {keepsClock && (
+            <Section title="Attendance — Last 30 Days" icon={ClipboardCheck}>
+              {related.staffAttendance?.summaryLast30Days?.total > 0 ? (
+                <StatTiles
+                  tiles={[
+                    {
+                      label: 'Days recorded',
+                      value: related.staffAttendance.summaryLast30Days.total,
+                    },
+                    {
+                      label: 'Attended',
+                      value: related.staffAttendance.summaryLast30Days.attended,
+                      color: 'var(--clr-success)',
+                    },
+                    {
+                      label: 'Rate',
+                      value: `${related.staffAttendance.summaryLast30Days.attendanceRate}%`,
+                    },
+                    {
+                      label: 'Avg worked',
+                      value: `${Math.round(
+                        (related.staffAttendance.summaryLast30Days
+                          .averageWorkedMinutes || 0) / 6,
+                      ) / 10}h`,
+                    },
+                    {
+                      label: 'Late minutes',
+                      value:
+                        related.staffAttendance.summaryLast30Days
+                          .totalLateMinutes || 0,
+                    },
+                  ]}
+                />
+              ) : (
+                <EmptyRow>No clock-in records in the last 30 days.</EmptyRow>
+              )}
+              {related.staffAttendance?.recent?.length > 0 && (
+                <div className="table-wrapper" style={{ marginTop: 16 }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Clock In</th>
+                        <th>Clock Out</th>
+                        <th>Worked</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Section>
+                    </thead>
+                    <tbody>
+                      {related.staffAttendance.recent.map((a) => (
+                        <tr key={a._id}>
+                          <td>{fmtDate(a.date)}</td>
+                          <td>
+                            <span className="badge badge--neutral">
+                              {a.status}
+                            </span>
+                          </td>
+                          <td>
+                            {a.clockIn?.at
+                              ? format(new Date(a.clockIn.at), 'HH:mm')
+                              : '—'}
+                          </td>
+                          <td>
+                            {a.clockOut?.at
+                              ? format(new Date(a.clockOut.at), 'HH:mm')
+                              : '—'}
+                          </td>
+                          <td>
+                            {a.workedMinutes
+                              ? `${Math.floor(a.workedMinutes / 60)}h ${
+                                  a.workedMinutes % 60
+                                }m`
+                              : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Section>
+          )}
 
           <Section title="Assigned Tasks" icon={CheckSquare}>
             {related.tasks?.stats?.total > 0 ? (

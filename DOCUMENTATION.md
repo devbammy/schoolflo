@@ -250,7 +250,7 @@ full product to a school that asked for less.
 | Feature | Off removes | Off does **not** remove |
 | ------- | ----------- | ----------------------- |
 | `onlinePayments` | `/payments/initialize/*`, `/payments/verify/*`, `/webhooks` | Fee structures, `POST /payments/manual`, balances, receipts, the financial report |
-| `staffAttendance` | The whole `/staff-attendance` domain, the teacher clock, the admin roster | Student attendance, which is unrelated |
+| `staffAttendance` | The whole `/staff-attendance` domain, the teacher clock, the admin roster, the clock panel on a teacher's profile | Student attendance, which is unrelated |
 
 Profiles shipped today: `full` (default) and `office-fees` (fees collected at
 the school office, no staff clock).
