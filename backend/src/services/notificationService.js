@@ -445,6 +445,33 @@ const rawTemplates = {
     </div>
   `,
 
+  // The results email for a family whose fees are not cleared. It says the
+  // result exists and what is owed, and carries no score: the average and
+  // position in resultPublished are exactly what the portal is withholding.
+  resultWithheld: ({
+    studentName,
+    term,
+    academicYear,
+    outstanding,
+    loginUrl,
+  }) => `
+    <div style="background-color: #f0f4fb; padding: 40px 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(15, 28, 63, 0.1);">
+        <div style="background: linear-gradient(135deg, #1a4fab 0%, #0f3275 100%); padding: 40px; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Results Are Ready</h1>
+        </div>
+        <div style="padding: 40px;">
+          <p style="color: #3d4f73; font-size: 16px;">Dear Parent/Guardian,</p>
+          <p style="color: #3d4f73; font-size: 16px;">The <strong>${term} (${academicYear})</strong> results for <strong>${studentName}</strong> have been published.</p>
+          <div style="background: #fff7ed; border: 1px solid #fed7aa; padding: 20px; border-radius: 12px; margin: 30px 0;">
+            <p style="margin: 0; color: #9a3412; font-size: 15px;">Results can be viewed and printed once school fees are paid in full. The outstanding balance is <strong>${outstanding}</strong>.</p>
+          </div>
+          <a href="${loginUrl}" style="display: block; background: #1a4fab; color: #ffffff; padding: 16px; border-radius: 10px; text-decoration: none; text-align: center; font-weight: 600; font-size: 16px;">Sign In to See Fees</a>
+        </div>
+      </div>
+    </div>
+  `,
+
   certificateIssued: ({
     recipientName,
     studentName,

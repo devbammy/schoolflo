@@ -130,7 +130,7 @@ schoolflo/
 │   │       ├── schoolTime.js      # school wall clock (staff attendance)
 │   │       ├── reconcilePayments.js
 │   │       └── ms.js
-│   └── tests/                     # 37 suites, 588 tests
+│   └── tests/                     # 39 suites, 614 tests
 │       ├── unit/                  # grading, validation, error handling
 │       ├── integration/           # real in-memory MongoDB
 │       └── setup/                 # one shared MongoDB, a database per suite
@@ -183,6 +183,13 @@ Registration requires an existing Admin, so the first one is seeded. Set
 ```bash
 cd backend && pnpm seed
 ```
+
+The seed makes the first admin only, and refuses once one exists. Every
+further admin is added on **People → Administrators** in the portal, which
+creates the account through `POST /auth/register` with role `Admin` and emails
+its starting password. Deactivating one there signs them out at once. The
+server refuses an admin deactivating themselves and refuses to deactivate the
+last active admin, so a school cannot lock itself out from that page.
 
 ### Windows
 
@@ -251,9 +258,47 @@ full product to a school that asked for less.
 | ------- | ----------- | ----------------------- |
 | `onlinePayments` | `/payments/initialize/*`, `/payments/verify/*`, `/webhooks` | Fee structures, `POST /payments/manual`, balances, receipts, the financial report |
 | `staffAttendance` | The whole `/staff-attendance` domain, the teacher clock, the admin roster, the clock panel on a teacher's profile | Student attendance, which is unrelated |
+| `resultsRequireFees` (**off** by default) | When **on**, a student or parent cannot see or print a term's result while that term's fee, or any earlier fee, has a balance. See [Results held back over fees](#results-held-back-over-fees) | Anything for staff, who always see results |
 
 Profiles shipped today: `full` (default) and `office-fees` (fees collected at
 the school office, no staff clock).
+
+### Results held back over fees
+
+`FEATURE_RESULTS_REQUIRE_FEES=true`. The only switch that defaults **off**:
+the others add something, this one withholds something, and defaulting it on
+would have locked every existing school's report cards on upgrade.
+
+**The rule** (`services/resultAccessService.js`): a term's result is locked
+for a student or parent while that term's fee, or any fee from before it, has
+anything outstanding. Paying next term early is not needed to see this one, but
+an old debt cannot be skipped by paying the newest fee. Part-paid is not paid.
+A class with no fee set locks nobody. Which fees count is
+`paymentService.billedFeesFor()`, the same list the fee page shows, so a
+family is never locked over a debt they cannot see.
+
+**Where it applies**, because a lock on the report card alone is undone by any
+other page that shows the same numbers:
+
+| Surface | When locked |
+| --- | --- |
+| `GET /results/report-card/:id` (view and print) | **402** with `errors: { reason: 'FEES_OUTSTANDING', term, academicYear, outstanding, fees }` |
+| `GET /results/student/:id/history` | The term moves to `locked`, without its scores |
+| CA tracking (`/ca-tracking/student`, `/analytics`, `/chart`) | 402 while any term in the year that has results is locked: the yearly figures would give it away |
+| Student and parent dashboards | No scores or average for a locked term, and `resultsLock` says why |
+| The "results published" email | A parent who owes gets `resultWithheld`: results are ready, the balance, **no average or position** |
+
+402, not 403: the viewer may see this child's results, and what is in the way
+is a debt, so the client shows the balance and a link to the fee page
+(`components/common/ResultsLocked.jsx`).
+
+**Exceptions.** An admin can release one student's results despite the balance
+from the student's profile (`PUT /users/:id/results-release`), for a
+scholarship or a payment plan. Stored as `studentProfile.resultsRelease`
+(who, when, an optional note), audited as `results.release` and
+`results.release_withdrawn` against the student, and withdrawable. Without
+it, the office's only way to release a report card was to record a payment that
+never happened.
 
 ### How a feature is enforced
 
@@ -1467,7 +1512,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 37 suites, 588 tests
+pnpm test              # 39 suites, 614 tests
 pnpm test:coverage
 ```
 

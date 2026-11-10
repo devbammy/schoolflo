@@ -38,7 +38,7 @@ const seedAdmin = async () => {
     if (existing) {
       console.error(
         '❌ An admin account already exists. Nothing was changed. ' +
-          'Create further admins from the portal.',
+          'Add further admins on the Administrators page in the portal.',
       );
       process.exit(1);
     }

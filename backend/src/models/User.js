@@ -83,6 +83,14 @@ const UserSchema = new mongoose.Schema(
         default: 'Active',
       },
       graduationDate: Date,
+      // An admin's decision to show this student's results although fees are
+      // not complete: a scholarship, an agreed payment plan. Absent means no
+      // exception. See services/resultAccessService.js.
+      resultsRelease: {
+        by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        at: Date,
+        note: { type: String, trim: true, maxlength: 200 },
+      },
       // Where this student WAS. `class` above only says where they are now.
       // See utils/enrolment.js.
       enrolments: [

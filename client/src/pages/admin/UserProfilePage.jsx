@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { userService } from '../../services/api';
 import { useFeature } from '../../store/featureStore';
 import toast from 'react-hot-toast';
+import ResultsAccessPanel from '../../components/results/ResultsAccessPanel';
 import { shownEmail } from '../../utils/mailbox';
 
 // ── Shared bits ──────────────────────────────────────────────────────────────
@@ -567,6 +568,17 @@ export default function UserProfilePage() {
               <EmptyRow>No attendance recorded this term.</EmptyRow>
             )}
           </Section>
+
+          <ResultsAccessPanel
+            studentId={user._id}
+            access={related.resultsAccess}
+            onChange={(resultsAccess) =>
+              setData((d) => ({
+                ...d,
+                related: { ...d.related, resultsAccess },
+              }))
+            }
+          />
 
           <Section title="Results History" icon={GraduationCap}>
             {related.results?.length > 0 ? (

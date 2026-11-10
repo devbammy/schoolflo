@@ -43,6 +43,8 @@ describe('Feature resolution', () => {
     expect(resolveFeatures({})).toEqual({
       onlinePayments: true,
       staffAttendance: true,
+      // The exception: it withholds results, so a school has to ask for it.
+      resultsRequireFees: false,
     });
   });
 
@@ -50,6 +52,7 @@ describe('Feature resolution', () => {
     expect(resolveFeatures({ SCHOOL_PROFILE: 'office-fees' })).toEqual({
       onlinePayments: false,
       staffAttendance: false,
+      resultsRequireFees: false,
     });
   });
 
@@ -96,6 +99,7 @@ describe('Feature resolution', () => {
   it('derives the env var name from the feature name', () => {
     expect(envKey('onlinePayments')).toBe('FEATURE_ONLINE_PAYMENTS');
     expect(envKey('staffAttendance')).toBe('FEATURE_STAFF_ATTENDANCE');
+    expect(envKey('resultsRequireFees')).toBe('FEATURE_RESULTS_REQUIRE_FEES');
   });
 
   it('covers every declared feature in every profile lookup', () => {

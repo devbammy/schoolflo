@@ -26,6 +26,7 @@ const {
 const AppError = require('../utils/AppError');
 const { applySort } = require('../utils/listSort');
 const { buildUserUpdate } = require('../utils/userUpdate');
+const { describeResultsAccess } = require('./resultAccessController');
 const audit = require('../services/auditService');
 const {
   uploadToCloudinary,
@@ -275,6 +276,9 @@ const getUserProfile = async (req, res) => {
     }
 
     related.attendance = attendance;
+    // Whether this student's results are held back over fees, for the
+    // admin's release switch on the profile page.
+    related.resultsAccess = await describeResultsAccess(studentId);
     related.results = results;
     related.library = library;
     related.fees = {

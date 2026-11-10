@@ -24,6 +24,11 @@ const { clientUrl } = require('../config/clientUrl');
 const { enqueueEmail } = require('../services/jobQueue');
 const audit = require('../services/auditService');
 const {
+  assertResultUnlocked,
+  getResultLock,
+  getResultLockFor,
+} = require('../services/resultAccessService');
+const {
   validateScores,
   validateScoreBatch,
 } = require('../utils/scoreValidation');
@@ -439,6 +444,29 @@ const notifyParentsOfResults = async (studentIds, term, academicYear) => {
       const { average, overallPosition, totalStudentsInClass } =
         reportCard.summary;
 
+      // A parent the portal would refuse the result to must not be emailed
+      // the average and position instead. They are told it is ready, and what
+      // is owed, and nothing about how the child did.
+      const lock = (await getResultLock(studentId)).lockFor(term, academicYear);
+      if (lock.locked) {
+        for (const parent of parents) {
+          const { success } = await enqueueEmail({
+            to: parent.email,
+            subject: `${term} results for ${student.firstName} ${student.lastName}`,
+            html: emailTemplates.resultWithheld({
+              studentName: `${student.firstName} ${student.lastName}`,
+              term,
+              academicYear,
+              outstanding: `₦${lock.outstanding.toLocaleString('en-NG')}`,
+              loginUrl: `${clientUrl()}/login`,
+            }),
+          });
+          if (success) sent += 1;
+          else skipped += 1;
+        }
+        continue;
+      }
+
       for (const parent of parents) {
         const { success } = await enqueueEmail({
           to: parent.email,
@@ -482,6 +510,10 @@ const getReportCard = async (req, res) => {
 
   const denied = checkResultAccess(req.user, studentId);
   if (denied) return sendError(res, 403, denied);
+
+  // Before the card is built: a family with fees outstanding gets the balance
+  // instead (402). Printing goes through this same request.
+  await assertResultUnlocked(req.user, studentId, term, academicYear);
 
   const reportCard = await generateReportCard(studentId, term, academicYear);
   if (!reportCard)
@@ -564,9 +596,25 @@ const getStudentResultHistory = async (req, res) => {
     .populate('class', 'name')
     .sort({ academicYear: -1, term: 1 });
 
+  // A term whose fees are not cleared is listed without its scores, so the
+  // family sees that a result exists and what stands in the way of it.
+  const lock = await getResultLockFor(req.user, studentId);
+  const locked = new Map();
+
   // Group by academicYear + term
   const grouped = {};
   results.forEach((r) => {
+    if (lock.isLocked(r.term, r.academicYear)) {
+      const key = `${r.academicYear} — ${r.term}`;
+      if (!locked.has(key)) {
+        locked.set(key, {
+          term: r.term,
+          academicYear: r.academicYear,
+          ...lock.lockFor(r.term, r.academicYear),
+        });
+      }
+      return;
+    }
     const key = `${r.academicYear} — ${r.term}`;
     if (!grouped[key])
       grouped[key] = {
@@ -577,9 +625,12 @@ const getStudentResultHistory = async (req, res) => {
     grouped[key].subjects.push(r);
   });
 
+  const visible = Object.values(grouped);
+
   return sendSuccess(res, 200, 'Result history fetched', {
-    history: Object.values(grouped),
-    total: results.length,
+    history: visible,
+    locked: [...locked.values()],
+    total: visible.reduce((n, g) => n + g.subjects.length, 0),
   });
 };
 
@@ -590,4 +641,6 @@ module.exports = {
   getReportCard,
   getClassResults,
   getStudentResultHistory,
+  // Exported for tests: it runs in the background after a publish responds.
+  notifyParentsOfResults,
 };

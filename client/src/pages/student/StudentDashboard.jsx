@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Award, BookOpen, FileText, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardService } from '../../services/api';
+import ResultsLocked from '../../components/common/ResultsLocked';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { CA_MAX, caTotal } from '../../utils/scoreComponents';
@@ -58,6 +59,7 @@ export default function StudentDashboard() {
     pendingAssignments = [],
     announcements = [],
     feeBalance,
+    resultsLock,
   } = data || {};
   const attendance = stats.attendance || {};
   const attendancePct = attendance.percentage || 0;
@@ -175,7 +177,12 @@ export default function StudentDashboard() {
         <div className="card__header">
           <h2 className="card__title">Recent results</h2>
         </div>
-        {recentResults.length === 0 ? (
+        {resultsLock?.locked ? (
+          // Held back over unpaid fees: say so, rather than "no results".
+          <div className="card__body">
+            <ResultsLocked compact lock={resultsLock} />
+          </div>
+        ) : recentResults.length === 0 ? (
           <div className="dash-empty">No published results yet</div>
         ) : (
           <div

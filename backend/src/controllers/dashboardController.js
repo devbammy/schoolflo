@@ -9,6 +9,7 @@ const { sendSuccess, sendError } = require('../utils/apiResponse');
 const { getFeeBalances } = require('../services/paymentService');
 const { buildAdminOverview } = require('../services/adminOverviewService');
 const { getCurrentPeriod } = require('../utils/academicPeriod');
+const { getResultLockFor } = require('../services/resultAccessService');
 
 // @desc    Admin master dashboard
 // @route   GET /api/v1/dashboard/admin
@@ -296,6 +297,14 @@ const getStudentDashboard = async (req, res) => {
     ? await getFeeBalances(studentId, [recentPayment.feeStructure])
     : [];
 
+  // A term whose fees are not cleared shows no score at all, not even the
+  // average: the dashboard would otherwise be a second report card.
+  const resultsLock = (await getResultLockFor(req.user, studentId)).lockFor(
+    term,
+    academicYear,
+  );
+  if (resultsLock.locked) results.splice(0, results.length);
+
   const avgScore = results.length
     ? (results.reduce((s, r) => s + r.totalScore, 0) / results.length).toFixed(
         1,
@@ -311,6 +320,7 @@ const getStudentDashboard = async (req, res) => {
       pendingAssignmentsCount: pendingAssignments.length,
     },
     recentResults: results.slice(0, 5),
+    resultsLock,
     pendingAssignments,
     announcements,
     recentPayment,
@@ -339,12 +349,13 @@ const getParentDashboard = async (req, res) => {
   // For each child, get latest results + payment status
   const childrenData = await Promise.all(
     children.map(async (child) => {
-      const [latestResults, latestPayment, attendanceSummary, currentFee] =
+      const [recentResults, latestPayment, attendanceSummary, currentFee] =
         await Promise.all([
+          // More than are shown, because locked terms are dropped below.
           Result.find({ student: child._id, isPublished: true })
             .populate('subject', 'name')
             .sort({ createdAt: -1 })
-            .limit(5),
+            .limit(40),
 
           Payment.findOne({ student: child._id })
             .sort({ createdAt: -1 })
@@ -366,6 +377,14 @@ const getParentDashboard = async (req, res) => {
         ? await getFeeBalances(child._id, [currentFee])
         : [];
 
+      // Scores from a term whose fees are not cleared are left out, average
+      // included, and the parent is told why.
+      const lock = await getResultLockFor(req.user, child._id);
+      const latestResults = recentResults
+        .filter((r) => !lock.isLocked(r.term, r.academicYear))
+        .slice(0, 5);
+      const resultsLock = lock.lockFor(term, academicYear);
+
       const avg = latestResults.length
         ? (
             latestResults.reduce((s, r) => s + r.totalScore, 0) /
@@ -380,6 +399,7 @@ const getParentDashboard = async (req, res) => {
         latestPayment,
         feeBalance: feeBalance || null,
         attendance: attendanceSummary,
+        resultsLock,
       };
     }),
   );

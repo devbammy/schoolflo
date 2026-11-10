@@ -323,6 +323,22 @@ with their **admission number** and a password the admin prints on a slip.
   numbers are guessable, so it would open every child's records to every
   child.
 
+### Results held back over fees
+
+`FEATURE_RESULTS_REQUIRE_FEES`, **off** by default: the one switch that
+withholds rather than adds. When on, a term's result is locked for a student or
+parent while that term's fee or any earlier one has a balance;
+`services/resultAccessService.js` is the one definition.
+
+- **Every surface that shows a score asks it**: report card, results history,
+  CA tracking, both dashboards, and the results-published email, which used to
+  carry the average and position. A new page that shows scores to a student or
+  parent must ask too, or it undoes the lock.
+- **Locked answers 402**, with the balance in `errors`, never 403.
+- **Staff are never locked.** Only Student and Parent viewers.
+- An admin release lives in `studentProfile.resultsRelease`, written by path
+  with `updateOne`, and is audited against the student.
+
 ### Audit log
 
 - Append-only. No write/update/delete route exists, and none should.
@@ -503,7 +519,7 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 37 suites, 588 tests, Jest, `maxWorkers: 1`. The integration
+`pnpm test` — 39 suites, 614 tests, Jest, `maxWorkers: 1`. The integration
 suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
 and take from about three minutes to ten on a slow machine, mostly bcrypt at
 cost 12. Tests that exercise failures log to the console by design, so judge a

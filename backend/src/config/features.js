@@ -32,6 +32,16 @@ const FEATURES = {
   // The whole staff attendance domain: the teacher's clock, the admin's daily
   // roster, per-staff summaries and the records behind them.
   staffAttendance: true,
+
+  // Results held back from a family until fees are paid: a term's result is
+  // locked while that term's fee, or any earlier one, has a balance. See
+  // services/resultAccessService.js.
+  //
+  // The one feature that defaults OFF, and on purpose. The others add
+  // something, so "on" is the safe default; this one withholds something, and
+  // defaulting it on would have locked every existing school's report cards
+  // the day they upgraded. A school opts in: FEATURE_RESULTS_REQUIRE_FEES=true.
+  resultsRequireFees: false,
 };
 
 // Named profiles. A profile is a delta on top of "everything on", so a new

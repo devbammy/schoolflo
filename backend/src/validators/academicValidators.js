@@ -263,9 +263,28 @@ const linkChildRules = [
   objectIdBody('childId', 'Child'),
 ];
 
+// An admin's exception to the fee lock on results (resultAccessController).
+const resultsReleaseRules = [
+  ...idParam,
+  body('release')
+    .exists()
+    .withMessage('Say whether to release or lock the results.')
+    .bail()
+    .isBoolean()
+    .withMessage('release must be true or false.')
+    .toBoolean(),
+  body('note')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Keep the note under 200 characters.'),
+];
+
 module.exports = {
   CLASS_LEVELS,
   idParam,
+  resultsReleaseRules,
   createParentRules,
   updateParentRules,
   linkChildRules,

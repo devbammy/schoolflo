@@ -10,7 +10,7 @@ const AppError = require('../utils/AppError');
 const { applySort } = require('../utils/listSort');
 const audit = require('../services/auditService');
 const { buildFeeLedger } = require('../services/feeLedgerService');
-const { isBilledFor, sessionStart } = require('../utils/enrolment');
+const { sessionStart } = require('../utils/enrolment');
 const { TERMS } = require('../config/constants');
 const {
   initializePaystack,
@@ -18,6 +18,7 @@ const {
   generateReceiptNumber,
   resolvePayableAmount,
   getFeeBalances,
+  billedFeesFor,
   settlePayment,
   sendReceiptEmail,
 } = require('../services/paymentService');
@@ -118,29 +119,8 @@ const getStudentFeeBalances = async (req, res) => {
       _id: req.query.feeStructureId,
     }).sort({ dueDate: 1 });
   } else {
-    // Which fees apply depends on where the student was in each session, not
-    // only on where they are now. Reading the current class alone made a
-    // promoted child's unpaid fees vanish from this page. Anything they have
-    // paid towards is included as well, so a receipt always has a fee behind it.
-    const profile = student.studentProfile || {};
-    const classIds = [
-      profile.class,
-      ...(profile.enrolments || []).map((e) => e.class),
-    ].filter(Boolean);
-    const paidFeeIds = await Payment.distinct('feeStructure', {
-      student: studentId,
-      amountPaid: { $gt: 0 },
-    });
-
-    const candidates = await Fees.find({
-      isActive: true,
-      $or: [{ class: { $in: classIds } }, { _id: { $in: paidFeeIds } }],
-    }).sort({ dueDate: 1 });
-
-    const paidIds = new Set(paidFeeIds.map(String));
-    const applicable = candidates.filter(
-      (fee) => isBilledFor(student, fee) || paidIds.has(String(fee._id)),
-    );
+    // See billedFeesFor: where the student was each session, not just now.
+    const applicable = await billedFeesFor(student);
 
     const termOrder = Object.values(TERMS);
     const isEarlier = (fee) => {

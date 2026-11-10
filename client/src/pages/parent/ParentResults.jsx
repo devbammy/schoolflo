@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { resultService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
+import ResultsLocked, {
+  lockFromError,
+} from '../../components/common/ResultsLocked';
 import { getCurrentAcademicYear } from '../../utils/academicYear';
 import { CA_MAX, caTotal } from '../../utils/scoreComponents';
 export default function ParentResults() {
@@ -10,6 +13,8 @@ export default function ParentResults() {
   const [selected, setSelected] = useState('');
   const [reportCard, setReportCard] = useState(null);
   const [loading, setLoading] = useState(false);
+  // Set when the school holds this term's result back over unpaid fees.
+  const [lock, setLock] = useState(null);
   const [term, setTerm] = useState('First Term');
 
   const childId = selected || children[0]?._id || children[0];
@@ -17,10 +22,14 @@ export default function ParentResults() {
   useEffect(() => {
     if (!childId) return;
     setLoading(true);
+    setLock(null);
     resultService
       .getReportCard(childId, { term, academicYear: getCurrentAcademicYear() })
       .then((r) => setReportCard(r.data.data))
-      .catch(() => setReportCard(null))
+      .catch((err) => {
+        setLock(lockFromError(err));
+        setReportCard(null);
+      })
       .finally(() => setLoading(false));
   }, [childId, term]);
 
@@ -70,6 +79,8 @@ export default function ParentResults() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
           <div className="spinner" />
         </div>
+      ) : lock ? (
+        <ResultsLocked lock={lock} />
       ) : !reportCard ? (
         <div className="card">
           <div className="empty-state">

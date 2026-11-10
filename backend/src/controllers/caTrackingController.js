@@ -1,6 +1,36 @@
 const caTrackingService = require('../services/caTrackingService');
 const { sendSuccess, sendError } = require('../utils/apiResponse');
 const { assertStudentAccess } = require('../utils/studentAccess');
+const { Result } = require('../models/Exam');
+const {
+  getResultLockFor,
+  lockedError,
+} = require('../services/resultAccessService');
+
+/**
+ * CA tracking is results by another route: every term's CA, exam score,
+ * total, grade and position, plus a yearly average built from them. So it is
+ * locked like the report card, by the terms it would show. A year is shown
+ * only when every term in it that has results is unlocked; otherwise the
+ * yearly figures alone would give a locked term away.
+ */
+const assertTrackingUnlocked = async (user, studentId, academicYear) => {
+  const lock = await getResultLockFor(user, studentId);
+  if (!lock.enforced || lock.released) return;
+
+  const filter = { student: studentId, isPublished: true };
+  if (academicYear) filter.academicYear = academicYear;
+  const terms = await Result.find(filter).select('term academicYear').lean();
+
+  const blocked = terms.find((r) => lock.isLocked(r.term, r.academicYear));
+  if (blocked) {
+    throw lockedError(
+      blocked.term,
+      blocked.academicYear,
+      lock.lockFor(blocked.term, blocked.academicYear),
+    );
+  }
+};
 
 /**
  * These three routes carry `protect` but no `authorize`, so every signed-in
@@ -28,6 +58,7 @@ exports.getStudentTracking = async (req, res) => {
   const { academicYear } = req.query;
 
   assertStudentAccess(req.user, studentId, CA_SUBJECT);
+  await assertTrackingUnlocked(req.user, studentId, academicYear);
 
   const trackers = await caTrackingService.getStudentTracking(
     studentId,
@@ -55,6 +86,7 @@ exports.getStudentAnalytics = async (req, res) => {
   const { academicYear } = req.query;
 
   assertStudentAccess(req.user, studentId, CA_SUBJECT);
+  await assertTrackingUnlocked(req.user, studentId, academicYear);
 
   const analytics = await caTrackingService.getStudentAnalytics(
     studentId,
@@ -69,6 +101,7 @@ exports.getChartData = async (req, res) => {
   const { academicYear } = req.query;
 
   assertStudentAccess(req.user, studentId, CA_SUBJECT);
+  await assertTrackingUnlocked(req.user, studentId, academicYear);
 
   const chartData = await caTrackingService.generateChartData(
     studentId,

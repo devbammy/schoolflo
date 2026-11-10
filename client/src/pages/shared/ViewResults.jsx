@@ -3,6 +3,9 @@ import { resultService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import PrintableReportCard from '../../components/results/PrintableReportCard';
 import { toast } from 'react-hot-toast';
+import ResultsLocked, {
+  lockFromError,
+} from '../../components/common/ResultsLocked';
 import {
   Printer,
   Layout,
@@ -30,6 +33,8 @@ const ViewResults = () => {
   const [gradeScale, setGradeScale] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
+  // Set when the school holds the result back over unpaid fees.
+  const [lock, setLock] = useState(null);
   const [selectedTerm, setSelectedTerm] = useState('First Term');
   const [selectedYear, setSelectedYear] = useState(getCurrentAcademicYear());
   const [showPrintView, setShowPrintView] = useState(false);
@@ -77,6 +82,7 @@ const ViewResults = () => {
   const fetchResults = async () => {
     try {
       setLoading(true);
+      setLock(null);
 
       const response = await resultService.getReportCard(studentId, {
         term: selectedTerm,
@@ -88,6 +94,17 @@ const ViewResults = () => {
       setGradeScale(response?.data?.data?.gradeScale || []);
       setSummary(response?.data?.data?.summary || null);
     } catch (error) {
+      setResults([]);
+      setCumulative(null);
+      setSummary(null);
+
+      // Held back over unpaid fees: nothing to print, and the reason is shown.
+      const held = lockFromError(error);
+      if (held) {
+        setLock(held);
+        return;
+      }
+
       // Handle empty result gracefully
       if (
         error?.response?.status === 404 ||
@@ -183,6 +200,8 @@ const ViewResults = () => {
           </button>
         </div>
       </header>
+
+      {lock && <ResultsLocked lock={lock} />}
 
       {results.length > 0 && !showPrintView && (
         <div className="results-stats-strip">

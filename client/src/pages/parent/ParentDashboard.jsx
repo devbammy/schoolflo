@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CalendarCheck, TrendingUp, Users, Wallet } from 'lucide-react';
 import { dashboardService } from '../../services/api';
+import ResultsLocked from '../../components/common/ResultsLocked';
 import toast from 'react-hot-toast';
 import {
   DashHeader,
@@ -36,7 +37,14 @@ const feeTile = (feeBalance) => {
 };
 
 function ChildCard({ entry }) {
-  const { child, averageScore, attendance, latestResults, feeBalance } = entry;
+  const {
+    child,
+    averageScore,
+    attendance,
+    latestResults,
+    feeBalance,
+    resultsLock,
+  } = entry;
   const fee = feeTile(feeBalance);
 
   return (
@@ -80,6 +88,14 @@ function ChildCard({ entry }) {
             to="/parent/payments"
           />
         </div>
+
+        {/* This term held back over unpaid fees. Older, paid terms still
+            show below. */}
+        {resultsLock?.locked && (
+          <div style={{ marginTop: 14 }}>
+            <ResultsLocked compact lock={resultsLock} />
+          </div>
+        )}
 
         {latestResults?.length > 0 && (
           <>

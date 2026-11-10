@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 const { randomUUID } = require('crypto');
 const { clientUrl } = require('../config/clientUrl');
 const AppError = require('../utils/AppError');
-const { Payment } = require('../models/Fees');
+const { Fees, Payment } = require('../models/Fees');
+const { isBilledFor } = require('../utils/enrolment');
 const { buildFeeLedger } = require('./feeLedgerService');
 const Sequence = require('../models/Sequence');
 const { PAYMENT_STATUS, PAYMENT_GATEWAY } = require('../config/constants');
@@ -267,6 +268,41 @@ const describeFeeBalance = (feeStructure, paid) => {
     minimumOnlinePayment:
       outstanding > 0 ? Math.min(MIN_PAYMENT_NGN, outstanding) : 0,
   };
+};
+
+/**
+ * Every fee structure this student is billed for, in due-date order.
+ *
+ * Which fees apply depends on where the student was in each session, not only
+ * on where they are now. Reading the current class alone made a promoted
+ * child's unpaid fees vanish. Anything they have paid towards is included as
+ * well, so a receipt always has a fee behind it.
+ *
+ * The fee page and the result lock both read this, so a parent is never told
+ * a result is locked over a debt the fee page does not show them.
+ *
+ * `student` needs studentProfile.class, .enrolments and .profileStatus.
+ */
+const billedFeesFor = async (student) => {
+  const profile = student.studentProfile || {};
+  const classIds = [
+    profile.class,
+    ...(profile.enrolments || []).map((e) => e.class),
+  ].filter(Boolean);
+  const paidFeeIds = await Payment.distinct('feeStructure', {
+    student: student._id,
+    amountPaid: { $gt: 0 },
+  });
+
+  const candidates = await Fees.find({
+    isActive: true,
+    $or: [{ class: { $in: classIds } }, { _id: { $in: paidFeeIds } }],
+  }).sort({ dueDate: 1 });
+
+  const paidIds = new Set(paidFeeIds.map(String));
+  return candidates.filter(
+    (fee) => isBilledFor(student, fee) || paidIds.has(String(fee._id)),
+  );
 };
 
 /**
@@ -555,6 +591,7 @@ module.exports = {
   getPaidBreakdown,
   describeFeeBalance,
   getFeeBalances,
+  billedFeesFor,
   resolvePayableAmount,
   settlePayment,
   sendReceiptEmail,

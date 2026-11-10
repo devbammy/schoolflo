@@ -3,6 +3,9 @@ import { Download, FileText, TrendingUp } from 'lucide-react';
 import { resultService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
+import ResultsLocked, {
+  lockFromError,
+} from '../../components/common/ResultsLocked';
 import {
   getCurrentAcademicYear,
   generateAcademicYearOptions,
@@ -22,6 +25,8 @@ export default function StudentResults() {
   const { user } = useAuthStore();
   const [reportCard, setReportCard] = useState(null);
   const [loading, setLoading] = useState(false);
+  // Set when the school holds this term's result back over unpaid fees.
+  const [lock, setLock] = useState(null);
   const [filters, setFilters] = useState({
     term: 'First Term',
     academicYear: getCurrentAcademicYear(),
@@ -30,11 +35,16 @@ export default function StudentResults() {
   useEffect(() => {
     if (!user?._id) return;
     setLoading(true);
+    setLock(null);
     resultService
       .getReportCard(user._id, filters)
       .then((r) => setReportCard(r.data.data))
       .catch((err) => {
-        if (err.response?.status !== 404) toast.error('Failed to load results');
+        const held = lockFromError(err);
+        setLock(held);
+        if (!held && err.response?.status !== 404) {
+          toast.error('Failed to load results');
+        }
         setReportCard(null);
       })
       .finally(() => setLoading(false));
@@ -85,6 +95,8 @@ export default function StudentResults() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
           <div className="spinner" />
         </div>
+      ) : lock ? (
+        <ResultsLocked lock={lock} />
       ) : !reportCard ? (
         <div className="card">
           <div className="empty-state">

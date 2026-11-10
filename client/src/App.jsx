@@ -23,6 +23,9 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const StudentsPage = lazy(() => import('./pages/admin/StudentsPage'));
 const TeachersPage = lazy(() => import('./pages/admin/TeachersPage'));
+const AdministratorsPage = lazy(() =>
+  import('./pages/admin/AdministratorsPage'),
+);
 const ParentsPage = lazy(() => import('./pages/admin/ParentsPage'));
 const UserProfilePage = lazy(() => import('./pages/admin/UserProfilePage'));
 const ClassesPage = lazy(() => import('./pages/admin/ClassesPage'));
@@ -238,6 +241,7 @@ export default function App() {
               <Route index element={<AdminDashboard />} />
               <Route path="students" element={<StudentsPage />} />
               <Route path="teachers" element={<TeachersPage />} />
+              <Route path="administrators" element={<AdministratorsPage />} />
               <Route path="parents" element={<ParentsPage />} />
               <Route path="users/:id" element={<UserProfilePage />} />
               <Route path="classes" element={<ClassesPage />} />

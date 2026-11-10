@@ -27,6 +27,7 @@ import {
   CheckSquare,
   UserRoundCheck,
   Timer,
+  UserCog,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import useFeatureStore from '../../store/featureStore';
@@ -49,6 +50,11 @@ const NAV_CONFIG = {
         { to: '/admin/students', icon: Users, label: 'Students' },
         { to: '/admin/teachers', icon: GraduationCap, label: 'Teachers' },
         { to: '/admin/parents', icon: Heart, label: 'Parents' },
+        {
+          to: '/admin/administrators',
+          icon: UserCog,
+          label: 'Administrators',
+        },
       ],
     },
     {

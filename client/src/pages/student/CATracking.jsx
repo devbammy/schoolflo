@@ -18,6 +18,9 @@ import {
   generateAcademicYearOptions,
 } from '../../utils/academicYear';
 import './styles/caTracking.scss';
+import ResultsLocked, {
+  lockFromError,
+} from '../../components/common/ResultsLocked';
 
 const CATracking = () => {
   const { user } = useAuthStore();
@@ -27,6 +30,8 @@ const CATracking = () => {
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
+  // Set when the school holds the result back over unpaid fees.
+  const [lock, setLock] = useState(null);
   const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
 
   useEffect(() => {
@@ -38,6 +43,7 @@ const CATracking = () => {
   const fetchTracking = async () => {
     try {
       setLoading(true);
+      setLock(null);
 
       const res = await caTrackingService.getStudentTracking(user._id, {
         academicYear,
@@ -45,7 +51,10 @@ const CATracking = () => {
 
       setTracking(res?.data?.data || []);
     } catch (error) {
-      toast.error('Failed to fetch tracking data');
+      setTracking([]);
+      const held = lockFromError(error);
+      if (held) setLock(held);
+      else toast.error('Failed to fetch tracking data');
     } finally {
       setLoading(false);
     }
@@ -58,7 +67,9 @@ const CATracking = () => {
       });
       setAnalytics(res?.data?.data || null);
     } catch (error) {
-      console.error('Analytics error:', error);
+      setAnalytics(null);
+      // A fee lock is already shown by fetchTracking; anything else is logged.
+      if (!lockFromError(error)) console.error('Analytics error:', error);
     }
   };
 
@@ -182,7 +193,9 @@ const CATracking = () => {
       )}
 
       {/* Empty State Logic before the main content layout */}
-      {tracking.length === 0 && !loading && (
+      {lock && <ResultsLocked lock={lock} />}
+
+      {tracking.length === 0 && !loading && !lock && (
         <div className="empty-state">
           <Activity size={48} />
           <p>No assessment data found for the {academicYear} academic year.</p>
