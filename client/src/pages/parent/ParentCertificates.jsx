@@ -55,7 +55,7 @@ const ParentCertificates = () => {
   };
 
   // Group certificates by child
-  const certificatesByChild = certificates.reduce((acc, cert) => {
+  const certificatesByChild = (Array.isArray(certificates) ? certificates : []).reduce((acc, cert) => {
     const childId = cert.student._id;
     if (!acc[childId]) {
       acc[childId] = {
