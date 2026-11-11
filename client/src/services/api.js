@@ -189,9 +189,10 @@ export const userService = {
   toggleStatus: (id) => api.patch(`/users/${id}/toggle-status`),
   // A new password for a student, returned once for a printed slip.
   issueLoginSlip: (id) => api.post(`/users/${id}/login-slip`),
-  // Show a student's results despite unpaid fees, or withdraw that.
-  setResultsRelease: (id, data) =>
-    api.put(`/users/${id}/results-release`, data),
+  // A student's results access: { mode: 'auto' | 'open' | 'withheld', note }.
+  getResultsAccess: (id) => api.get(`/users/${id}/results-access`),
+  setResultsAccess: (id, data) =>
+    api.put(`/users/${id}/results-access`, data),
   delete: (id) => api.delete(`/users/${id}`),
   uploadAvatar: (id, file) => {
     const form = new FormData();

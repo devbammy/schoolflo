@@ -6,22 +6,33 @@ const { sessionStart } = require('../utils/enrolment');
 const { billedFeesFor, getFeeBalances } = require('./paymentService');
 
 /**
- * Results held back until fees are paid.
+ * Who may see a student's results, as a student or parent.
  *
- * A school that withholds report cards from families who owe asked for it, and
- * the rule they chose is: **a term's result is locked while that term's fee,
- * or any fee from before it, has anything outstanding.** Paying next term
- * early is not required to see this one, but an old debt cannot be skipped
- * past by paying the newest fee. A part-payment does not count as paid.
+ * Two things decide it.
+ *
+ * **The school's fee rule** (`resultsRequireFees`, off unless turned on): a
+ * term's result is locked while that term's fee, or any fee from before it,
+ * has anything outstanding. Paying next term early is not required to see this
+ * one, but an old debt cannot be skipped by paying the newest fee. A
+ * part-payment does not count as paid. Off by default because it withholds
+ * something: on by default, an upgrade would have locked every existing
+ * school's results overnight.
+ *
+ * **An admin's setting for one student**, which wins over the rule:
+ *
+ * | Setting   | Stored as                        | Effect                                  |
+ * | --------- | -------------------------------- | --------------------------------------- |
+ * | automatic | neither field                    | the fee rule, or open if the rule is off |
+ * | open      | `studentProfile.resultsRelease`  | shown whatever is owed                  |
+ * | withheld  | `studentProfile.resultsWithheld` | hidden whatever is paid, rule on or off  |
+ *
+ * "Open" came first, for scholarships and payment plans. "Withheld" was asked
+ * for next: a school sometimes holds one child's report back for a reason that
+ * has nothing to do with fees (a disciplinary matter, an unreturned textbook),
+ * and the office had no way to do it. Only one of the two fields is ever set.
  *
  * Who it applies to: a student looking at their own results and a parent
- * looking at a child's. Staff are never locked out. An admin may release one
- * student's results despite a balance (`studentProfile.resultsRelease`), which
- * is audited and can be withdrawn.
- *
- * Off unless the school turns it on (`resultsRequireFees`), because it
- * withholds something: on by default, an upgrade would have locked every
- * existing school's results overnight.
+ * looking at a child's. Staff are never locked out.
  *
  * Every surface that shows a score asks here: the report card, the results
  * history, CA tracking, both dashboards, and the "results published" email,
@@ -31,6 +42,7 @@ const { billedFeesFor, getFeeBalances } = require('./paymentService');
 
 const LOCKED_ROLES = ['Student', 'Parent'];
 const TERM_ORDER = Object.values(TERMS);
+const ACCESS_MODES = ['auto', 'open', 'withheld'];
 
 // Where a term sits in time. Sessions first, then the term within one.
 const periodOf = (term, academicYear) =>
@@ -39,9 +51,50 @@ const periodOf = (term, academicYear) =>
 const UNLOCKED = Object.freeze({
   enforced: false,
   released: false,
+  withheld: false,
+  unpaid: [],
   isLocked: () => false,
   lockFor: () => ({ locked: false, outstanding: 0, fees: [] }),
 });
+
+const withheldLock = (hold) => ({
+  enforced: true,
+  released: false,
+  withheld: true,
+  hold,
+  unpaid: [],
+  isLocked: () => true,
+  lockFor: () => ({ locked: true, withheld: true, outstanding: 0, fees: [] }),
+});
+
+/** The admin's setting for this student: 'auto', 'open' or 'withheld'. */
+const accessModeOf = (student) => {
+  const profile = student?.studentProfile || {};
+  if (profile.resultsWithheld?.at) return 'withheld';
+  if (profile.resultsRelease?.at) return 'open';
+  return 'auto';
+};
+
+/**
+ * What this student still owes, fee by fee, ignoring any admin setting. The
+ * fee page reads the same list (paymentService.billedFeesFor), so a family is
+ * never locked over a debt they cannot see.
+ */
+const unpaidFeesFor = async (student) => {
+  const fees = await billedFeesFor(student);
+  return (await getFeeBalances(student._id, fees))
+    .filter((b) => b.outstanding > 0)
+    .map((b) => ({
+      feeStructure: String(b.feeStructure._id),
+      title: b.feeStructure.title,
+      term: b.feeStructure.term,
+      academicYear: b.feeStructure.academicYear,
+      outstanding: b.outstanding,
+    }));
+};
+
+const STUDENT_FIELDS =
+  'role studentProfile.class studentProfile.enrolments studentProfile.profileStatus studentProfile.resultsRelease studentProfile.resultsWithheld';
 
 /**
  * The lock for one student, computed once and asked about many terms.
@@ -51,32 +104,33 @@ const UNLOCKED = Object.freeze({
  * family needs to see instead of the result.
  */
 const getResultLock = async (studentOrId) => {
-  if (!isEnabled('resultsRequireFees')) return UNLOCKED;
-
-  const student =
-    studentOrId && studentOrId.studentProfile
-      ? studentOrId
-      : await User.findById(studentOrId).select(
-          'role studentProfile.class studentProfile.enrolments studentProfile.profileStatus studentProfile.resultsRelease',
-        );
+  const student = await User.findById(studentOrId?._id || studentOrId).select(
+    STUDENT_FIELDS,
+  );
   if (!student) return UNLOCKED;
 
-  const release = student.studentProfile?.resultsRelease;
-  if (release?.at) {
-    return { ...UNLOCKED, enforced: true, released: true, release };
+  // Checked before the school rule: a withheld result stays withheld at a
+  // school that does not lock over fees at all.
+  const mode = accessModeOf(student);
+  if (mode === 'withheld') {
+    return withheldLock(student.studentProfile.resultsWithheld);
   }
 
-  const fees = await billedFeesFor(student);
-  const unpaid = (await getFeeBalances(student._id, fees))
-    .filter((b) => b.outstanding > 0)
-    .map((b) => ({
-      feeStructure: String(b.feeStructure._id),
-      title: b.feeStructure.title,
-      term: b.feeStructure.term,
-      academicYear: b.feeStructure.academicYear,
-      outstanding: b.outstanding,
-      period: periodOf(b.feeStructure.term, b.feeStructure.academicYear),
-    }));
+  if (!isEnabled('resultsRequireFees')) return UNLOCKED;
+
+  if (mode === 'open') {
+    return {
+      ...UNLOCKED,
+      enforced: true,
+      released: true,
+      release: student.studentProfile.resultsRelease,
+    };
+  }
+
+  const unpaid = (await unpaidFeesFor(student)).map((fee) => ({
+    ...fee,
+    period: periodOf(fee.term, fee.academicYear),
+  }));
 
   const blocking = (term, academicYear) => {
     const at = periodOf(term, academicYear);
@@ -86,6 +140,7 @@ const getResultLock = async (studentOrId) => {
   return {
     enforced: true,
     released: false,
+    withheld: false,
     unpaid: unpaid.map(({ period, ...fee }) => fee),
     isLocked: (term, academicYear) => blocking(term, academicYear).length > 0,
     lockFor: (term, academicYear) => {
@@ -111,11 +166,23 @@ const getResultLockFor = async (user, studentOrId) =>
 /**
  * The error a locked result answers with.
  *
- * 402, not 403. The viewer is allowed to see this child's results; what stands
- * in the way is a debt, and the client shows the balance and a way to pay
- * rather than "access denied". `errors` carries what that screen needs.
+ * Over fees: 402, not 403. The viewer is allowed to see this child's results;
+ * what stands in the way is a debt, so the client shows the balance and the
+ * fee page rather than "access denied".
+ *
+ * Withheld by the school: 403. There is nothing to pay, and saying how much
+ * is owed would be wrong; the family is sent to the office. Neither message
+ * says why the school is holding the result: that is for the office to tell.
  */
 const lockedError = (term, academicYear, lock) => {
+  if (lock.withheld) {
+    return new AppError(
+      403,
+      'The school is holding these results. Please contact the school office.',
+      { reason: 'RESULTS_WITHHELD', term, academicYear },
+    );
+  }
+
   const naira = `₦${lock.outstanding.toLocaleString('en-NG')}`;
   return new AppError(
     402,
@@ -130,7 +197,7 @@ const lockedError = (term, academicYear, lock) => {
   );
 };
 
-/** Throws the 402 when this viewer may not see this term yet. */
+/** Throws when this viewer may not see this term yet. */
 const assertResultUnlocked = async (user, studentId, term, academicYear) => {
   const lock = await getResultLockFor(user, studentId);
   const forTerm = lock.lockFor(term, academicYear);
@@ -138,6 +205,9 @@ const assertResultUnlocked = async (user, studentId, term, academicYear) => {
 };
 
 module.exports = {
+  ACCESS_MODES,
+  accessModeOf,
+  unpaidFeesFor,
   getResultLock,
   getResultLockFor,
   assertResultUnlocked,

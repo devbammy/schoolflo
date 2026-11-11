@@ -318,20 +318,22 @@ describe('the results email', () => {
   });
 });
 
-describe('an admin releasing a student despite the balance', () => {
-  const release = (body, as = admin) =>
+describe('an admin setting one student’s results access', () => {
+  const setAccess = (body, as = admin) =>
     request(app)
-      .put(`/users/${student._id}/results-release`)
+      .put(`/users/${student._id}/results-access`)
       .set('Authorization', `Bearer ${as.generateAccessToken()}`)
       .send(body);
 
-  it('opens every term, and is audited against the student', async () => {
-    const res = await release({ release: true, note: 'Scholarship' });
+  it('"open" shows every term despite the balance, audited against the student', async () => {
+    const res = await setAccess({ mode: 'open', note: 'Scholarship' });
 
     expect(res.status).toBe(200);
     expect(res.body.data.resultsAccess).toMatchObject({
-      released: true,
+      mode: 'open',
+      visible: true,
       note: 'Scholarship',
+      outstanding: 90000,
     });
     expect((await card(FIRST)).status).toBe(200);
     expect((await card(SECOND, parent)).status).toBe(200);
@@ -340,20 +342,122 @@ describe('an admin releasing a student despite the balance', () => {
     expect(String(entry.subject)).toBe(String(student._id));
   });
 
-  it('can be withdrawn, locking the results again', async () => {
-    await release({ release: true });
-    await release({ release: false });
+  it('"auto" returns the student to the fee rule', async () => {
+    await setAccess({ mode: 'open' });
+    await setAccess({ mode: 'auto' });
 
     expect((await card(FIRST)).status).toBe(402);
     expect(
-      await AuditLog.countDocuments({ action: 'results.release_withdrawn' }),
+      await AuditLog.countDocuments({ action: 'results.access_auto' }),
     ).toBe(1);
+  });
+
+  it('"withheld" hides results from a student whose fees are fully paid', async () => {
+    await pay(FIRST, 45000);
+    await pay(SECOND, 45000);
+
+    const res = await setAccess({
+      mode: 'withheld',
+      note: 'See the principal',
+    });
+
+    expect(res.body.data.resultsAccess).toMatchObject({
+      mode: 'withheld',
+      visible: false,
+      outstanding: 0,
+    });
+    const held = await card(FIRST, parent);
+    expect(held.status).toBe(403);
+    expect(held.body.errors).toMatchObject({ reason: 'RESULTS_WITHHELD' });
+    // The family is sent to the office; the admin's note is not shown to them.
+    expect(JSON.stringify(held.body)).not.toMatch(/principal/);
+    expect(await AuditLog.countDocuments({ action: 'results.withhold' })).toBe(
+      1,
+    );
+  });
+
+  it('"withheld" works at a school that does not lock results over fees', async () => {
+    delete process.env.FEATURE_RESULTS_REQUIRE_FEES;
+    resetFeatures();
+    expect((await card(FIRST)).status).toBe(200);
+
+    await setAccess({ mode: 'withheld' });
+
+    expect((await card(FIRST)).status).toBe(403);
+    expect((await card(FIRST, admin)).status).toBe(200);
+  });
+
+  it('a withheld student sees no scores anywhere', async () => {
+    await pay(FIRST, 45000);
+    await pay(SECOND, 45000);
+    await setAccess({ mode: 'withheld' });
+
+    actingUser = parent;
+    const history = await request(app).get(
+      `/results/student/${student._id}/history`,
+    );
+    expect(history.body.data.history).toEqual([]);
+    expect(history.body.data.locked).toHaveLength(2);
+
+    const ca = await request(app)
+      .get(`/ca/student/${student._id}`)
+      .query({ academicYear: YEAR });
+    expect(ca.status).toBe(403);
+
+    const dash = await request(app)
+      .get('/dashboard/parent')
+      .query({ term: FIRST, academicYear: YEAR });
+    expect(dash.body.data.childrenData[0].latestResults).toEqual([]);
+    expect(dash.body.data.childrenData[0].resultsLock).toMatchObject({
+      locked: true,
+      withheld: true,
+    });
+  });
+
+  it('a withheld student’s parent is emailed without scores or a balance', async () => {
+    await pay(FIRST, 45000);
+    await setAccess({ mode: 'withheld' });
+
+    await notifyParentsOfResults([student._id], FIRST, YEAR);
+
+    const { html } = enqueueEmail.mock.calls.at(-1)[0];
+    expect(html).toMatch(/contact the school office/);
+    expect(html).not.toMatch(/Class Position|outstanding balance/);
+  });
+
+  it('only one setting is ever stored', async () => {
+    await setAccess({ mode: 'open' });
+    await setAccess({ mode: 'withheld' });
+
+    const stored = await User.findById(student._id).lean();
+    expect(stored.studentProfile.resultsRelease).toBeUndefined();
+    expect(stored.studentProfile.resultsWithheld.at).toBeTruthy();
+  });
+
+  it('can be read back for any student', async () => {
+    const res = await request(app)
+      .get(`/users/${student._id}/results-access`)
+      .set('Authorization', `Bearer ${admin.generateAccessToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.resultsAccess).toMatchObject({
+      mode: 'auto',
+      feeRule: true,
+      visible: false,
+      outstanding: 90000,
+    });
+  });
+
+  it('refuses a setting that does not exist', async () => {
+    const res = await setAccess({ mode: 'sometimes' });
+
+    expect(res.status).toBe(400);
   });
 
   it('is for admins only', async () => {
     const teacher = await makeUser('Teacher');
 
-    const res = await release({ release: true }, teacher);
+    const res = await setAccess({ mode: 'open' }, teacher);
 
     expect(res.status).toBe(403);
     expect((await card(FIRST)).status).toBe(402);
@@ -365,7 +469,7 @@ describe('an admin releasing a student despite the balance', () => {
       { 'studentProfile.section': 'A', 'studentProfile.parentId': parent._id },
     );
 
-    await release({ release: true });
+    await setAccess({ mode: 'withheld' });
 
     const stored = await User.findById(student._id);
     expect(stored.studentProfile.section).toBe('A');

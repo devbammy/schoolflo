@@ -334,10 +334,13 @@ parent while that term's fee or any earlier one has a balance;
   CA tracking, both dashboards, and the results-published email, which used to
   carry the average and position. A new page that shows scores to a student or
   parent must ask too, or it undoes the lock.
-- **Locked answers 402**, with the balance in `errors`, never 403.
+- **Locked over fees answers 402**, with the balance in `errors`. Withheld by
+  an admin answers 403 with `reason: 'RESULTS_WITHHELD'` and no balance.
 - **Staff are never locked.** Only Student and Parent viewers.
-- An admin release lives in `studentProfile.resultsRelease`, written by path
-  with `updateOne`, and is audited against the student.
+- **An admin sets each student's access**: `auto` (the rule), `open`
+  (`studentProfile.resultsRelease`) or `withheld` (`studentProfile.resultsWithheld`).
+  Never both fields. **Withheld applies even when the fee rule is off**, so
+  `getResultLock` reads the student before it checks the feature flag.
 
 ### Audit log
 
@@ -519,7 +522,7 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 39 suites, 614 tests, Jest, `maxWorkers: 1`. The integration
+`pnpm test` — 39 suites, 621 tests, Jest, `maxWorkers: 1`. The integration
 suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
 and take from about three minutes to ten on a slow machine, mostly bcrypt at
 cost 12. Tests that exercise failures log to the console by design, so judge a

@@ -91,6 +91,13 @@ const UserSchema = new mongoose.Schema(
         at: Date,
         note: { type: String, trim: true, maxlength: 200 },
       },
+      // The opposite: results hidden from this student and their parents
+      // whatever has been paid. Never set together with resultsRelease.
+      resultsWithheld: {
+        by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        at: Date,
+        note: { type: String, trim: true, maxlength: 200 },
+      },
       // Where this student WAS. `class` above only says where they are now.
       // See utils/enrolment.js.
       enrolments: [

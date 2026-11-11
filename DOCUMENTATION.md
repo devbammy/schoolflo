@@ -130,7 +130,7 @@ schoolflo/
 │   │       ├── schoolTime.js      # school wall clock (staff attendance)
 │   │       ├── reconcilePayments.js
 │   │       └── ms.js
-│   └── tests/                     # 39 suites, 614 tests
+│   └── tests/                     # 39 suites, 621 tests
 │       ├── unit/                  # grading, validation, error handling
 │       ├── integration/           # real in-memory MongoDB
 │       └── setup/                 # one shared MongoDB, a database per suite
@@ -292,13 +292,26 @@ other page that shows the same numbers:
 is a debt, so the client shows the balance and a link to the fee page
 (`components/common/ResultsLocked.jsx`).
 
-**Exceptions.** An admin can release one student's results despite the balance
-from the student's profile (`PUT /users/:id/results-release`), for a
-scholarship or a payment plan. Stored as `studentProfile.resultsRelease`
-(who, when, an optional note), audited as `results.release` and
-`results.release_withdrawn` against the student, and withdrawable. Without
-it, the office's only way to release a report card was to record a payment that
-never happened.
+**Per-student access.** An admin sets each student's results access, for any
+student, whether or not the school locks results over fees. It is on the
+student's profile and behind the lock button on each row of the Students list
+(`GET` / `PUT /users/:id/results-access { mode, note }`).
+
+| Mode | Stored as | Student and parents see |
+| --- | --- | --- |
+| `auto` (default) | neither field | the fee rule above, or everything when the rule is off |
+| `open` | `studentProfile.resultsRelease` | every published result, whatever is owed |
+| `withheld` | `studentProfile.resultsWithheld` | nothing, whatever is paid, **even with the fee rule off** |
+
+Only one of the two fields is ever set. Each holds who set it, when, and an
+optional note for the office, which is never shown to the family. A withheld
+result answers **403** with `reason: 'RESULTS_WITHHELD'` and no balance, and
+the results-published email says to contact the office, with no score and no
+amount. Changes are audited against the student as `results.release`,
+`results.withhold` and `results.access_auto`. Without `open`, the office's only
+way to release a report card was to record a payment that never happened;
+`withheld` was asked for to hold one child's report back for a reason that has
+nothing to do with fees.
 
 ### How a feature is enforced
 
@@ -1512,7 +1525,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 39 suites, 614 tests
+pnpm test              # 39 suites, 621 tests
 pnpm test:coverage
 ```
 

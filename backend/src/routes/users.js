@@ -21,7 +21,7 @@ const {
 const {
   updateUserRules,
   idParam,
-  resultsReleaseRules,
+  resultsAccessRules,
 } = require('../validators/academicValidators');
 const {
   objectIdParam,
@@ -35,7 +35,10 @@ const {
   getImportColumns,
 } = require('../controllers/userImportController');
 const { issueLoginSlip } = require('../controllers/loginSlipController');
-const { setResultsRelease } = require('../controllers/resultAccessController');
+const {
+  getResultsAccess,
+  setResultsAccess,
+} = require('../controllers/resultAccessController');
 
 // Bulk import. These sit above '/:id' for the same reason the student roster
 // does — 'import' must never be read as a user id.
@@ -96,13 +99,20 @@ router.put(
   updateUser,
 );
 
-// Show a student's results although fees are not complete, or withdraw that.
-router.put(
-  '/:id/results-release',
+// A student's results access: shown, withheld, or the school rule.
+router.get(
+  '/:id/results-access',
   protect,
   authorize('Admin'),
-  validate(resultsReleaseRules),
-  setResultsRelease,
+  validate(idParam),
+  getResultsAccess,
+);
+router.put(
+  '/:id/results-access',
+  protect,
+  authorize('Admin'),
+  validate(resultsAccessRules),
+  setResultsAccess,
 );
 
 // A new password for a student, returned once for a printed login slip.

@@ -457,7 +457,10 @@ const notifyParentsOfResults = async (studentIds, term, academicYear) => {
               studentName: `${student.firstName} ${student.lastName}`,
               term,
               academicYear,
-              outstanding: `₦${lock.outstanding.toLocaleString('en-NG')}`,
+              // None when an admin withheld it: there is nothing to pay.
+              outstanding: lock.withheld
+                ? null
+                : `₦${lock.outstanding.toLocaleString('en-NG')}`,
               loginUrl: `${clientUrl()}/login`,
             }),
           });

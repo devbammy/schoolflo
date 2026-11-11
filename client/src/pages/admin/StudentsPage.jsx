@@ -14,6 +14,7 @@ import {
   UserX,
   Eye,
   KeyRound,
+  FileLock,
 } from 'lucide-react';
 import { userService, classService } from '../../services/api';
 import SortSelect, { DEFAULT_SORT } from '../../components/common/SortSelect';
@@ -22,6 +23,7 @@ import useQuickAction from '../../utils/useQuickAction';
 import BulkImportModal from '../../components/common/BulkImportModal';
 import Modal from '../../components/common/Modal';
 import LoginSlips from '../../components/common/LoginSlips';
+import ResultsAccessPanel from '../../components/results/ResultsAccessPanel';
 import { shownEmail } from '../../utils/mailbox';
 
 // How each fee-status value from the API renders in the table.
@@ -86,6 +88,8 @@ export default function StudentsPage() {
   const [slip, setSlip] = useState(null);
   const [slipFor, setSlipFor] = useState(null);
   const [issuing, setIssuing] = useState(false);
+  // The student whose results access is open for editing.
+  const [accessFor, setAccessFor] = useState(null);
 
   // The overview is school-wide, so it is fetched independently of the table's
   // search / class / page filters. `limit: 1` — we only want the counts.
@@ -457,6 +461,23 @@ export default function StudentsPage() {
                                 'admission no.'
                               }`}
                           </div>
+                          {/* Only when an admin has overridden the school
+                              rule; "Automatic" needs no badge. */}
+                          {s.studentProfile?.resultsWithheld?.at ? (
+                            <span
+                              className="badge badge--danger"
+                              style={{ marginTop: 4, fontSize: '0.7rem' }}
+                            >
+                              Results withheld
+                            </span>
+                          ) : s.studentProfile?.resultsRelease?.at ? (
+                            <span
+                              className="badge badge--info"
+                              style={{ marginTop: 4, fontSize: '0.7rem' }}
+                            >
+                              Results always shown
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </td>
@@ -538,6 +559,13 @@ export default function StudentsPage() {
                           title="New password and login slip"
                         >
                           <KeyRound size={14} />
+                        </button>
+                        <button
+                          className="btn btn--ghost btn--sm btn--icon"
+                          onClick={() => setAccessFor(s)}
+                          title="Results access"
+                        >
+                          <FileLock size={14} />
                         </button>
                         <button
                           className="btn btn--ghost btn--sm btn--icon"
@@ -863,6 +891,21 @@ export default function StudentsPage() {
           Use this when a slip is lost or a password is forgotten. The student
           can change the new password themselves after signing in.
         </p>
+      </Modal>
+
+      <Modal
+        open={Boolean(accessFor)}
+        onClose={() => setAccessFor(null)}
+        title={`Results access: ${accessFor?.firstName || ''} ${accessFor?.lastName || ''}`}
+        maxWidth={560}
+      >
+        {accessFor && (
+          <ResultsAccessPanel
+            bare
+            studentId={accessFor._id}
+            onChange={() => load()}
+          />
+        )}
       </Modal>
 
       <Modal

@@ -4,20 +4,25 @@ import { Lock, Wallet } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 
 /**
- * What a family sees in place of a result held back over fees.
+ * What a family sees in place of a result they cannot see yet.
  *
- * The server decides (services/resultAccessService.js) and answers 402 with
- * the term, the balance and the fees behind it. This only shows that, with a
- * way to the fee page: a dead "access denied" would leave a parent not knowing
- * whether the result exists at all, or what to do about it.
+ * The server decides (services/resultAccessService.js). Held over fees, it
+ * answers 402 with the term, the balance and the fees behind it, and this
+ * shows them with a way to the fee page: a dead "access denied" would leave a
+ * parent not knowing whether the result exists, or what to do. Withheld by an
+ * admin, it answers 403 with no balance, and this sends the family to the
+ * office without saying why: that is for the school to tell them.
  */
 
 /** The lock details from a failed request, or null if it is not a lock. */
 export const lockFromError = (err) => {
+  const status = err?.response?.status;
   const details = err?.response?.data?.errors;
-  return err?.response?.status === 402 && details?.reason === 'FEES_OUTSTANDING'
-    ? details
-    : null;
+  if (status === 402 && details?.reason === 'FEES_OUTSTANDING') return details;
+  if (status === 403 && details?.reason === 'RESULTS_WITHHELD') {
+    return { ...details, withheld: true };
+  }
+  return null;
 };
 
 const naira = (n) => `₦${Number(n || 0).toLocaleString('en-NG')}`;
@@ -28,6 +33,40 @@ export default function ResultsLocked({ lock, compact = false }) {
 
   const feesPage = role === 'Parent' ? '/parent/payments' : '/student/payments';
   const when = [lock.term, lock.academicYear].filter(Boolean).join(' ');
+
+  if (lock.withheld) {
+    const words =
+      'The school is holding these results for now. Please contact the school office.';
+    return compact ? (
+      <div
+        style={{
+          display: 'flex',
+          gap: 10,
+          alignItems: 'flex-start',
+          fontSize: '0.875rem',
+          color: 'var(--clr-text-2)',
+        }}
+      >
+        <Lock
+          size={16}
+          style={{ color: 'var(--clr-warning)', flexShrink: 0, marginTop: 2 }}
+        />
+        <span style={{ minWidth: 0 }}>{words}</span>
+      </div>
+    ) : (
+      <div className="card">
+        <div className="empty-state">
+          <Lock
+            size={44}
+            className="empty-state__icon"
+            style={{ color: 'var(--clr-warning)' }}
+          />
+          <p className="empty-state__title">Results not available</p>
+          <p className="empty-state__text">{words}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (compact) {
     return (

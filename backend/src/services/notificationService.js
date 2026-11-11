@@ -445,9 +445,11 @@ const rawTemplates = {
     </div>
   `,
 
-  // The results email for a family whose fees are not cleared. It says the
-  // result exists and what is owed, and carries no score: the average and
-  // position in resultPublished are exactly what the portal is withholding.
+  // The results email for a family who cannot see the result yet. It says the
+  // result exists and carries no score: the average and position in
+  // resultPublished are exactly what the portal is withholding. With a balance
+  // it says what is owed; without one (an admin withheld the result) it sends
+  // the family to the office, and never says why.
   resultWithheld: ({
     studentName,
     term,
@@ -464,9 +466,13 @@ const rawTemplates = {
           <p style="color: #3d4f73; font-size: 16px;">Dear Parent/Guardian,</p>
           <p style="color: #3d4f73; font-size: 16px;">The <strong>${term} (${academicYear})</strong> results for <strong>${studentName}</strong> have been published.</p>
           <div style="background: #fff7ed; border: 1px solid #fed7aa; padding: 20px; border-radius: 12px; margin: 30px 0;">
-            <p style="margin: 0; color: #9a3412; font-size: 15px;">Results can be viewed and printed once school fees are paid in full. The outstanding balance is <strong>${outstanding}</strong>.</p>
+            <p style="margin: 0; color: #9a3412; font-size: 15px;">${
+              outstanding
+                ? `Results can be viewed and printed once school fees are paid in full. The outstanding balance is <strong>${outstanding}</strong>.`
+                : 'The school is holding these results for now. Please contact the school office.'
+            }</p>
           </div>
-          <a href="${loginUrl}" style="display: block; background: #1a4fab; color: #ffffff; padding: 16px; border-radius: 10px; text-decoration: none; text-align: center; font-weight: 600; font-size: 16px;">Sign In to See Fees</a>
+          <a href="${loginUrl}" style="display: block; background: #1a4fab; color: #ffffff; padding: 16px; border-radius: 10px; text-decoration: none; text-align: center; font-weight: 600; font-size: 16px;">${outstanding ? 'Sign In to See Fees' : 'Sign In'}</a>
         </div>
       </div>
     </div>

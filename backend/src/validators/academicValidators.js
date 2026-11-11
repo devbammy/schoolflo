@@ -263,16 +263,15 @@ const linkChildRules = [
   objectIdBody('childId', 'Child'),
 ];
 
-// An admin's exception to the fee lock on results (resultAccessController).
-const resultsReleaseRules = [
+// An admin's setting for one student's results (resultAccessController).
+const resultsAccessRules = [
   ...idParam,
-  body('release')
-    .exists()
-    .withMessage('Say whether to release or lock the results.')
+  body('mode')
+    .exists({ checkFalsy: true })
+    .withMessage("Choose how this student's results are shown.")
     .bail()
-    .isBoolean()
-    .withMessage('release must be true or false.')
-    .toBoolean(),
+    .isIn(['auto', 'open', 'withheld'])
+    .withMessage('mode must be auto, open or withheld.'),
   body('note')
     .optional({ values: 'falsy' })
     .isString()
@@ -284,7 +283,7 @@ const resultsReleaseRules = [
 module.exports = {
   CLASS_LEVELS,
   idParam,
-  resultsReleaseRules,
+  resultsAccessRules,
   createParentRules,
   updateParentRules,
   linkChildRules,
