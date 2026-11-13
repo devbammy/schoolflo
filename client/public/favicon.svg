@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
+  <!-- The sign-in page's logo tile: the white lucide School icon on a
+       36px tile of --clr-primary with 10px corners. The icon is drawn at 26px rather than the page's 18px:
+       at tab size (16px) the page's proportion left it 8px wide and unreadable. Paths copied from
+       lucide-react 0.312.0 (ISC), so the tab icon and the page match. -->
+  <rect width="36" height="36" rx="10" fill="#1a4fab"/>
+  <g transform="translate(5 5) scale(1.0833)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m4 6 8-4 8 4"/>
+    <path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/>
+    <path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/>
+    <path d="M18 5v17"/>
+    <path d="M6 5v17"/>
+    <circle cx="12" cy="9" r="2"/>
+  </g>
+</svg>
