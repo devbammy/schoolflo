@@ -1,4 +1,4 @@
-# SchoolFlo — feature status
+# SchoolFlo — feature status - GPIS
 
 What is built, what is partly built, and what is still missing. Scoped to a
 production school management portal for a Nigerian secondary school.
@@ -86,14 +86,14 @@ works, see [DOCUMENTATION.md](DOCUMENTATION.md).
 
 ## Partly built
 
-| Feature | What exists | What is missing |
-| ------- | ----------- | --------------- |
-| **School-wide analytics** | Admin overview: attendance pulse, fee collection, stalled marking, attention items | Pass rates per subject, average scores by class, attendance trends over time, teacher performance |
-| **Debt ledger** | Per-student, per-fee balances, `studentsOwing` for a term, and arrears from earlier terms and sessions on the parent and student pages | A school-wide arrears report, and a per-family view |
-| **SMS** | Twilio wired for announcements, skipped when unconfigured | Nigerian-first providers (Termii, Africa's Talking); no fee or result alerts by SMS |
-| **Session management** | Sessions are recorded and revocable; logout-everywhere works | No endpoint or UI listing a user's active devices, so a user cannot drop one device |
-| **Event management** | Calendar carries PTA meetings, sports day and general events | No RSVP tracking, no reminders |
-| **Document generation** | PDFs for report card, leaving certificate, admission letter | No fee invoice a parent can present at a bank |
+| Feature                   | What exists                                                                                                                            | What is missing                                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **School-wide analytics** | Admin overview: attendance pulse, fee collection, stalled marking, attention items                                                     | Pass rates per subject, average scores by class, attendance trends over time, teacher performance |
+| **Debt ledger**           | Per-student, per-fee balances, `studentsOwing` for a term, and arrears from earlier terms and sessions on the parent and student pages | A school-wide arrears report, and a per-family view                                               |
+| **SMS**                   | Twilio wired for announcements, skipped when unconfigured                                                                              | Nigerian-first providers (Termii, Africa's Talking); no fee or result alerts by SMS               |
+| **Session management**    | Sessions are recorded and revocable; logout-everywhere works                                                                           | No endpoint or UI listing a user's active devices, so a user cannot drop one device               |
+| **Event management**      | Calendar carries PTA meetings, sports day and general events                                                                           | No RSVP tracking, no reminders                                                                    |
+| **Document generation**   | PDFs for report card, leaving certificate, admission letter                                                                            | No fee invoice a parent can present at a bank                                                     |
 
 ---
 
