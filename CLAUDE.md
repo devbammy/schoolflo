@@ -522,7 +522,7 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 39 suites, 621 tests, Jest, `maxWorkers: 1`. The integration
+`pnpm test` — 40 suites, 626 tests, Jest, `maxWorkers: 1`. The integration
 suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
 and take from about three minutes to ten on a slow machine, mostly bcrypt at
 cost 12. Tests that exercise failures log to the console by design, so judge a

@@ -117,6 +117,7 @@ const getUsers = async (req, res) => {
     search,
     isActive,
     class: classId,
+    section,
     gender,
     withFeeStatus,
   } = req.query;
@@ -126,6 +127,16 @@ const getUsers = async (req, res) => {
   if (role) filter.role = role;
   if (isActive !== undefined) filter.isActive = isActive === 'true';
   if (classId) filter['studentProfile.class'] = classId;
+  // A section (arm) is a name within a class, so it only means something with
+  // the class beside it; on its own it would mix every class's "A". Matched
+  // without regard to case, because the import keeps whatever the spreadsheet
+  // said ("a" or "A").
+  if (classId && section) {
+    filter['studentProfile.section'] = new RegExp(
+      `^${escapeRegex(String(section).trim())}$`,
+      'i',
+    );
+  }
   if (gender) filter['studentProfile.gender'] = gender;
 
   if (search) {

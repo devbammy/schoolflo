@@ -73,6 +73,9 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
+  // A section (arm) only means something inside a class, so this filter is
+  // offered once a class is picked and cleared whenever the class changes.
+  const [sectionFilter, setSectionFilter] = useState('');
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, pages: 1 });
@@ -91,11 +94,14 @@ export default function StudentsPage() {
   // The student whose results access is open for editing.
   const [accessFor, setAccessFor] = useState(null);
 
-  // The overview is school-wide, so it is fetched independently of the table's
-  // search / class / page filters. `limit: 1` — we only want the counts.
+  // The overview follows the class and section filters, so "SS 2 B" shows SS 2
+  // B's numbers, but not the search box or the page. `limit: 1` — we only
+  // want the counts.
   const loadStats = useCallback(async () => {
     try {
       const base = { role: 'Student', limit: 1 };
+      if (classFilter) base.class = classFilter;
+      if (classFilter && sectionFilter) base.section = sectionFilter;
       const [all, active, male, female] = await Promise.all([
         userService.getAll(base),
         userService.getAll({ ...base, isActive: 'true' }),
@@ -114,7 +120,7 @@ export default function StudentsPage() {
     } catch {
       // Non-critical: the strip simply stays in its loading state.
     }
-  }, []);
+  }, [classFilter, sectionFilter]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -127,6 +133,7 @@ export default function StudentsPage() {
       };
       if (search) params.search = search;
       if (classFilter) params.class = classFilter;
+      if (classFilter && sectionFilter) params.section = sectionFilter;
       params.sort = sort;
       const res = await userService.getAll(params);
       setStudents(res.data.data);
@@ -136,7 +143,7 @@ export default function StudentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, classFilter, sort]);
+  }, [page, search, classFilter, sectionFilter, sort]);
 
   useEffect(() => {
     load();
@@ -252,6 +259,18 @@ export default function StudentsPage() {
     }
   };
 
+  const sectionsOf = (classId) =>
+    (classes || []).find((c) => c._id === classId)?.sections || [];
+  const filterSections = sectionsOf(classFilter);
+  const formSections = sectionsOf(form.studentProfile?.class);
+  // The import keeps the spreadsheet's spelling ("a"), the class says "A":
+  // match without regard to case so an edit shows the student's section.
+  const savedSection = form.studentProfile?.section || '';
+  const formSectionValue =
+    formSections.find(
+      (sec) => sec.name.toLowerCase() === savedSection.toLowerCase(),
+    )?.name || savedSection;
+
   const setField = (path, val) => {
     const keys = path.split('.');
     if (keys.length === 1) {
@@ -347,6 +366,7 @@ export default function StudentsPage() {
           value={classFilter}
           onChange={(e) => {
             setClassFilter(e.target.value);
+            setSectionFilter('');
             setPage(1);
           }}
         >
@@ -359,6 +379,25 @@ export default function StudentsPage() {
               </option>
             ))}
         </select>
+        {classFilter && filterSections.length > 0 && (
+          <select
+            className="form-control"
+            style={{ width: 'auto', minWidth: 140 }}
+            value={sectionFilter}
+            onChange={(e) => {
+              setSectionFilter(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Section"
+          >
+            <option value="">All sections</option>
+            {filterSections.map((sec) => (
+              <option key={sec.name} value={sec.name}>
+                Section {sec.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Table */}
@@ -489,7 +528,12 @@ export default function StudentsPage() {
                     >
                       {s.studentProfile?.admissionNumber || '—'}
                     </td>
-                    <td>{s.studentProfile?.class?.name || '—'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {s.studentProfile?.class?.name || '—'}
+                      {s.studentProfile?.class && s.studentProfile?.section
+                        ? ` · ${s.studentProfile.section}`
+                        : ''}
+                    </td>
                     <td>{s.studentProfile?.gender || '—'}</td>
                     <td>
                       {s.studentProfile?.parentId ? (
@@ -711,7 +755,16 @@ export default function StudentsPage() {
                       className="form-control"
                       value={form.studentProfile?.class || ''}
                       onChange={(e) =>
-                        setField('studentProfile.class', e.target.value)
+                        // A new class has its own sections: the old choice
+                        // would not belong to it.
+                        setForm((f) => ({
+                          ...f,
+                          studentProfile: {
+                            ...f.studentProfile,
+                            class: e.target.value,
+                            section: '',
+                          },
+                        }))
                       }
                     >
                       <option value="">Select class</option>
@@ -722,6 +775,45 @@ export default function StudentsPage() {
                             {c.name}
                           </option>
                         ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Section</label>
+                    <select
+                      className="form-control"
+                      value={formSectionValue}
+                      onChange={(e) =>
+                        setField('studentProfile.section', e.target.value)
+                      }
+                      disabled={
+                        !form.studentProfile?.class || formSections.length === 0
+                      }
+                    >
+                      <option value="">
+                        {!form.studentProfile?.class
+                          ? 'Choose a class first'
+                          : formSections.length === 0
+                            ? 'This class has no sections'
+                            : 'Select section'}
+                      </option>
+                      {formSections.map((sec) => (
+                        <option key={sec.name} value={sec.name}>
+                          {sec.name}
+                        </option>
+                      ))}
+                      {/* A section saved before it was removed from the
+                          class still shows, rather than vanishing from the
+                          form and being cleared on the next save. */}
+                      {form.studentProfile?.section &&
+                        !formSections.some(
+                          (sec) =>
+                            sec.name.toLowerCase() ===
+                            form.studentProfile.section.toLowerCase(),
+                        ) && (
+                          <option value={form.studentProfile.section}>
+                            {form.studentProfile.section}
+                          </option>
+                        )}
                     </select>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>

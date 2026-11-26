@@ -130,7 +130,7 @@ schoolflo/
 │   │       ├── schoolTime.js      # school wall clock (staff attendance)
 │   │       ├── reconcilePayments.js
 │   │       └── ms.js
-│   └── tests/                     # 39 suites, 621 tests
+│   └── tests/                     # 40 suites, 626 tests
 │       ├── unit/                  # grading, validation, error handling
 │       ├── integration/           # real in-memory MongoDB
 │       └── setup/                 # one shared MongoDB, a database per suite
@@ -1525,7 +1525,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 39 suites, 621 tests
+pnpm test              # 40 suites, 626 tests
 pnpm test:coverage
 ```
 

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { query } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const validate = require('../middleware/validate');
@@ -71,7 +72,16 @@ router.get(
   '/',
   protect,
   authorize('Admin'),
-  validate([...paginationQuery(), ...sortQuery()]),
+  validate([
+    ...paginationQuery(),
+    ...sortQuery(),
+    query('section')
+      .optional({ values: 'falsy' })
+      .isString()
+      .trim()
+      .isLength({ max: 30 })
+      .withMessage('Section is too long.'),
+  ]),
   getUsers,
 );
 
