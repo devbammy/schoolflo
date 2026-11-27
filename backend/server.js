@@ -45,6 +45,8 @@ const libraryRoutes = require('./src/routes/library');
 const calendarRoutes = require('./src/routes/calendar');
 const examScheduleRoutes = require('./src/routes/examSchedule.routes');
 const caTrackingRoutes = require('./src/routes/caTracking.routes');
+const reportRemarkRoutes = require('./src/routes/reportRemarks');
+const schoolSettingsRoutes = require('./src/routes/schoolSettings');
 const promotionRoutes = require('./src/routes/promotion.routes');
 const certificateRoutes = require('./src/routes/certificate.routes');
 const webhookRoutes = require('./src/routes/webhooks');
@@ -265,6 +267,8 @@ if (features.staffAttendance) {
 }
 app.use('/api/v1/exams', examRoutes);
 app.use('/api/v1/results', resultRoutes);
+app.use('/api/v1/report-remarks', reportRemarkRoutes);
+app.use('/api/v1/school-settings', schoolSettingsRoutes);
 app.use('/api/v1/fees', feesRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/assignments', assignmentRoutes);

@@ -28,6 +28,7 @@ import {
   UserRoundCheck,
   Timer,
   UserCog,
+  ClipboardPen,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import useFeatureStore from '../../store/featureStore';
@@ -69,6 +70,11 @@ const NAV_CONFIG = {
         },
         { to: '/admin/timetables', icon: Calendar, label: 'Timetables' },
         { to: '/admin/results', icon: BarChart3, label: 'Results & Reports' },
+        {
+          to: '/admin/report-comments',
+          icon: ClipboardPen,
+          label: 'Behaviour & Comments',
+        },
         { to: '/admin/library', icon: BookMarked, label: 'Library' },
         {
           label: 'Exam Schedules',
@@ -111,6 +117,11 @@ const NAV_CONFIG = {
           feature: 'staffAttendance',
         },
         { to: '/admin/audit', icon: ScrollText, label: 'Audit Log' },
+        {
+          to: '/admin/school-details',
+          icon: School,
+          label: 'School Details',
+        },
       ],
     },
   ],
@@ -132,6 +143,11 @@ const NAV_CONFIG = {
       items: [
         { to: '/teacher/attendance', icon: Users, label: 'Attendance' },
         { to: '/teacher/grades', icon: BarChart3, label: 'Grades & Results' },
+        {
+          to: '/teacher/report-comments',
+          icon: ClipboardPen,
+          label: 'Behaviour & Comments',
+        },
         {
           to: '/teacher/assignments',
           icon: ClipboardList,
@@ -309,9 +325,7 @@ export default function DashboardLayout() {
     <>
       <div className="sidebar__logo">
         <div className="sidebar__logo-icon">S</div>
-        {!collapsed && (
-          <div className="sidebar__logo-text">SchoolFlo</div>
-        )}
+        {!collapsed && <div className="sidebar__logo-text">SchoolFlo</div>}
       </div>
 
       <nav className="sidebar__nav">

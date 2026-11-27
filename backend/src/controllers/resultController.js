@@ -1,6 +1,6 @@
-const { Result, Exam, calculateGrade } = require('../models/Exam');
+const { Result, Exam, calculateGrade, roundScore } = require('../models/Exam');
+const Class = require('../models/Class');
 const User = require('../models/User');
-const { GRADE_SCALE } = require('../config/constants');
 const { checkStudentAccess } = require('../utils/studentAccess');
 const {
   canEnterScores,
@@ -17,7 +17,10 @@ const {
 const {
   computeClassStatistics,
   generateReportCard,
+  summariseClass,
 } = require('../services/gradingService');
+const AppError = require('../utils/AppError');
+const { signatureDataUrl } = require('./schoolSettingsController');
 const { emailTemplates } = require('../services/notificationService');
 const caTrackingService = require('../services/caTrackingService');
 const { clientUrl } = require('../config/clientUrl');
@@ -34,12 +37,14 @@ const {
 } = require('../utils/scoreValidation');
 
 // Centralized calculation. Callers must pass scores that have already been
-// through validateScores() — this only computes, it does not check.
-const computeResultFields = (scores = {}) => {
+// through validateScores() — this only computes, it does not check. `level`
+// is the class's, because the primary and college scales grade the same
+// total differently.
+const computeResultFields = (scores = {}, level) => {
   const { ca1 = 0, ca2 = 0, classWork = 0, project = 0, exam = 0 } = scores;
 
-  const totalScore = ca1 + ca2 + classWork + project + exam;
-  const grading = calculateGrade(totalScore);
+  const totalScore = roundScore(ca1 + ca2 + classWork + project + exam);
+  const grading = calculateGrade(totalScore, level);
 
   return {
     scores: { ca1, ca2, classWork, project, exam },
@@ -113,7 +118,9 @@ const upsertResult = async (req, res) => {
     return sendError(res, 400, validation.errors.join(' '), validation.errors);
   }
 
-  const computed = computeResultFields(validation.scores);
+  const classLevel = (await Class.findById(classId).select('level').lean())
+    ?.level;
+  const computed = computeResultFields(validation.scores, classLevel);
 
   // Captured before the write so the audit entry can show what a score was
   // changed FROM — the question that actually gets asked when a mark is
@@ -276,9 +283,14 @@ const bulkUpsertResults = async (req, res) => {
     );
   }
 
+  // bulkWrite skips the save hook that grades a result, so the class's level
+  // is read once here and every row is graded on its scale.
+  const classLevel = (await Class.findById(classId).select('level').lean())
+    ?.level;
+
   const operations = batch.rows.map(
     ({ student, scores = {}, teacherComment }) => {
-      const computed = computeResultFields(scores);
+      const computed = computeResultFields(scores, classLevel);
 
       return {
         updateOne: {
@@ -518,7 +530,16 @@ const getReportCard = async (req, res) => {
   // instead (402). Printing goes through this same request.
   await assertResultUnlocked(req.user, studentId, term, academicYear);
 
-  const reportCard = await generateReportCard(studentId, term, academicYear);
+  // A card compares the student with their arm. Staff may ask for the whole
+  // class instead (?scope=class); a family always sees the arm, as printed.
+  const scope =
+    req.query.scope === 'class' && ['Admin', 'Teacher'].includes(req.user.role)
+      ? 'class'
+      : 'arm';
+
+  const reportCard = await generateReportCard(studentId, term, academicYear, {
+    scope,
+  });
   if (!reportCard)
     return sendError(res, 404, 'No published results found for this term');
 
@@ -526,14 +547,15 @@ const getReportCard = async (req, res) => {
     .select('firstName lastName studentProfile avatar')
     .populate('studentProfile.class', 'name level');
 
-  // The legend travels with the card. The printable component used to carry
-  // its own hardcoded copy of the ladder — "A: 70-100 (Distinction) | ..." —
-  // which meant a school adjusting GRADE_SCALE got a report card whose table
-  // and whose legend disagreed. The client cannot import backend constants,
-  // so the server sends them.
+  // The legend travels with the card (reportCard.gradeScale), on the class's
+  // own scale. The printable component used to carry a hardcoded copy of the
+  // ladder, so a school adjusting its scale got a card whose table and whose
+  // legend disagreed.
   return sendSuccess(res, 200, 'Report card fetched', {
     student,
-    gradeScale: GRADE_SCALE,
+    // The head's signature travels only inside a card, to someone allowed to
+    // see it; it has no URL of its own (see SchoolSettings).
+    signature: await signatureDataUrl(),
     ...reportCard,
   });
 };
@@ -637,7 +659,23 @@ const getStudentResultHistory = async (req, res) => {
   });
 };
 
+// @desc    A class's standings for a term: by arm, or the whole class
+// @route   GET /api/v1/results/class/:classId/summary?term=&academicYear=&section=
+// @access  Admin
+const getClassSummary = async (req, res) => {
+  const { classId } = req.params;
+  const { term, academicYear, section } = req.query;
+  if (!term || !academicYear) {
+    throw AppError.badRequest('Term and academicYear are required');
+  }
+  const summary = await summariseClass(classId, term, academicYear, {
+    section: section || undefined,
+  });
+  return sendSuccess(res, 200, 'Class summary', summary);
+};
+
 module.exports = {
+  getClassSummary,
   upsertResult,
   bulkUpsertResults,
   publishResults,

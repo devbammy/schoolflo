@@ -163,12 +163,13 @@ describe('the public configuration', () => {
     expect(res.body.data.features).toBeDefined();
   });
 
-  it('sends the one grading scale, for the score-entry pages', async () => {
-    const { GRADE_SCALE } = require('../../src/config/constants');
+  it('sends both grading scales, for the score-entry pages', async () => {
+    const { GRADE_SCALES } = require('../../src/config/constants');
 
     const res = await request(app).get('/config');
 
-    expect(res.body.data.gradeScale).toEqual(GRADE_SCALE);
+    expect(res.body.data.gradeScales).toEqual(GRADE_SCALES);
+    expect(res.body.data.gradeScales.primary[0].grade).toBe('A1');
   });
 
   it('is null rather than blank when unset', async () => {

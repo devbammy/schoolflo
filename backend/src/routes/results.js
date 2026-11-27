@@ -10,6 +10,7 @@ const {
   getReportCard,
   getClassResults,
   getStudentResultHistory,
+  getClassSummary,
 } = require('../controllers/resultController');
 const {
   upsertResultRules,
@@ -46,6 +47,15 @@ router.get(
   protect,
   validate(reportCardRules),
   getReportCard,
+);
+// A class's standings for a term, by arm or for the whole class. Above
+// '/class/:classId' so 'summary' is never read as part of that route.
+router.get(
+  '/class/:classId/summary',
+  protect,
+  authorize('Admin'),
+  validate(classIdParamRules),
+  getClassSummary,
 );
 router.get(
   '/class/:classId',

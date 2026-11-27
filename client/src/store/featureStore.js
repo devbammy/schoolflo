@@ -43,7 +43,8 @@ const fetchFeatures = (set, { force }) => {
       set({
         features: data.data.features,
         school: data.data.school || null,
-        gradeScale: data.data.gradeScale || [],
+        // Two scales, primary and college; a page picks by its class's level.
+        gradeScales: data.data.gradeScales || {},
         loaded: true,
       });
     })
@@ -65,7 +66,7 @@ const useFeatureStore = create((set) => ({
   },
   // Who this deployment is, so a school's name is set once, in its environment.
   school: null,
-  gradeScale: [],
+  gradeScales: {},
   loaded: false,
 
   /** First read, at app mount. Gates the initial render. */

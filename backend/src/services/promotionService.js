@@ -1,7 +1,8 @@
 const Promotion = require('../models/Promotion');
 const User = require('../models/User');
 const CATracker = require('../models/CATracker');
-const { Result } = require('../models/Exam');
+const { Result, passMarkFor } = require('../models/Exam');
+const Class = require('../models/Class');
 const AppError = require('../utils/AppError');
 const { assignCompetitionRanks } = require('./gradingService');
 const { ENROLLED_FILTER, recordEnrolment } = require('../utils/enrolment');
@@ -52,6 +53,14 @@ class PromotionService {
 
     const processedStudents = [];
 
+    // A subject is failed below the pass mark of the class's own scale: 40 in
+    // the primary section, 50 in the college. This was a flat 40, so a JSS
+    // student on 45 counted as passing a subject their report card graded F9.
+    const passMark = passMarkFor(
+      (await Class.findById(promotion.fromClass._id).select('level').lean())
+        ?.level,
+    );
+
     // Class positions come from one read, ranked once. This used to sit inside
     // the per-student loop, so a class of 45 ran 45 identical queries.
     const allResults = await Result.find({
@@ -101,14 +110,15 @@ class PromotionService {
             yearlyAverages.length
           : null;
 
-      // Find failed subjects (yearly average < 40). A tracker with no average
-      // yet is "not assessed", not a fail: null < 40 is true in JavaScript.
+      // Find failed subjects (yearly average below the pass mark). A tracker
+      // with no average yet is "not assessed", not a fail: null < 40 is true
+      // in JavaScript.
       const failedSubjects = trackers
         .filter(
           (t) =>
             t.subject &&
             typeof t.yearlyAverage === 'number' &&
-            t.yearlyAverage < 40,
+            t.yearlyAverage < passMark,
         )
         .map((t) => t.subject._id);
 

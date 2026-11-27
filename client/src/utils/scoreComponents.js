@@ -33,6 +33,13 @@ export const EMPTY_SCORES = Object.fromEntries(
 export const caTotal = (scores = {}) =>
   CA_COMPONENTS.reduce((sum, { key }) => sum + (scores?.[key] || 0), 0);
 
-/** Sum of every component — the score the grade is read from. */
+/**
+ * Sum of every component — the score the grade is read from. Rounded to two
+ * places: scores carry decimals (a project of 7.30), and binary floating point
+ * turns 9 + 7 + 5.3 + 7.3 + 54 into 82.60000000000001.
+ */
 export const scoreTotal = (scores = {}) =>
-  SCORE_COMPONENTS.reduce((sum, { key }) => sum + (scores?.[key] || 0), 0);
+  Math.round(
+    SCORE_COMPONENTS.reduce((sum, { key }) => sum + (scores?.[key] || 0), 0) *
+      100,
+  ) / 100;

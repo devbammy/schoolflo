@@ -3,6 +3,7 @@ import { Download, FileText, TrendingUp } from 'lucide-react';
 import { resultService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
+import { gradeColor } from '../../utils/grading';
 import ResultsLocked, {
   lockFromError,
 } from '../../components/common/ResultsLocked';
@@ -11,14 +12,6 @@ import {
   generateAcademicYearOptions,
 } from '../../utils/academicYear';
 
-const GRADE_COLORS = {
-  A: '#10B981',
-  B: '#3B82F6',
-  C: '#F59E0B',
-  D: '#F97316',
-  E: '#EF4444',
-  F: '#991B1B',
-};
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 
 export default function StudentResults() {
@@ -123,12 +116,12 @@ export default function StudentResults() {
               {
                 label: 'Average Score',
                 value: `${summary.average}%`,
-                color: GRADE_COLORS[summary.grade],
+                color: gradeColor(summary.grade),
               },
               {
                 label: 'Overall Grade',
                 value: summary.grade,
-                color: GRADE_COLORS[summary.grade],
+                color: gradeColor(summary.grade),
               },
               {
                 label: 'Class Position',
@@ -282,7 +275,7 @@ export default function StudentResults() {
                       </td>
                       <td
                         style={{
-                          color: GRADE_COLORS[r.grade],
+                          color: gradeColor(r.grade),
                           fontWeight: 500,
                           fontSize: '0.875rem',
                         }}
@@ -324,7 +317,7 @@ export default function StudentResults() {
                         textAlign: 'center',
                         fontFamily: 'var(--font-display)',
                         fontSize: '1.125rem',
-                        color: GRADE_COLORS[summary.grade],
+                        color: gradeColor(summary.grade),
                       }}
                     >
                       {summary.average}%

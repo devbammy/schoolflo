@@ -9,6 +9,7 @@ const {
   assertStudentAccess,
   scopeQueryToStudents,
 } = require('../utils/studentAccess');
+const { assertResultUnlocked } = require('../services/resultAccessService');
 const { parentsOfStudent } = require('../utils/parentLookup');
 const {
   sendEmail,
@@ -433,6 +434,22 @@ exports.downloadCertificate = async (req, res) => {
   }
   if (certificate.status === 'Revoked' && !isAdmin) {
     return sendError(res, 403, 'This certificate has been revoked.');
+  }
+
+  // A report card is a result, so it is held back exactly as the results page
+  // is: over unpaid fees, or withheld by an admin. Without this, a family the
+  // portal refused the result to could download the same scores as a PDF.
+  if (
+    certificate.certificateType === 'Report Card' &&
+    certificate.term &&
+    certificate.academicYear
+  ) {
+    await assertResultUnlocked(
+      req.user,
+      certificate.student,
+      certificate.term,
+      certificate.academicYear,
+    );
   }
 
   if (!certificate.pdfData || !certificate.pdfData.length) {

@@ -129,8 +129,9 @@ caTrackerSchema.methods.calculateTrend = function () {
   }
 };
 
-// Method to calculate yearly average
-caTrackerSchema.methods.calculateYearlyAverage = function () {
+// Method to calculate yearly average. `level` is the class's, which picks
+// the grading scale (primary or college) for the yearly grade.
+caTrackerSchema.methods.calculateYearlyAverage = function (level) {
   const validTotals = this.termRecords
     .map((r) => r.total)
     .filter((t) => t !== undefined && t !== null);
@@ -146,13 +147,13 @@ caTrackerSchema.methods.calculateYearlyAverage = function () {
     ).toFixed(2),
   );
 
-  // Assign yearly grade
-  if (this.yearlyAverage >= 70) this.yearlyGrade = 'A';
-  else if (this.yearlyAverage >= 60) this.yearlyGrade = 'B';
-  else if (this.yearlyAverage >= 50) this.yearlyGrade = 'C';
-  else if (this.yearlyAverage >= 45) this.yearlyGrade = 'D';
-  else if (this.yearlyAverage >= 40) this.yearlyGrade = 'E';
-  else this.yearlyGrade = 'F';
+  // Graded on the school's scale for the class's level. This used to be its
+  // own A–F ladder written out here, a second copy of the scale that would
+  // have printed a third grade beside the card's two.
+  // Required lazily: Exam requires nothing from here, but loading it at the top
+  // of a model file risks an order-dependent cycle as models grow.
+  const { calculateGrade } = require('./Exam');
+  this.yearlyGrade = calculateGrade(this.yearlyAverage, level).grade;
 };
 
 module.exports = mongoose.model('CATracker', caTrackerSchema);

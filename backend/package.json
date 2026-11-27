@@ -21,7 +21,9 @@
     "migrate:certificates": "node src/utils/migrateCertificatePdfs.js",
     "migrate:certificates:apply": "node src/utils/migrateCertificatePdfs.js --apply",
     "migrate:enrolments": "node src/utils/migrateEnrolments.js",
-    "migrate:enrolments:apply": "node src/utils/migrateEnrolments.js --apply"
+    "migrate:enrolments:apply": "node src/utils/migrateEnrolments.js --apply",
+    "migrate:grades": "node src/utils/regradeResults.js",
+    "migrate:grades:apply": "node src/utils/regradeResults.js --apply"
   },
   "dependencies": {
     "@agendajs/mongo-backend": "^4.0.3",

@@ -22,19 +22,33 @@ import {
 } from '../../utils/scoreComponents';
 
 import useFeatureStore from '../../store/featureStore';
-import { gradeFor, hasScoreEntry } from '../../utils/grading';
+import ClassStandings from '../../components/results/ClassStandings';
+import {
+  gradeFor,
+  hasScoreEntry,
+  scaleForLevel,
+  gradeColor,
+} from '../../utils/grading';
 
 const TERMS = ['First Term', 'Second Term', 'Third Term'];
 
 export default function ResultsAdminPage() {
-  const gradeScale = useFeatureStore((s) => s.gradeScale);
-  const gradeOf = (score) => gradeFor(score, gradeScale);
+  const gradeScales = useFeatureStore((s) => s.gradeScales);
 
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [students, setStudents] = useState([]);
   const [results, setResults] = useState([]);
   const [scores, setScores] = useState({});
+  // The grade preview uses the selected class's scale (primary or college).
+  const gradeOf = (score) =>
+    gradeFor(
+      score,
+      scaleForLevel(
+        classes.find((c) => c._id === filters.class)?.level,
+        gradeScales,
+      ),
+    );
   const [filters, setFilters] = useState({
     class: '',
     subject: '',
@@ -180,14 +194,6 @@ export default function ResultsAdminPage() {
     }
   };
 
-  const GRADE_COLORS = {
-    A: '#10B981',
-    B: '#3B82F6',
-    C: '#F59E0B',
-    D: '#F97316',
-    E: '#EF4444',
-    F: '#991B1B',
-  };
   const activeSubjects = filters.subject
     ? subjects.filter((s) => s._id === filters.subject)
     : subjects.filter((s) =>
@@ -345,11 +351,21 @@ export default function ResultsAdminPage() {
               with published results
             </span>
             <span style={{ color: 'var(--clr-text-3)' }}>
-              Caps: CA1/CA2/Mid = 10 each, Exam = 70
+              Caps: 1st CA, 2nd CA, class work and project 10 each; exam 60
             </span>
           </div>
         )}
       </div>
+
+      {/* Standings by arm or for the whole class, from published results. */}
+      {filters.class && !filters.subject && (
+        <ClassStandings
+          classId={filters.class}
+          term={filters.term}
+          academicYear={filters.academicYear}
+          sections={classes.find((c) => c._id === filters.class)?.sections || []}
+        />
+      )}
 
       {/* Score Entry / Results Table */}
       {!filters.class ? (
@@ -424,6 +440,7 @@ export default function ResultsAdminPage() {
                           <input
                             type="number"
                             min={0}
+                            step={0.01}
                             max={SCORE_CAPS[field]}
                             className="form-control"
                             style={{
@@ -603,7 +620,7 @@ export default function ResultsAdminPage() {
                           fontWeight: 700,
                           color:
                             avg !== '—'
-                              ? GRADE_COLORS[gradeOf(parseFloat(avg))]
+                              ? gradeColor(gradeOf(parseFloat(avg)))
                               : 'var(--clr-text-3)',
                         }}
                       >
@@ -664,12 +681,12 @@ export default function ResultsAdminPage() {
                 {
                   l: 'Average',
                   v: `${reportCard.summary?.average}%`,
-                  c: GRADE_COLORS[reportCard.summary?.grade],
+                  c: gradeColor(reportCard.summary?.grade),
                 },
                 {
                   l: 'Grade',
                   v: reportCard.summary?.grade,
-                  c: GRADE_COLORS[reportCard.summary?.grade],
+                  c: gradeColor(reportCard.summary?.grade),
                 },
                 {
                   l: 'Position',

@@ -12,7 +12,13 @@ class CATrackingService {
       student: studentId,
       academicYear,
       isPublished: true,
-    }).populate('subject');
+    })
+      .populate('subject')
+      .populate('class', 'level');
+
+    // The yearly grade is on the scale of the class the results were filed
+    // under (primary or college).
+    const level = results[0]?.class?.level;
 
     // Group by subject
     const subjectGroups = {};
@@ -76,7 +82,7 @@ class CATrackingService {
         tracker.termRecords = sortedTerms;
       }
 
-      tracker.calculateYearlyAverage();
+      tracker.calculateYearlyAverage(level);
       tracker.calculateTrend();
       await tracker.save();
       trackers.push(tracker);

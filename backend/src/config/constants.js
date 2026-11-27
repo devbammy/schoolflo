@@ -112,17 +112,93 @@ module.exports = {
     PARENT: 'Parent',
   },
 
-  // Nigerian grading scale — the single source of truth for grading.
-  // Change a boundary or a grade point here and every report card, GPA and
-  // transcript in the system follows.
-  GRADE_SCALE: [
-    { min: 70, max: 100, grade: 'A', remark: 'Distinction', gradePoint: 5.0 },
-    { min: 60, max: 69, grade: 'B', remark: 'Credit', gradePoint: 4.0 },
-    { min: 50, max: 59, grade: 'C', remark: 'Merit', gradePoint: 3.0 },
-    { min: 45, max: 49, grade: 'D', remark: 'Pass', gradePoint: 2.0 },
-    { min: 40, max: 44, grade: 'E', remark: 'Weak Pass', gradePoint: 1.0 },
-    { min: 0, max: 39, grade: 'F', remark: 'Fail', gradePoint: 0.0 },
-  ],
+  // The school's grading scales — the single source of truth for grading.
+  // Change a boundary or a remark here and every report card, legend, grade
+  // preview and promotion decision follows.
+  //
+  // Two scales, chosen by the class's level (gradeScaleKey below): the school
+  // grades its primary section (Pre-Nursery to Basic 5) more generously than
+  // its college (JSS 1 to SS 3), and its printed report cards carry both. The
+  // portal used to have one A–F ladder for everyone, so no report card it
+  // printed matched the school's own.
+  //
+  // Matched on `min` alone, highest band first (see calculateGrade): `max` is
+  // only what the printed key shows.
+  GRADE_SCALES: {
+    primary: [
+      { min: 80, max: 100, grade: 'A1', remark: 'Excellent', gradePoint: 5.0 },
+      {
+        min: 70,
+        max: 79.99,
+        grade: 'B2',
+        remark: 'Very Good',
+        gradePoint: 4.0,
+      },
+      { min: 65, max: 69.99, grade: 'B3', remark: 'Good', gradePoint: 3.5 },
+      { min: 60, max: 64.99, grade: 'C4', remark: 'Credit', gradePoint: 3.0 },
+      { min: 55, max: 59.99, grade: 'C5', remark: 'Credit', gradePoint: 2.5 },
+      { min: 50, max: 54.99, grade: 'C6', remark: 'Credit', gradePoint: 2.0 },
+      { min: 45, max: 49.99, grade: 'D7', remark: 'Pass', gradePoint: 1.5 },
+      { min: 40, max: 44.99, grade: 'E8', remark: 'Pass', gradePoint: 1.0 },
+      { min: 0, max: 39.99, grade: 'F9', remark: 'Fail', gradePoint: 0.0 },
+    ],
+    college: [
+      {
+        min: 90,
+        max: 100,
+        grade: 'A1',
+        remark: 'Distinction',
+        gradePoint: 5.0,
+      },
+      {
+        min: 80,
+        max: 89.99,
+        grade: 'B2',
+        remark: 'Distinction',
+        gradePoint: 4.0,
+      },
+      {
+        min: 75,
+        max: 79.99,
+        grade: 'B3',
+        remark: 'Distinction',
+        gradePoint: 3.5,
+      },
+      { min: 70, max: 74.99, grade: 'C4', remark: 'Credit', gradePoint: 3.0 },
+      { min: 65, max: 69.99, grade: 'C5', remark: 'Credit', gradePoint: 2.5 },
+      { min: 60, max: 64.99, grade: 'C6', remark: 'Credit', gradePoint: 2.0 },
+      { min: 55, max: 59.99, grade: 'D7', remark: 'Pass', gradePoint: 1.5 },
+      { min: 50, max: 54.99, grade: 'E8', remark: 'Pass', gradePoint: 1.0 },
+      { min: 0, max: 49.99, grade: 'F9', remark: 'Fail', gradePoint: 0.0 },
+    ],
+  },
+
+  // Which scale a class uses, by its level. Primary covers Pre-Nursery, the
+  // nursery classes, KG and Basic 1–5 (they are all created as 'Primary');
+  // everything else is the college.
+  gradeScaleKey: (level) => (level === 'Primary' ? 'primary' : 'college'),
+
+  // The head's comment on a report card, by the student's overall grade. The
+  // A1, B2 and C5 wordings are the school's own, from its printed cards; the
+  // rest follow them and are the school's to change here.
+  HEAD_COMMENTS: {
+    A1: 'AN EXCELLENT RESULT, KEEP IT UP',
+    B2: 'VERY GOOD RESULT, YOU CAN DO BETTER THAN THIS',
+    B3: 'GOOD RESULT, THERE IS ROOM FOR IMPROVEMENT',
+    C4: 'GOOD RESULT, THERE IS ROOM FOR IMPROVEMENT',
+    C5: 'GOOD RESULT, THERE IS ROOM FOR IMPROVEMENT',
+    C6: 'A FAIR RESULT, WORK HARDER NEXT TERM',
+    D7: 'A WEAK RESULT, YOU NEED TO PUT IN MORE EFFORT',
+    E8: 'A WEAK RESULT, YOU NEED TO PUT IN MORE EFFORT',
+    F9: 'A POOR RESULT, PLEASE SEE THE SCHOOL',
+  },
+
+  // Who signs the card: the primary section has a head teacher, the college a
+  // head of school, as on the school's printed cards.
+  HEAD_COMMENT_LABELS: {
+    primary: "HEAD TEACHER'S COMMENT/SIGN",
+    college: "HEAD OF SCHOOL'S COMMENT",
+  },
 
   // Per-component maximums that every score entry is validated against.
   // 1st CA 10 + 2nd CA 10 + Class Work 10 + Project 10 + Exam 60 = 100.

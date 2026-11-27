@@ -8,7 +8,7 @@ import {
 } from '../../services/api';
 import toast from 'react-hot-toast';
 import useFeatureStore from '../../store/featureStore';
-import { gradeFor, hasScoreEntry } from '../../utils/grading';
+import { gradeFor, scaleForLevel, hasScoreEntry } from '../../utils/grading';
 import {
   getCurrentAcademicYear,
   generateAcademicYearOptions,
@@ -86,9 +86,16 @@ export default function GradesPage() {
 
   const calcTotal = (studentId) => scoreTotal(scores[studentId]);
 
-  const gradeScale = useFeatureStore((s) => s.gradeScale);
+  // The grade preview uses the selected class's scale (primary or college).
+  const gradeScales = useFeatureStore((s) => s.gradeScales);
   const getGrade = (total) => {
-    const g = gradeFor(total, gradeScale);
+    const g = gradeFor(
+      total,
+      scaleForLevel(
+        classes.find((c) => c._id === filters.class)?.level,
+        gradeScales,
+      ),
+    );
     return { g, c: g };
   };
 
@@ -343,6 +350,7 @@ export default function GradesPage() {
                             <input
                               type="number"
                               min={0}
+                              step={0.01}
                               max={SCORE_CAPS[field]}
                               className="form-control"
                               style={{

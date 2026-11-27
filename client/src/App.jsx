@@ -23,8 +23,8 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const StudentsPage = lazy(() => import('./pages/admin/StudentsPage'));
 const TeachersPage = lazy(() => import('./pages/admin/TeachersPage'));
-const AdministratorsPage = lazy(() =>
-  import('./pages/admin/AdministratorsPage'),
+const AdministratorsPage = lazy(
+  () => import('./pages/admin/AdministratorsPage'),
 );
 const ParentsPage = lazy(() => import('./pages/admin/ParentsPage'));
 const UserProfilePage = lazy(() => import('./pages/admin/UserProfilePage'));
@@ -97,7 +97,13 @@ const ParentCertificates = lazy(
 const MyLibraryPage = lazy(() => import('./pages/shared/MyLibraryPage'));
 const CalendarViewPage = lazy(() => import('./pages/shared/CalendarViewPage'));
 const ViewResults = lazy(() => import('./pages/shared/ViewResults'));
-const PaymentVerifyPage = lazy(() => import('./pages/shared/PaymentVerifyPage'));
+const SchoolDetailsPage = lazy(() => import('./pages/admin/SchoolDetailsPage'));
+const ReportRemarksPage = lazy(
+  () => import('./pages/shared/ReportRemarksPage'),
+);
+const PaymentVerifyPage = lazy(
+  () => import('./pages/shared/PaymentVerifyPage'),
+);
 
 const PageLoader = () => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
@@ -249,6 +255,8 @@ export default function App() {
               <Route path="fees" element={<FeesPage />} />
               <Route path="payments" element={<PaymentsPage />} />
               <Route path="results" element={<ResultsAdminPage />} />
+              <Route path="school-details" element={<SchoolDetailsPage />} />
+              <Route path="report-comments" element={<ReportRemarksPage />} />
               <Route path="timetables" element={<TimetablePage />} />
               <Route path="library" element={<LibraryPage />} />
               <Route path="calendar" element={<AcademicCalendarPage />} />
@@ -281,6 +289,7 @@ export default function App() {
               <Route path="attendance" element={<AttendancePage />} />
               <Route path="assignments" element={<AssignmentsTeacherPage />} />
               <Route path="grades" element={<GradesPage />} />
+              <Route path="report-comments" element={<ReportRemarksPage />} />
               <Route path="library" element={<MyLibraryPage />} />
               <Route path="announcements" element={<AnnouncementsPage />} />
               <Route path="calendar" element={<CalendarViewPage />} />

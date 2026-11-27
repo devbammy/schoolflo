@@ -48,6 +48,8 @@ From `backend/`:
 | Repair payments | `pnpm reconcile:apply` |
 | Backfill class history (read-only) | `pnpm migrate:enrolments` |
 | Write the class history | `pnpm migrate:enrolments:apply` |
+| Regrade results on the scales (read-only) | `pnpm migrate:grades` |
+| Write the regrade | `pnpm migrate:grades:apply` |
 
 From `client/`: `pnpm dev` (`:5173`), `pnpm build`, `pnpm lint`.
 
@@ -177,17 +179,46 @@ correction as a transfer. See [Known gaps](DOCUMENTATION.md#17-known-gaps).
 
 ### Grading
 
-- `GRADE_SCALE` and `SCORE_BREAKDOWN` in `config/constants.js` are the single
+- `GRADE_SCALES` and `SCORE_BREAKDOWN` in `config/constants.js` are the single
   sources of truth. `calculateGrade`, the PDF legend and the API response all
   derive from them. **Do not write a second ladder anywhere**, especially not
   in the client — the report-card endpoint sends `gradeScale` and
   `summary.principalComment` precisely so the client never has to.
+- **There are two scales, chosen by the class's level**, never by the page:
+  `primary` (A1 from 80, F9 below 40) for `level: 'Primary'` (KG to Basic 5),
+  `college` (A1 from 90, F9 below 50) for JSS and SSS. `gradeScaleKey(level)`
+  picks; `calculateGrade(score, level)` and `passMarkFor(level)` take the
+  level. Promotion's pass mark comes from `passMarkFor` too: it was a
+  hard-coded 40, which passed a college student the college scale fails.
+  The head's comment (`HEAD_COMMENTS`) is by grade code, and its label
+  (`HEAD_COMMENT_LABELS`) by scale.
+- **A Result's grade is stored**, so changing a scale needs
+  `pnpm migrate:grades` (read-only) then `pnpm migrate:grades:apply`, which
+  regrades Results and CA trackers by their class's level.
+- **The report card compares a student with their arm** (section): position,
+  learners, highest/lowest/class average. `?scope=class` (staff only) and the
+  admin's `GET /results/class/:classId/summary` give the whole class.
+- Cumulative divides by **the terms the student actually has** and says so:
+  obtainable is 100 × those terms per subject.
+- **Behaviour ratings and the teacher's comment are `ReportRemark`**, one per
+  student per term, entered by the form teacher (`assertClassAccess`) or an
+  admin, and locked to teachers once results are published.
+- Attendance on the card: Present and Late count present; Absent and Excused
+  count absent.
+- **The certificate PDF and the on-screen card are one design** and read the
+  same `generateReportCard`. Change one, change the other
+  (`pdfService.generateReportCard`, `PrintableReportCard.jsx`).
+- **The head's signature is never on a URL.** `SchoolSettings` keeps the logo
+  and signature as bytes; the logo is public (`GET /config/logo`), the
+  signature only travels inside a card, as a data URL, to someone allowed to
+  see it. A downloaded Report Card certificate asks `assertResultUnlocked`,
+  like every other surface showing scores.
 - **Score entry saves only students with a score.** The grades pages used to
   send every student in the class and file a 0 for each blank, so a student
   who does not take an optional subject got an F in it on their report card.
   `hasScoreEntry` in `client/src/utils/grading.js` decides who is sent.
-- The grade preview while typing uses `gradeScale` from `GET /config`, never
-  a ladder written in the page. Both score-entry pages used to carry one.
+- The grade preview while typing uses `gradeScales` from `GET /config`, picked
+  by the class's level (`scaleForLevel`), never a ladder written in the page. Both score-entry pages used to carry one.
 - `bulkWrite` bypasses `pre('save')`, which is why `utils/scoreValidation.js`
   exists and why the bulk path computes fields explicitly.
 - Positions use competition ranking; averages are rounded to 2dp *before*
@@ -522,7 +553,7 @@ one shared underline read as broken.
 
 ## Testing
 
-`pnpm test` — 40 suites, 626 tests, Jest, `maxWorkers: 1`. The integration
+`pnpm test` — 43 suites, 695 tests, Jest, `maxWorkers: 1`. The integration
 suites need a MongoDB binary (`mongodb-memory-server` fetches it on first run)
 and take from about three minutes to ten on a slow machine, mostly bcrypt at
 cost 12. Tests that exercise failures log to the console by design, so judge a
@@ -576,7 +607,7 @@ Client code has **no test runner**. The check is that it lints and builds.
 
 | Looking for | Go to |
 | --- | --- |
-| Grade scale, score caps, roles, terms | `backend/src/config/constants.js` |
+| Grade scales, head comments, score caps, roles, terms | `backend/src/config/constants.js` |
 | What a student owes | `paymentService.getFeeBalances()` |
 | What the school is owed | `feeLedgerService.buildFeeLedger()` |
 | Settlement | `paymentService.settlePayment()` |
@@ -594,6 +625,10 @@ Client code has **no test runner**. The check is that it lints and builds.
 | Who may see a student's records | `utils/studentAccess.js` |
 | Which features this school runs | `config/features.js` |
 | Client's copy of the feature set | `client/src/store/featureStore.js` |
+| Report card data (arm, cumulative, attendance, remarks) | `gradingService.generateReportCard()` |
+| Report card, on screen and as PDF | `client/src/components/results/PrintableReportCard.jsx`, `pdfService.generateReportCard()` |
+| Behaviour and teacher's comment | `backend/src/models/ReportRemark.js` |
+| School address, logo, signature | `backend/src/models/SchoolSettings.js` |
 | Printable timetable grid | `client/src/components/common/PrintableTimetable.jsx` |
 | Bulk import UI | `client/src/components/common/BulkImportModal.jsx` |
 | Has this account a real mailbox? | `backend/src/utils/mailbox.js` |

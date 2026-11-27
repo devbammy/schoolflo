@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { resultService } from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
+import { gradeColor } from '../../utils/grading';
 import ResultsLocked, {
   lockFromError,
 } from '../../components/common/ResultsLocked';
@@ -33,14 +34,6 @@ export default function ParentResults() {
       .finally(() => setLoading(false));
   }, [childId, term]);
 
-  const GRADE_COLORS = {
-    A: '#10B981',
-    B: '#3B82F6',
-    C: '#F59E0B',
-    D: '#F97316',
-    E: '#EF4444',
-    F: '#991B1B',
-  };
 
   return (
     <>
@@ -137,7 +130,7 @@ export default function ParentResults() {
                     </td>
                     <td
                       style={{
-                        color: GRADE_COLORS[r.grade],
+                        color: gradeColor(r.grade),
                         fontSize: '0.875rem',
                       }}
                     >
@@ -159,7 +152,7 @@ export default function ParentResults() {
             <span style={{ fontSize: '0.875rem', color: 'var(--clr-text-3)' }}>
               Average:{' '}
               <strong
-                style={{ color: GRADE_COLORS[reportCard.summary?.grade] }}
+                style={{ color: gradeColor(reportCard.summary?.grade) }}
               >
                 {reportCard.summary?.average}%
               </strong>

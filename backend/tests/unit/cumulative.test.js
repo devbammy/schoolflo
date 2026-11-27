@@ -49,13 +49,68 @@ describe('buildSubjectCumulatives', () => {
     const [subject] = buildSubjectCumulatives(
       [row('s1', maths, 'First Term', 78), row('s1', maths, 'Second Term', 84)],
       terms,
+      'Primary',
     );
 
     expect(subject.cumulativeScore).toBe(81);
-    expect(subject.grade).toBe('A');
+    expect(subject.grade).toBe('A1');
+    expect(subject.obtainableScore).toBe(200);
+    expect(subject.obtainedScore).toBe(162);
     expect(subject.termScores).toEqual({
       'First Term': 78,
       'Second Term': 84,
+    });
+  });
+
+  // The school's own sheets: Basic 1 Second Term, Basic Science and
+  // Technology (165 of 200), and JS 1 Third Term, Agricultural Science
+  // (214.20 of 300).
+  it("reproduces the cumulative columns on the school's Second Term card", () => {
+    const [subject] = buildSubjectCumulatives(
+      [row('s1', maths, 'First Term', 86), row('s1', maths, 'Second Term', 79)],
+      terms,
+      'Primary',
+    );
+
+    expect(subject).toMatchObject({
+      obtainableScore: 200,
+      obtainedScore: 165,
+      cumulativeScore: 82.5,
+      grade: 'A1',
+    });
+  });
+
+  it("reproduces the cumulative columns on the school's Third Term card", () => {
+    const [subject] = buildSubjectCumulatives(
+      [
+        row('s1', maths, 'First Term', 70.3),
+        row('s1', maths, 'Second Term', 70.9),
+        row('s1', maths, 'Third Term', 73),
+      ],
+      ['First Term', 'Second Term', 'Third Term'],
+      'JSS',
+    );
+
+    expect(subject).toMatchObject({
+      obtainableScore: 300,
+      obtainedScore: 214.2,
+      cumulativeScore: 71.4,
+      grade: 'C4',
+    });
+  });
+
+  it('states the terms it divided by when a term is missing', () => {
+    const [subject] = buildSubjectCumulatives(
+      [row('s1', maths, 'Second Term', 70), row('s1', maths, 'Third Term', 80)],
+      ['First Term', 'Second Term', 'Third Term'],
+      'JSS',
+    );
+
+    expect(subject).toMatchObject({
+      termsCounted: 2,
+      obtainableScore: 200,
+      obtainedScore: 150,
+      cumulativeScore: 75,
     });
   });
 
@@ -129,11 +184,16 @@ describe('summariseCumulative', () => {
   ];
 
   it('averages the per-subject cumulatives, not the raw rows', () => {
-    const summary = summariseCumulative(classRows, 's1', terms).summary;
+    const summary = summariseCumulative(
+      classRows,
+      's1',
+      terms,
+      'Primary',
+    ).summary;
 
     // Maths 85, English 65 -> 75
     expect(summary.average).toBe(75);
-    expect(summary.grade).toBe('A');
+    expect(summary.grade).toBe('B2');
     expect(summary.totalSubjects).toBe(2);
   });
 
@@ -162,11 +222,16 @@ describe('summariseCumulative', () => {
   });
 
   it('weights the cumulative GPA by credit unit', () => {
-    // Maths 85 (A, 5.0, 3 credits), English 65 (B, 4.0, 2 credits)
-    // (5*3 + 4*2) / 5 = 4.6
-    const summary = summariseCumulative(classRows, 's1', terms).summary;
+    // Primary scale: Maths 85 (A1, 5.0, 3 credits), English 65 (B3, 3.5,
+    // 2 credits): (5*3 + 3.5*2) / 5 = 4.4
+    const summary = summariseCumulative(
+      classRows,
+      's1',
+      terms,
+      'Primary',
+    ).summary;
 
-    expect(summary.gpa).toBe(4.6);
+    expect(summary.gpa).toBe(4.4);
     expect(summary.totalCredits).toBe(5);
   });
 

@@ -254,6 +254,9 @@ export const examService = {
 };
 
 export const resultService = {
+  // A class's standings for a term: { term, academicYear, section? }.
+  getClassSummary: (classId, params) =>
+    api.get(`/results/class/${classId}/summary`, { params }),
   upsert: (data) => api.post('/results', data),
   bulkUpsert: (data) => api.post('/results/bulk', data),
   publish: (data) => api.post('/results/publish', data),
@@ -543,4 +546,11 @@ export const auditService = {
   getStudentHistory: (studentId) => api.get(`/audit/student/${studentId}`),
   getEntityHistory: (entity, entityId) =>
     api.get(`/audit/entity/${entity}/${entityId}`),
+};
+
+// Behaviour ratings and the teacher's comment on each report card, entered by
+// the class's form teacher.
+export const reportRemarkService = {
+  getForClass: (params) => api.get('/report-remarks', { params }),
+  save: (data) => api.put('/report-remarks', data),
 };

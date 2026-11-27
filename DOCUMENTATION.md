@@ -88,7 +88,7 @@ schoolflo/
 │   │   │   ├── env.js             # refuses to boot on a bad environment
 │   │   │   ├── features.js        # which features this school runs
 │   │   │   ├── clientUrl.js       # the one address for links
-│   │   │   └── constants.js       # roles, terms, GRADE_SCALE, score caps
+│   │   │   └── constants.js       # roles, terms, GRADE_SCALES, score caps
 │   │   ├── models/                # 25 Mongoose models in 21 files
 │   │   ├── controllers/           # 25 controllers
 │   │   ├── services/              # 14 services
@@ -130,7 +130,7 @@ schoolflo/
 │   │       ├── schoolTime.js      # school wall clock (staff attendance)
 │   │       ├── reconcilePayments.js
 │   │       └── ms.js
-│   └── tests/                     # 40 suites, 626 tests
+│   └── tests/                     # 43 suites, 695 tests
 │       ├── unit/                  # grading, validation, error handling
 │       ├── integration/           # real in-memory MongoDB
 │       └── setup/                 # one shared MongoDB, a database per suite
@@ -225,6 +225,8 @@ inconsistent.
 | Repair payments   | `pnpm reconcile:apply`     |
 | Report missing class history | `pnpm migrate:enrolments` |
 | Write class history | `pnpm migrate:enrolments:apply` |
+| Regrade results (read-only) | `pnpm migrate:grades` |
+| Write the regrade | `pnpm migrate:grades:apply` |
 | Report public certificate PDFs | `pnpm migrate:certificates` |
 | Move them into the database | `pnpm migrate:certificates:apply` |
 
@@ -411,20 +413,40 @@ Caps live in `SCORE_BREAKDOWN` (`config/constants.js`) and are enforced in two
 places that both read from it: `utils/scoreValidation.js` (every write path)
 and `validators/resultValidators.js` (the request edge).
 
-### Grading scale
+### Grading scales
 
-`GRADE_SCALE` in `config/constants.js` is the **single source of truth**. The
-report-card legend in `pdfService` is generated from it, and `calculateGrade`
-derives from it — there is no second ladder to keep in sync.
+`GRADE_SCALES` in `config/constants.js` is the **single source of truth**. It
+holds two scales, the school's own, and a class's `level` chooses between them
+(`gradeScaleKey`): **primary** for `Primary` (KG to Basic 5), **college** for
+JSS and SSS. `calculateGrade(score, level)`, the legend on both report cards,
+the client's grade preview and the promotion pass mark (`passMarkFor`) all
+derive from it.
 
-| Score  | Grade | Remark      | Grade point |
-| ------ | ----- | ----------- | ----------- |
-| 70–100 | A     | Distinction | 5.0         |
-| 60–69  | B     | Credit      | 4.0         |
-| 50–59  | C     | Merit       | 3.0         |
-| 45–49  | D     | Pass        | 2.0         |
-| 40–44  | E     | Weak Pass   | 1.0         |
-| 0–39   | F     | Fail        | 0.0         |
+| Grade | Remark | Primary | College | Grade point |
+| ----- | ------ | ------- | ------- | ----------- |
+| A1 | Excellent / Distinction | 80–100 | 90–100 | 5.0 |
+| B2 | Very Good / Distinction | 70–79.99 | 80–89.99 | 4.0 |
+| B3 | Good / Distinction | 65–69.99 | 75–79.99 | 3.5 |
+| C4 | Credit | 60–64.99 | 70–74.99 | 3.0 |
+| C5 | Credit | 55–59.99 | 65–69.99 | 2.5 |
+| C6 | Credit | 50–54.99 | 60–64.99 | 2.0 |
+| D7 | Pass | 45–49.99 | 55–59.99 | 1.5 |
+| E8 | Pass | 40–44.99 | 50–54.99 | 1.0 |
+| F9 | Fail | 0–39.99 | 0–49.99 | 0.0 |
+
+The remark is the scale's own: primary says Excellent, Very Good, Good; college
+says Distinction for all three. Bands match on `min` only, so 79.995 is never
+left between two bands.
+
+A Result stores its grade, so a scale change, or this one, needs a regrade:
+`pnpm migrate:grades` reports what would change and `pnpm migrate:grades:apply`
+writes it, for Results and CA trackers, each by its class's level. Results that
+predate the scales carry `A`–`F`; the enum still accepts them until the
+regrade has run.
+
+The head's comment is chosen by grade (`HEAD_COMMENTS`) and labelled by scale
+(`HEAD_COMMENT_LABELS`): "HEAD TEACHER'S COMMENT/SIGN" on a primary card,
+"HEAD OF SCHOOL'S COMMENT" on a college one.
 
 ### Ranking
 
@@ -438,32 +460,62 @@ noise are treated as the tie they are.
 Report cards accumulate down the session: a **Second Term** card carries First
 Term with it, and a **Third Term** card carries First and Second. First Term
 has nothing behind it, so `generateReportCard` returns `cumulative: null` there
-and every renderer omits the section.
+and every renderer leaves the columns off.
 
 ```
-subject cumulative = mean of that subject's term scores present in the window
-student cumulative = mean of that student's subject cumulatives
+obtainable  = 100 × the terms this student has a score for, in that subject
+obtained    = the sum of those scores
+cumm. score = obtained ÷ those terms        (165 / 200 → 82.5)
 ```
 
-Averaging over the terms actually present (rather than treating a missing term
-as a zero) means a subject picked up mid-session is not punished for the terms
-it was not offered in. Because the cumulative stays on a 0–100 scale, the same
-`GRADE_SCALE` bands, remarks and grade points apply to it, and cumulative
-position uses the same competition ranking as the termly position.
+Dividing by the terms the student actually has, and printing the obtainable
+that results, means a subject picked up mid-session is not punished for the
+terms it was not taken in, and the card shows what it divided by. The
+cumulative stays on 0–100, so the same scale grades it.
 
-The legend travels with the card. `GET /results/report-card/:studentId`
-returns `gradeScale` (the `GRADE_SCALE` rows) and `summary.principalComment`
-alongside the results, and `PrintableReportCard` renders both from that
-payload. It used to hold its own hardcoded copy of the ladder and its own
-comment thresholds, so a school adjusting the scale got a card whose grades
-and whose legend disagreed. The client cannot import backend constants, so the
-server sends them rather than the client guessing.
+`computeCumulative` reads only **published** results, so an unpublished term
+never leaks into a parent-facing card.
 
-`computeCumulative` (`services/gradingService.js`) reads only **published**
-results, so an unpublished term never leaks into a parent-facing card. It is
-surfaced by `GET /results/report-card/:studentId` as `cumulative`, printed as a
-second table on the PDF, and rendered in `PrintableReportCard`, `ViewResults`
-and the admin report-card modal.
+### The report card
+
+One design, from the school's own termly sheets, drawn twice from one payload:
+`PrintableReportCard.jsx` on screen and for printing, and
+`pdfService.generateReportCard` (pdfkit) for the issued "Report Card"
+certificate. Both read `gradingService.generateReportCard`, so they cannot
+disagree with each other or with the results pages.
+
+| On the card | Comes from |
+| --- | --- |
+| Position, learners, highest / lowest / class average | the student's **arm** (section); `?scope=class` gives the whole class, for staff |
+| Obtainable, obtained, average, grade | the term's published results |
+| Days present / absent | the register for the term: Present and Late are present, Absent and Excused absent |
+| Behaviour ticks, teacher's comment | `ReportRemark` |
+| Head's comment | `HEAD_COMMENTS` by the average's grade |
+| Next term begins | the academic calendar |
+| Promoted / repeat stamp | an applied promotion batch, on Third Term only |
+| Address, contacts, logo, signature | `SchoolSettings`, falling back to `SCHOOL_ADDRESS` / `SCHOOL_EMAIL` / `SCHOOL_PHONE` |
+
+The admin sees standings both ways on the Results page (`ClassStandings`, from
+`GET /results/class/:classId/summary?section=`): one arm, or the whole class.
+
+**Behaviour and comments** (`/report-remarks`, the "Behaviour & Comments"
+page): one `ReportRemark` per student per term, seven traits rated Excellent
+to Poor and a comment of up to 300 characters. Only the class's form teacher
+(`assertClassAccess`) or an admin may write them, only for students in that
+class, and a teacher may no longer change them once the term's results are
+published.
+
+**School details** (`/school-settings`, Admin; the "School Details" page):
+address, email, phones, logo and the head's signature, as bytes in MongoDB.
+The logo is public at `GET /config/logo?v=<updated>` (cached for good, since a
+new logo is a new URL). The signature never gets a URL: on one, anyone could
+lift it onto a forged document. It travels only inside a report card, as a
+data URL, to a viewer already allowed that card.
+
+A downloaded Report Card certificate is held back exactly like the results
+page (`assertResultUnlocked`): 402 over fees, 403 when withheld. Before that
+check, a family refused the results page could download the same scores as a
+PDF.
 
 ### GPA
 
@@ -819,7 +871,7 @@ Base URL: `/api/v1`. All routes require a Bearer token unless marked Public.
 | POST   | `/logout`                | Any    | Revokes this device                          |
 | POST   | `/logout-all`            | Any    | Revokes every device                         |
 
-### Results — `/results` (6 routes)
+### Results — `/results` (7 routes)
 
 | Method | Endpoint                      | Access                    |
 | ------ | ----------------------------- | ------------------------- |
@@ -827,11 +879,24 @@ Base URL: `/api/v1`. All routes require a Bearer token unless marked Public.
 | POST   | `/bulk`                       | Admin, Teacher (own subject) |
 | POST   | `/publish`                    | Admin                     |
 | GET    | `/report-card/:studentId`     | Admin, Teacher, own, own child |
+| GET    | `/class/:classId/summary`     | Admin (standings, `?section=` for one arm) |
 | GET    | `/class/:classId`             | Admin, Teacher (scoped)   |
 | GET    | `/student/:studentId/history` | Admin, Teacher, own, own child |
 
 `POST /results/bulk` validates every row first and rejects the **whole batch**
 if any row is invalid — a half-applied set of scores is worse than none.
+
+### Report remarks — `/report-remarks` and school details — `/school-settings`
+
+| Method | Endpoint | Access |
+| ------ | -------- | ------ |
+| GET | `/report-remarks?class&term&academicYear&section` | Admin, form teacher |
+| PUT | `/report-remarks` `{ class, term, academicYear, remarks[] }` | Admin, form teacher (until published) |
+| GET / PUT | `/school-settings` | Admin |
+| PUT / DELETE | `/school-settings/:image` (`logo` | `signature`, multipart `file`) | Admin |
+| GET | `/config/logo` | Public |
+
+See [§6, The report card](#the-report-card).
 
 ### Payments — `/payments` (7) and `/fees` (4)
 
@@ -1525,7 +1590,7 @@ VITE_API_URL=https://api.yourschool.ng/api/v1
 
 ```bash
 cd backend
-pnpm test              # 40 suites, 626 tests
+pnpm test              # 43 suites, 695 tests
 pnpm test:coverage
 ```
 

@@ -1,9 +1,12 @@
 const mongoose = require('mongoose');
 const {
   EXAM_TYPES,
-  GRADE_SCALE,
+  GRADE_SCALES,
+  gradeScaleKey,
   SCORE_BREAKDOWN,
 } = require('../config/constants');
+
+const GRADE_CODES = GRADE_SCALES.college.map((band) => band.grade);
 
 // ─── EXAM SESSION MODEL ─────────────────────────────────────────────────────
 const ExamSchema = new mongoose.Schema(
@@ -131,7 +134,10 @@ const ResultSchema = new mongoose.Schema(
     },
     grade: {
       type: String,
-      enum: ['A', 'B', 'C', 'D', 'E', 'F'],
+      // The school's A1–F9 codes. The old A–F letters stay valid so a result
+      // saved before the change can still be read and re-graded
+      // (scripts/regradeResults.js) instead of failing validation.
+      enum: [...GRADE_CODES, 'A', 'B', 'C', 'D', 'E', 'F'],
     },
     remark: String,
     gradePoint: Number,
@@ -153,26 +159,69 @@ const ResultSchema = new mongoose.Schema(
   },
 );
 
-// Auto-calculate total score and grade
-ResultSchema.pre('save', function (next) {
-  if (this.isModified('scores')) {
-    const { ca1, ca2, classWork, project, exam } = this.scores;
-    this.totalScore =
-      (ca1 || 0) + (ca2 || 0) + (classWork || 0) + (project || 0) + (exam || 0);
-    const grading = calculateGrade(this.totalScore);
+// Auto-calculate total score and grade. The grade depends on the class's
+// scale (primary or college), so the class's level is read here: the same 72
+// is a B2 in Basic 3 and a C4 in JSS 3.
+ResultSchema.pre('save', async function () {
+  if (this.isModified('scores') || this.isModified('class')) {
+    // The total is rebuilt only from changed score parts. A change of class
+    // alone re-grades the total the row already has: recomputing it from the
+    // parts reset a row saved with a total but no parts to 0.
+    if (this.isModified('scores')) {
+      const { ca1, ca2, classWork, project, exam } = this.scores || {};
+      this.totalScore = roundScore(
+        (ca1 || 0) +
+          (ca2 || 0) +
+          (classWork || 0) +
+          (project || 0) +
+          (exam || 0),
+      );
+    }
+    const level = await levelOfClass(this.class);
+    const grading = calculateGrade(this.totalScore, level);
     this.grade = grading.grade;
     this.remark = grading.remark;
     this.gradePoint = grading.gradePoint;
   }
-  next();
 });
 
+// Scores carry decimals (a project of 7.30), and adding them in binary
+// floating point gives 82.60000000000001. Two places is what the card prints.
+function roundScore(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+async function levelOfClass(classId) {
+  if (!classId) return undefined;
+  const Class = mongoose.model('Class');
+  const found = await Class.findById(classId).select('level').lean();
+  return found?.level;
+}
+
+/** The scale a class level uses: primary (Pre-Nursery to Basic 5) or college. */
+function gradeScaleFor(level) {
+  return GRADE_SCALES[gradeScaleKey(level)];
+}
+
 /**
- * Resolve a score to its band on the school's grading scale.
- * Reads GRADE_SCALE in config/constants.js — there is no second ladder to keep
- * in sync when the school changes its boundaries.
+ * The lowest passing score on a level's scale: anything below it is F9.
+ * Promotion counts failed subjects against it, so primary fails below 40 and
+ * the college below 50, as the school's two keys say.
  */
-function calculateGrade(score) {
+function passMarkFor(level) {
+  const scale = gradeScaleFor(level);
+  const fail = scale.find((band) => band.grade === 'F9');
+  return Math.min(...scale.filter((b) => b !== fail).map((b) => b.min));
+}
+
+/**
+ * Resolve a score to its band on the school's grading scale for that level.
+ * Reads GRADE_SCALES in config/constants.js — there is no second ladder to
+ * keep in sync when the school changes its boundaries. A level that is not
+ * given is graded on the college scale, the stricter of the two.
+ */
+function calculateGrade(score, level) {
+  const GRADE_SCALE = gradeScaleFor(level);
   const value = Number(score) || 0;
 
   // Matched on `min` alone, highest band first. The bands are written as
@@ -207,4 +256,12 @@ ResultSchema.index({ class: 1, term: 1, academicYear: 1 });
 
 const Result = mongoose.model('Result', ResultSchema);
 
-module.exports = { Exam, Result, calculateGrade };
+module.exports = {
+  Exam,
+  Result,
+  calculateGrade,
+  gradeScaleFor,
+  passMarkFor,
+  roundScore,
+  GRADE_CODES,
+};

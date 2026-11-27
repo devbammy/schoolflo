@@ -27,11 +27,8 @@ const ViewResults = () => {
   // Second and Third Term report cards carry the earlier terms with them;
   // First Term comes back null and the section is skipped.
   const [cumulative, setCumulative] = useState(null);
-  // The grading ladder and the principal's comment are computed server-side
-  // from GRADE_SCALE and travel with the card, so the printed legend can
-  // never drift from the grades in the table above it.
-  const [gradeScale, setGradeScale] = useState([]);
-  const [summary, setSummary] = useState(null);
+  // The whole report-card response, which the printable card renders as is.
+  const [card, setCard] = useState(null);
   const [loading, setLoading] = useState(false);
   // Set when the school holds the result back over unpaid fees.
   const [lock, setLock] = useState(null);
@@ -47,18 +44,6 @@ const ViewResults = () => {
           user.parentProfile?.children[0]?._id ||
           user.parentProfile?.children[0]
       : user._id;
-  }, [user, selectedChildId]);
-
-  // Determine the student object for display (handles Parent vs Student roles)
-  const displayStudent = useMemo(() => {
-    if (user.role === 'Parent') {
-      // Find the selected child from parent's children array
-      const selectedChild = user.parentProfile?.children?.find(
-        (child) => (child._id || child) === selectedChildId,
-      );
-      return selectedChild || user.parentProfile?.children?.[0];
-    }
-    return user;
   }, [user, selectedChildId]);
 
   // Initialize selected child for parents
@@ -91,12 +76,11 @@ const ViewResults = () => {
 
       setResults(response?.data?.data?.results || []);
       setCumulative(response?.data?.data?.cumulative || null);
-      setGradeScale(response?.data?.data?.gradeScale || []);
-      setSummary(response?.data?.data?.summary || null);
+      setCard(response?.data?.data || null);
     } catch (error) {
       setResults([]);
       setCumulative(null);
-      setSummary(null);
+      setCard(null);
 
       // Held back over unpaid fees: nothing to print, and the reason is shown.
       const held = lockFromError(error);
@@ -113,8 +97,7 @@ const ViewResults = () => {
       ) {
         setResults([]);
         setCumulative(null);
-        setSummary(null);
-        return;
+          return;
       }
 
       toast.error('Failed to fetch results');
@@ -346,13 +329,9 @@ const ViewResults = () => {
         ) : (
           <div className="print-section-wrapper anim-fade-in">
             <PrintableReportCard
-              student={displayStudent}
-              results={results}
+              card={card}
               term={selectedTerm}
               academicYear={selectedYear}
-              cumulative={cumulative}
-              gradeScale={gradeScale}
-              summary={summary}
             />
           </div>
         )}

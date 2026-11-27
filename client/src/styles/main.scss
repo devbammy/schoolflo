@@ -1008,6 +1008,8 @@ p {
 }
 
 // ─── Grade Badges ─────────────────────────────────────────────────────────────
+// The school's A1–F9 codes share their letter's colour; the bare letters stay
+// for results saved before the change and not yet re-graded.
 .grade {
   display: inline-flex;
   align-items: center;
@@ -1019,27 +1021,36 @@ p {
   font-size: 0.875rem;
   font-weight: 700;
 
-  &-A {
+  &-A,
+  &-A1 {
     background: #d1fae5;
     color: #065f46;
   }
-  &-B {
+  &-B,
+  &-B2,
+  &-B3 {
     background: #dbeafe;
     color: #1e40af;
   }
-  &-C {
+  &-C,
+  &-C4,
+  &-C5,
+  &-C6 {
     background: #fef3c7;
     color: #92400e;
   }
-  &-D {
+  &-D,
+  &-D7 {
     background: #ffedd5;
     color: #9a3412;
   }
-  &-E {
+  &-E,
+  &-E8 {
     background: #fce7f3;
     color: #9d174d;
   }
-  &-F {
+  &-F,
+  &-F9 {
     background: #fee2e2;
     color: #991b1b;
   }

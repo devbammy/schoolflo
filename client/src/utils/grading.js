@@ -29,3 +29,28 @@ export const gradeFor = (score, scale) => {
  */
 export const hasScoreEntry = (entry) =>
   Boolean(entry) && Object.values(entry).some((v) => v !== undefined && v !== '');
+
+/**
+ * The scale a class grades on, from the two the server sends. Primary
+ * (Pre-Nursery to Basic 5, level 'Primary') and college (JSS 1 to SS 3) grade
+ * the same total differently: 72 is B2 in Basic 3 and C4 in JSS 3. Mirrors
+ * gradeScaleKey in the backend's config/constants.js.
+ */
+export const scaleForLevel = (level, gradeScales = {}) =>
+  (level === 'Primary' ? gradeScales.primary : gradeScales.college) || [];
+
+/**
+ * A colour for a grade, by its letter: A1 and the B's read green and blue, the
+ * C's amber, D7 and E8 orange and red, F9 dark red. Codes, not boundaries, so
+ * this never needs to know a scale.
+ */
+const GRADE_TONES = {
+  A: '#10B981',
+  B: '#3B82F6',
+  C: '#F59E0B',
+  D: '#F97316',
+  E: '#EF4444',
+  F: '#991B1B',
+};
+export const gradeColor = (grade) =>
+  GRADE_TONES[String(grade || '').charAt(0)] || 'var(--clr-text-2)';
